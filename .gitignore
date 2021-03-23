@@ -1,4 +1,4 @@
-.vscode
 build
 glibc
 glibc-build
+gmem_pass/**/obj

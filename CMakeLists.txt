@@ -23,6 +23,12 @@ target_link_libraries(neptune INTERFACE
     # PrivateLoad
 )
 
+add_custom_target(neptune-pass
+    COMMAND make
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/gmem_pass
+)
+add_dependencies(neptune neptune-pass)
+
 add_executable(MallocTest MallocTest.c)
 target_link_libraries(MallocTest neptune)
 
