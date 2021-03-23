@@ -1,3 +1,4 @@
 .vscode
 build
+glibc
 glibc-build
