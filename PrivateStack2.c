@@ -6,6 +6,7 @@
 typedef void *RegSet[9];
 extern int SaveState(RegSet *regs);
 extern void RestoreState(RegSet *regs);
+static RegSet nfStack[MAX_STACK_NUM];
 
 struct StackHeader {
     RegSet MoonStack;
@@ -17,12 +18,26 @@ struct StackHeader {
 
 static struct StackHeader *globalStack;
 
-void SetStack(void *stack) {
-    globalStack = stack;
+void SetStack(int stackId, void *stack) {
+    nfStack[stackId][0] = stack;
 }
 
 void InitStack() {
     globalStack->started = 0;
+}
+
+void StackStart(int stackId, PrivateStart start) {
+    //note that this function will only be called once upon a SetStack'd stack
+    //after the private stack is set up, trampoline and vio call symmetric `StackSwitch`
+    void *stackTop = nfStack[stackId][0];
+    //rebase rsp
+    asm(
+        "movq %0, %%rsp "
+        :
+        : "rm"(stackTop)
+        :);
+    //wait to be interrupted
+    start();
 }
 
 int StackRun(PrivateStart start) {
