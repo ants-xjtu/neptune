@@ -1,5 +1,6 @@
 .text
 .globl SaveState
+# check: if we need a hidden here
 .type SaveState, @function
 
 SaveState:
@@ -8,9 +9,11 @@ SaveState:
     0    8    10   18   20   28   30   38   40     44
 */
     # rdi: RegSet *reg
-    # TODO: check if the libc version(using 2 inst.) is faster
-    leaq 8(%rsp), (%rdi) # rsp + 8 = the original rsp when SaveState is not called
-    movq (%rsp), 0x8(%rdi) # rsp is now pointing to the return address because `call SaveState`
+    leaq 8(%rsp), %rdx # rsp + 8 = the original rsp when SaveState is not called
+    movq %rdx, (%rdi)
+    # TODO: check if mov (reg), (reg) is a bad syntax
+    movq (%rsp), %rdx
+    movq %rdx, 0x8(%rdi)
     movq %rbp, 0x10(%rdi)
     movq %r12, 0x18(%rdi)
     movq %r13, 0x20(%rdi)
@@ -18,7 +21,7 @@ SaveState:
     movq %r15, 0x30(%rdi)
     movq %rbx, 0x38(%rdi)
     fnstcw 0x40(%rdi)
-    stmxscr 0x44(%rdi)
+    stmxcsr 0x44(%rdi)
     xorl %eax, %eax
     ret
 
@@ -44,3 +47,32 @@ RestoreState:
     # ret
     jmp *%rcx
 
+.globl StackSwitchAsm
+.type StackSwitchAsm, @function
+StackSwitchAsm:
+    # %rdi: src stack | %rsi: dst stack
+    leaq 8(%rsp), %rdx
+    movq %rdx, (%rdi)
+    movq (%rsp), %rdx
+    movq %rdx, 0x8(%rdi)
+    movq %rbp, 0x10(%rdi)
+    movq %r12, 0x18(%rdi)
+    movq %r13, 0x20(%rdi)
+    movq %r14, 0x28(%rdi)
+    movq %r15, 0x30(%rdi)
+    movq %rbx, 0x38(%rdi)
+    fnstcw 0x40(%rdi)
+    stmxcsr 0x44(%rdi)
+
+    movq (%rsi), %rsp
+    # movq 0x8(%rdi), %rip
+    movq 0x8(%rsi), %rcx
+    movq 0x10(%rsi), %rbp
+    movq 0x18(%rsi), %r12
+    movq 0x20(%rsi), %r13
+    movq 0x28(%rsi), %r14
+    movq 0x30(%rsi), %r15
+    movq 0x38(%rsi), %rbx
+    fldcw 0x40(%rsi)
+    ldmxcsr 0x44(%rsi)
+    jmp *%rcx

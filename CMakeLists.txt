@@ -13,14 +13,14 @@ add_library(PrivateHeap INTERFACE)
 target_link_libraries(PrivateHeap INTERFACE dlmalloc)
 
 enable_language(ASM)
-# add_library(PrivateStack PrivateStack2.c StackSwitch.S)
+add_library(PrivateStack PrivateStack2.c StackSwitch.S)
 # TODO
 # add_library(PrivateLoad PrivateLoad.c)
 
 add_library(neptune INTERFACE)
 target_link_libraries(neptune INTERFACE 
     PrivateHeap 
-    # PrivateStack
+    PrivateStack
     # PrivateLoad
 )
 
@@ -33,8 +33,8 @@ add_dependencies(neptune neptune-pass)
 add_executable(MallocTest MallocTest.c)
 target_link_libraries(MallocTest neptune)
 
-# add_executable(StackTest StackTest.c)
-# target_link_libraries(StackTest neptune)
+add_executable(StackTest StackTest.c)
+target_link_libraries(StackTest neptune)
 
 # moons name: Moon_CamelCase
 add_executable(Moon_Test moon/test.c)

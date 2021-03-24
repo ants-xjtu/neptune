@@ -20,14 +20,16 @@ void start() {
 }
 
 int main(int argc, const char *argv[]) {
-    void *s = malloc(sizeof(unsigned char) * (4 << 10));
+    int stackSize = sizeof(unsigned char) * (4 << 10);
+    void *s = malloc(stackSize);
     printf("[runtime] created 4K stack at %p\n", s);
     printf("[runtime] initialize moon stack run\n");
-    SetStack(0, s);
+    // TODO: someone says this isn't aligned to anything, we shall see
+    SetStack(0, s + stackSize - 0x10);
     StackStart(0, start);
     printf("[runtime] initialize finished\n");
     while (count < 4) {
-        printf("process packet #%d\n", count);
+        printf("[runtime] process packet #%d\n", count);
         StackSwitch(0);
     }
     return 0;
