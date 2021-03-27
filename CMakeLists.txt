@@ -38,3 +38,6 @@ target_link_libraries(StackTest neptune)
 
 # moons name: Moon_CamelCase
 add_executable(Moon_Test moon/test.c)
+
+add_executable(StackSwitchBench benchmark/StackSwitchBench.c)
+target_link_libraries(StackSwitchBench neptune)
