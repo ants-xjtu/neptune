@@ -57,3 +57,7 @@ SET(REMOVE_ORQ "-fno-stack-clash-protection")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${REMOVE_ORQ}")
 add_executable(testLibnids LoaderTest/testLibnids.c)
 target_link_libraries(testLibnids neptune)
+
+add_executable(testLibnids-nosfi LoaderTest/testLibnids-nosfi.c)
+target_link_libraries(testLibnids-nosfi neptune)
+target_link_libraries(testLibnids-nosfi /home/hypermoon/neptune-yh/binary/libnids-nosfi.so.1.25)
