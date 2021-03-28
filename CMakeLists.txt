@@ -15,13 +15,24 @@ target_link_libraries(PrivateHeap INTERFACE dlmalloc)
 enable_language(ASM)
 add_library(PrivateStack PrivateStack2.c StackSwitch.S)
 # TODO
-# add_library(PrivateLoad PrivateLoad.c)
+add_library(PrivateLoad 
+    Loader/NanoNF.h
+    Loader/NFinit.c
+    Loader/NFlink.h
+    Loader/NFmap.c
+    Loader/NFopen.c
+    Loader/NFreloc.c
+    Loader/NFsym.c
+    Loader/NFusage.c
+    Loader/NFversion.c
+)
+target_link_libraries(PrivateLoad dl)
 
 add_library(neptune INTERFACE)
 target_link_libraries(neptune INTERFACE 
     PrivateHeap 
     PrivateStack
-    # PrivateLoad
+    PrivateLoad
 )
 
 add_custom_target(neptune-pass
@@ -41,3 +52,8 @@ add_executable(Moon_Test moon/test.c)
 
 add_executable(StackSwitchBench benchmark/StackSwitchBench.c)
 target_link_libraries(StackSwitchBench neptune)
+
+SET(REMOVE_ORQ "-fno-stack-clash-protection")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${REMOVE_ORQ}")
+add_executable(testLibnids LoaderTest/testLibnids.c)
+target_link_libraries(testLibnids neptune)

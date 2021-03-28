@@ -24,6 +24,10 @@ void SetStack(int stackId, void *stack) {
     nfStack[stackId][0] = stack;
 }
 
+void SetStackPC(int stackId, void *pc) {
+    nfStack[stackId][1] = pc;
+}
+
 // void InitStack() {
 //     globalStack->started = 0;
 // }

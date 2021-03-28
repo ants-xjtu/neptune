@@ -9,6 +9,8 @@ typedef void (*PrivateStart)(void);
 // set start address of a private stack
 void SetStack(int stackId, void *stack);
 
+void SetStackPC(int stackId, void *pc);
+
 // run `start` on an empty private stack until `StackSwitch` is called
 void StackStart(int stackId, PrivateStart start);
 
@@ -19,7 +21,7 @@ void StackStart(int stackId, PrivateStart start);
 // -1 means main (runtime) stack
 void StackSwitch(int stackId);
 
-// to setup a NF at stack#0: 
+// to setup a NF at stack#0:
 // (runtime) SetStack(0, 0x4242), StackStart(0, start)
 // (nf) virtual IO -> StackSwitch(-1)
 // to process a packet along NFs at stack#0, #1 and #2
