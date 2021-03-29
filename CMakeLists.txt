@@ -53,7 +53,7 @@ add_executable(Moon_Test moon/test.c)
 add_executable(StackSwitchBench benchmark/StackSwitchBench.c)
 target_link_libraries(StackSwitchBench neptune)
 
-SET(REMOVE_ORQ "-fno-stack-clash-protection")
+SET(REMOVE_ORQ "-fno-stack-protector")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${REMOVE_ORQ}")
 add_executable(testLibnids LoaderTest/testLibnids.c)
 target_link_libraries(testLibnids neptune)
