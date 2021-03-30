@@ -7,9 +7,7 @@
 typedef void (*PrivateStart)(void);
 
 // set start address of a private stack
-void SetStack(int stackId, void *stack);
-
-void SetStackPC(int stackId, void *pc);
+void SetStack(int stackId, void *stack, size_t len);
 
 // run `start` on an empty private stack until `StackSwitch` is called
 void StackStart(int stackId, PrivateStart start);

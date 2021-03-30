@@ -200,9 +200,9 @@ void nids_run_worker()
     // int nsec_val = sec_val * 1000000000;
     // int real_time = nsec_val + te.tv_nsec - ts.tv_nsec;
     printf("Time elapsed: %d seconds, %ld nanoseconds\n", sec_val, te.tv_nsec - ts.tv_nsec);
-
+    StackSwitch(-1);
     //we can't really switch back because RegSet of main stack is not stored
-    exit(0);
+    // exit(0);
 }
 
 void start()
@@ -234,7 +234,7 @@ int main(int argc, char *argv[], char **env)
     printf("[mb] allocate heap start at: %p - %p\n", heap, heap + sizeof(uint8_t) * HEAP_SIZE);
     //after this, all memory allocation functions are intercepted to Heap version
 
-    uint64_t len = NFusage_worker("/home/hypermoon/neptune-yh/binary/libnids-nosfi.so.1.25", 0);
+    uint64_t len = NFusage_worker("/home/hypermoon/neptune-yh/binary/libnids.so.1.25", 0);
     void *lib = memalign(getpagesize(), len);
     printf("allocate lib at %p - %p\n", lib, lib + len);
     ProxyRecord records[] = {{"malloc", HeapMalloc},
@@ -245,22 +245,22 @@ int main(int argc, char *argv[], char **env)
     void *handle = NFopen("/home/hypermoon/neptune-yh/binary/libnids-nosfi.so.1.25", 0, lib, records, argc, argv, env);
 
     //setting up heap bound, otherwise no nids function would actually run
-    // uintptr_t *Heap_Lower_Bound = NFsym(handle, "_Gmem_Heap_Lower_Bound");
-    // uintptr_t *Heap_Upper_Bound = NFsym(handle, "_Gmem_Heap_Upper_Bound");
-    // uintptr_t *Stack_Lower_Bound = NFsym(handle, "_Gmem_Stack_Lower_Bound");
-    // uintptr_t *Stack_Upper_Bound = NFsym(handle, "_Gmem_Stack_Upper_Bound");
-    // uintptr_t *SO_Lower_Bound = NFsym(handle, "_Gmem_SO_Lower_Bound");
-    // uintptr_t *SO_Upper_Bound = NFsym(handle, "_Gmem_SO_Upper_Bound");
+    uintptr_t *Heap_Lower_Bound = NFsym(handle, "_Gmem_Heap_Lower_Bound");
+    uintptr_t *Heap_Upper_Bound = NFsym(handle, "_Gmem_Heap_Upper_Bound");
+    uintptr_t *Stack_Lower_Bound = NFsym(handle, "_Gmem_Stack_Lower_Bound");
+    uintptr_t *Stack_Upper_Bound = NFsym(handle, "_Gmem_Stack_Upper_Bound");
+    uintptr_t *SO_Lower_Bound = NFsym(handle, "_Gmem_SO_Lower_Bound");
+    uintptr_t *SO_Upper_Bound = NFsym(handle, "_Gmem_SO_Upper_Bound");
 
-    //*Heap_Lower_Bound = (unsigned long)lib;
-    //*Heap_Upper_Bound = (unsigned long)(0x7fffffffffff);
-    // *Heap_Lower_Bound = (unsigned long)heap;
-    // *Heap_Upper_Bound = (unsigned long)(heap + sizeof(uint8_t) * HEAP_SIZE);
-    //we are tolerate here because I only care about nids_init()
-    // *Stack_Lower_Bound = (unsigned long)(0x000000000000);
-    // *Stack_Upper_Bound = (unsigned long)(0x7fffffffffff);
-    // *SO_Lower_Bound = (unsigned long)lib;
-    // *SO_Upper_Bound = (unsigned long)lib + len;
+    *Heap_Lower_Bound = (unsigned long)lib;
+    *Heap_Upper_Bound = (unsigned long)(0x7fffffffffff);
+    *Heap_Lower_Bound = (unsigned long)heap;
+    *Heap_Upper_Bound = (unsigned long)(heap + sizeof(uint8_t) * HEAP_SIZE);
+    // we are tolerate here because I only care about nids_init()
+    *Stack_Lower_Bound = (unsigned long)(0x000000000000);
+    *Stack_Upper_Bound = (unsigned long)(0x7fffffffffff);
+    *SO_Lower_Bound = (unsigned long)lib;
+    *SO_Upper_Bound = (unsigned long)lib + len;
 
     void (*register_chksum)(struct nids_chksum_ctl *, int) = NFsym(handle, "nids_register_chksum_ctl");
     register_chksum(&temp, 1);
@@ -284,13 +284,11 @@ int main(int argc, char *argv[], char **env)
     nids_run_local = NFsym(handle, "nids_run");
     /* 注册回调函数 */
 
-    // *Stack_Lower_Bound = (unsigned long)s;
-    // *Stack_Upper_Bound = (unsigned long)(s + stackSize - 0x18);
+    *Stack_Lower_Bound = (unsigned long)s;
+    *Stack_Upper_Bound = (unsigned long)(s + stackSize - 0x18);
 
-    SetStack(0, s + stackSize - 0x18);
-    StackStart(0, start);
-    SetStackPC(0, nids_run_worker);
-    StackSwitch(0);
+    SetStack(0, s, stackSize);
+    StackStart(0, nids_run_worker);
 
     return 0;
 }
