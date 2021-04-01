@@ -1,0 +1,361 @@
+libc {
+  GLIBC_2.0 {
+    pthread_attr_destroy;
+    pthread_attr_getdetachstate;
+    pthread_attr_getinheritsched;
+    pthread_attr_getschedparam;
+    pthread_attr_getschedpolicy;
+    pthread_attr_getscope;
+    pthread_attr_init;
+    pthread_attr_setdetachstate;
+    pthread_attr_setinheritsched;
+    pthread_attr_setschedparam;
+    pthread_attr_setschedpolicy;
+    pthread_attr_setscope;
+    pthread_cond_broadcast;
+    pthread_cond_destroy;
+    pthread_cond_init;
+    pthread_cond_signal;
+    pthread_cond_timedwait;
+    pthread_cond_wait;
+    pthread_condattr_destroy;
+    pthread_condattr_init;
+    pthread_equal;
+    pthread_exit;
+    pthread_getschedparam;
+    pthread_kill;
+    pthread_mutex_destroy;
+    pthread_mutex_init;
+    pthread_mutex_lock;
+    pthread_mutex_unlock;
+    pthread_self;
+    pthread_setcancelstate;
+    pthread_setcanceltype;
+    pthread_setschedparam;
+    pthread_sigmask;
+  }
+  GLIBC_2.1 {
+    pthread_attr_init;
+  }
+  GLIBC_2.2.3 {
+    pthread_getattr_np;
+  }
+  GLIBC_2.3.2 {
+    __register_atfork;
+    pthread_cond_broadcast;
+    pthread_cond_destroy;
+    pthread_cond_init;
+    pthread_cond_signal;
+    pthread_cond_timedwait;
+    pthread_cond_wait;
+  }
+  GLIBC_2.3.3 {
+    pthread_attr_setaffinity_np;
+    pthread_getaffinity_np;
+  }
+  GLIBC_2.3.4 {
+    pthread_attr_setaffinity_np;
+  }
+  # C11 thread symbols.
+  GLIBC_2.28 {
+    thrd_current;
+    thrd_equal;
+    thrd_sleep;
+    thrd_yield;
+  }
+  GLIBC_2.32 {
+    pthread_attr_getsigmask_np;
+    pthread_attr_setaffinity_np;
+    pthread_attr_setsigmask_np;
+    pthread_getaffinity_np;
+    pthread_getattr_np;
+    pthread_sigmask;
+  }
+  GLIBC_2.34 {
+    pthread_kill;
+  }
+  GLIBC_PRIVATE {
+    __futex_abstimed_wait64;
+    __futex_abstimed_wait_cancelable64;
+    __libc_alloca_cutoff;
+    __libc_dl_error_tsd;
+    __libc_pthread_init;
+    __lll_clocklock_elision;
+    __lll_lock_elision;
+    __lll_lock_wait;
+    __lll_lock_wait_private;
+    __lll_trylock_elision;
+    __lll_unlock_elision;
+    __pthread_attr_copy;
+    __pthread_attr_destroy;
+    __pthread_attr_init;
+    __pthread_attr_setaffinity_np;
+    __pthread_attr_setsigmask_internal;
+    __pthread_cond_destroy; # Used by the C11 threads.
+    __pthread_cond_init; # Used by the C11 threads.
+    __pthread_force_elision;
+    __pthread_getattr_default_np;
+  }
+}
+
+libpthread {
+  GLIBC_2.0 {
+    _Exit;
+    _IO_flockfile;
+    _IO_ftrylockfile;
+    _IO_funlockfile;
+    __errno_location;
+    __h_errno_location;
+    __pthread_atfork;
+    __pthread_getspecific;
+    __pthread_key_create;
+    __pthread_mutex_destroy;
+    __pthread_mutex_init;
+    __pthread_mutex_lock;
+    __pthread_mutex_trylock;
+    __pthread_mutex_unlock;
+    __pthread_mutexattr_destroy;
+    __pthread_mutexattr_init;
+    __pthread_mutexattr_settype;
+    __pthread_once;
+    __pthread_setspecific;
+    _exit;
+    _pthread_cleanup_pop;
+    _pthread_cleanup_pop_restore;
+    _pthread_cleanup_push;
+    _pthread_cleanup_push_defer;
+    flockfile;
+    ftrylockfile;
+    funlockfile;
+    longjmp;
+    pthread_atfork;
+    pthread_cancel;
+    pthread_cond_broadcast;
+    pthread_cond_signal;
+    pthread_cond_timedwait;
+    pthread_cond_wait;
+    pthread_create;
+    pthread_detach;
+    pthread_exit;
+    pthread_getspecific;
+    pthread_join;
+    pthread_key_create;
+    pthread_key_delete;
+    pthread_kill_other_threads_np;
+    pthread_mutex_destroy;
+    pthread_mutex_init;
+    pthread_mutex_lock;
+    pthread_mutex_trylock;
+    pthread_mutex_unlock;
+    pthread_mutexattr_destroy;
+    pthread_mutexattr_getkind_np;
+    pthread_mutexattr_init;
+    pthread_mutexattr_setkind_np;
+    pthread_once;
+    pthread_setcancelstate;
+    pthread_setcanceltype;
+    pthread_setspecific;
+    pthread_sigmask;
+    pthread_testcancel;
+    sem_destroy;
+    sem_getvalue;
+    sem_init;
+    sem_post;
+    sem_trywait;
+    sem_wait;
+    siglongjmp;
+  }
+
+  GLIBC_2.1 {
+    pthread_attr_getguardsize;
+    pthread_attr_getstackaddr;
+    pthread_attr_getstacksize;
+    pthread_attr_setguardsize;
+    pthread_attr_setstackaddr;
+    pthread_attr_setstacksize;
+    pthread_create;
+    pthread_getconcurrency;
+    pthread_mutexattr_gettype;
+    pthread_mutexattr_settype;
+    pthread_rwlock_destroy;
+    pthread_rwlock_init;
+    pthread_rwlock_rdlock;
+    pthread_rwlock_tryrdlock;
+    pthread_rwlock_trywrlock;
+    pthread_rwlock_unlock;
+    pthread_rwlock_wrlock;
+    pthread_rwlockattr_destroy;
+    pthread_rwlockattr_getkind_np;
+    pthread_rwlockattr_getpshared;
+    pthread_rwlockattr_init;
+    pthread_rwlockattr_setkind_np;
+    pthread_rwlockattr_setpshared;
+    pthread_setconcurrency;
+    sem_destroy;
+    sem_getvalue;
+    sem_init;
+    sem_post;
+    sem_trywait;
+    sem_wait;
+  }
+
+  GLIBC_2.1.1 {
+    sem_close;
+    sem_open;
+    sem_unlink;
+  }
+
+  GLIBC_2.1.2 {
+    __libpthread_version_placeholder;
+  }
+
+  GLIBC_2.2 {
+    __pthread_rwlock_destroy;
+    __pthread_rwlock_init;
+    __pthread_rwlock_rdlock;
+    __pthread_rwlock_tryrdlock;
+    __pthread_rwlock_trywrlock;
+    __pthread_rwlock_unlock;
+    __pthread_rwlock_wrlock;
+    __res_state;
+    pthread_attr_getstack;
+    pthread_attr_setstack;
+    pthread_barrier_destroy;
+    pthread_barrier_init;
+    pthread_barrier_wait;
+    pthread_barrierattr_destroy;
+    pthread_barrierattr_init;
+    pthread_barrierattr_setpshared;
+    pthread_condattr_getpshared;
+    pthread_condattr_setpshared;
+    pthread_getcpuclockid;
+    pthread_mutex_timedlock;
+    pthread_mutexattr_getpshared;
+    pthread_mutexattr_setpshared;
+    pthread_rwlock_timedrdlock;
+    pthread_rwlock_timedwrlock;
+    pthread_spin_destroy;
+    pthread_spin_init;
+    pthread_spin_lock;
+    pthread_spin_trylock;
+    pthread_spin_unlock;
+    pthread_yield;
+    sem_timedwait;
+  }
+
+  GLIBC_2.2.3 {
+    __libpthread_version_placeholder;
+  }
+
+  GLIBC_2.2.6 {
+    __libpthread_version_placeholder;
+  }
+
+  GLIBC_2.3.2 {
+    pthread_cond_broadcast;
+    pthread_cond_init;
+    pthread_cond_signal;
+    pthread_cond_timedwait;
+    pthread_cond_wait;
+  }
+
+  GLIBC_2.3.3 {
+    __pthread_cleanup_routine;
+    __pthread_register_cancel;
+    __pthread_register_cancel_defer;
+    __pthread_unregister_cancel;
+    __pthread_unregister_cancel_restore;
+    __pthread_unwind_next;
+    pthread_attr_getaffinity_np;
+    pthread_barrierattr_getpshared;
+    pthread_condattr_getclock;
+    pthread_condattr_setclock;
+    pthread_setaffinity_np;
+    pthread_timedjoin_np;
+    pthread_tryjoin_np;
+  }
+
+  GLIBC_2.3.4 {
+    pthread_attr_getaffinity_np;
+    pthread_getaffinity_np;
+    pthread_setaffinity_np;
+    pthread_setschedprio;
+  }
+
+  GLIBC_2.4 {
+    pthread_mutex_consistent_np;
+    pthread_mutex_getprioceiling;
+    pthread_mutex_setprioceiling;
+    pthread_mutexattr_getprioceiling;
+    pthread_mutexattr_getprotocol;
+    pthread_mutexattr_getrobust_np;
+    pthread_mutexattr_setprioceiling;
+    pthread_mutexattr_setprotocol;
+    pthread_mutexattr_setrobust_np;
+  };
+
+  GLIBC_2.11 {
+    pthread_sigqueue;
+  };
+
+  GLIBC_2.12 {
+    pthread_getname_np;
+    pthread_mutex_consistent;
+    pthread_mutexattr_getrobust;
+    pthread_mutexattr_setrobust;
+    pthread_setname_np;
+  };
+
+  GLIBC_2.18 {
+    pthread_getattr_default_np;
+    pthread_setattr_default_np;
+  }
+
+  # C11 thread symbols.
+  GLIBC_2.28 {
+    call_once;
+    cnd_broadcast;
+    cnd_destroy;
+    cnd_init;
+    cnd_signal;
+    cnd_timedwait;
+    cnd_wait;
+    mtx_destroy;
+    mtx_init;
+    mtx_lock;
+    mtx_timedlock;
+    mtx_trylock;
+    mtx_unlock;
+    thrd_create;
+    thrd_detach;
+    thrd_exit;
+    thrd_join;
+    tss_create;
+    tss_delete;
+    tss_get;
+    tss_set;
+  }
+
+  GLIBC_2.30 {
+    pthread_cond_clockwait;
+    pthread_mutex_clocklock;
+    pthread_rwlock_clockrdlock;
+    pthread_rwlock_clockwrlock;
+    sem_clockwait;
+  }
+
+  GLIBC_2.31 {
+    pthread_clockjoin_np;
+  }
+
+  GLIBC_PRIVATE {
+    __libpthread_freeres;
+    __pthread_barrier_init;
+    __pthread_barrier_wait;
+    __pthread_clock_gettime;
+    __pthread_clock_settime;
+    __pthread_get_minstack;
+    __pthread_initialize_minimal;
+    __pthread_unwind;
+  }
+}
