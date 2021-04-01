@@ -100,6 +100,8 @@ CFLAGS-bench-isnan.c += -fsignaling-nans
 CFLAGS-bench-isinf.c += -fsignaling-nans
 CFLAGS-bench-isfinite.c += -fsignaling-nans
 
+CFLAGS-bench-malloc-simple2.c += -I../..
+
 ifeq (${BENCHSET},)
 bench-malloc := malloc-thread malloc-simple
 else
@@ -183,7 +185,7 @@ bench-clean:
 ifneq ($(strip ${BENCHSET}),)
 VALIDBENCHSETNAMES := bench-pthread bench-math bench-string string-benchset \
    wcsmbs-benchset stdlib-benchset stdio-common-benchset math-benchset \
-   malloc-thread malloc-simple
+   malloc-thread malloc-simple malloc-simple2
 INVALIDBENCHSETNAMES := $(filter-out ${VALIDBENCHSETNAMES},${BENCHSET})
 ifneq (${INVALIDBENCHSETNAMES},)
 $(info The following values in BENCHSET are invalid: ${INVALIDBENCHSETNAMES})
@@ -264,7 +266,7 @@ endif
 bench-link-targets = $(timing-type) $(binaries-bench) $(binaries-benchset) \
 	$(binaries-bench-malloc)
 
-$(bench-link-targets): %: %.o $(objpfx)json-lib.o \
+$(bench-link-targets): %: %.o $(objpfx)json-lib.o ../../build/libdlmalloc.a \
 	$(link-extra-libs-tests) \
   $(sort $(filter $(common-objpfx)lib%,$(link-libc))) \
   $(addprefix $(csu-objpfx),start.o) $(+preinit) $(+postinit)

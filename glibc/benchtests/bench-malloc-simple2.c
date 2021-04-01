@@ -23,6 +23,7 @@
 #include <sys/resource.h>
 #include "bench-timing.h"
 #include "json-lib.h"
+#include "PrivateMalloc.h"
 
 /* Benchmark the malloc/free performance of a varying number of blocks of a
    given size.  This enables performance tracking of the t-cache and fastbins.
@@ -55,10 +56,12 @@ do_benchmark (malloc_args *args, int **arr)
   for (int j = 0; j < iters; j++)
     {
       for (int i = 0; i < n; i++)
-	arr[i] = malloc (size);
+	// arr[i] = malloc (size);
+  arr[i] = HeapMalloc(size);
 
       for (int i = 0; i < n; i++)
-	free (arr[i]);
+	// free (arr[i]);
+  HeapFree(arr[i]);
     }
 
   TIMING_NOW (stop);
@@ -86,6 +89,10 @@ bench (unsigned long size)
 {
   size_t iters = NUM_ITERS;
   int **arr = (int**) malloc (MAX_ALLOCS * sizeof (void*));
+  size_t heap_size = MAX_ALLOCS * size * 2;
+  void *heap = malloc(heap_size);
+  SetHeap(heap, heap_size);
+  InitHeap();
 
   for (int t = 0; t < 3; t++)
     for (int i = 0; i < NUM_ALLOCS; i++)
