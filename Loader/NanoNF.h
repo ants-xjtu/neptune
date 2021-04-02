@@ -34,3 +34,4 @@ extern void *NFopen(const char *file, int mode, void *addr, const ProxyRecord *r
 extern void *NFsym(void *l, const char *s);
 extern uint64_t NFusage(void *l);
 extern uint64_t NFusage_worker(const char *name, int mode);
+extern void NFAddPreload(const char *s);

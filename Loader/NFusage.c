@@ -17,6 +17,8 @@ uint64_t dissect_and_calculate(struct NF_list *nl);
 #define ALIGN_UP(base, size) ALIGN_DOWN((base) + (size)-1, (size))
 //static const char *sys_path[2];
 static const char *sys_path[3];  //a quick fix to load the custom libpcre2 without optimization
+static const char *preloadList[MAX_PRELOAD_NUM] = {NULL};
+struct NF_link_map *preloadMap[MAX_PRELOAD_NUM];
 
 void init_system_path() {
     // sys_path[0] = "/mnt/c/Users/dyh/Downloads/pcre2-10.31/build/.libs/";
@@ -29,6 +31,19 @@ uint64_t NFusage(void *ll) {
     /* do simple math, this is filled when NFopening */
     struct NF_link_map *l = ll;
     return l->l_map_end - l->l_map_start;
+}
+
+void NFAddPreload(const char *s)
+{
+    for(int i = 0;i < MAX_PRELOAD_NUM; i++)
+    {
+        if(preloadList[i] == NULL)
+        {
+            preloadList[i] = s;
+            return;
+        }
+    }
+    fprintf(stderr, "AddPreload error: MAX_PRELOAD_NUM reached\n");
 }
 
 uint64_t NFusage_worker(const char *name, int mode) {
@@ -74,6 +89,45 @@ uint64_t NFusage_worker(const char *name, int mode) {
     while (iter != NULL) {
         total += dissect_and_calculate(iter);
         iter = iter->next;
+    }
+
+    // At this moment, an NF and its dependencies are organized as a linked list
+    // we now append preload library
+    for(int i = 0; i < MAX_PRELOAD_NUM; i++)
+    {
+        if(preloadList[i] == NULL)
+            break;
+        tail->next = calloc(sizeof(struct NF_list), 1);
+        tail = tail->next;
+        // tail is now at last preload library
+        tail->map = calloc(sizeof(struct NF_link_map), 1);
+        preloadMap[i] = tail->map;
+        int p_fd = open(preloadList[i], O_RDONLY);
+        if(p_fd == -1)
+        {
+            fprintf(stderr, "NFusage_worker error: cannot open preload library %s\n", preloadList[i]);
+            exit(-1);
+        }
+
+        // a duplicate of early half of `NFusage_worker`
+        struct filebuf p_fb;
+        p_fb.len = 0;
+        size_t p_retlen = read(p_fd, p_fb.buf, sizeof(p_fb.buf) - p_fb.len);
+        Elf64_Ehdr *p_ehdr = (Elf64_Ehdr *)p_fb.buf;
+        Elf64_Addr p_maplength = p_ehdr->e_phnum * sizeof(Elf64_Phdr);
+        tail->fd = p_fd;
+        char *p_real_name = strdup(preloadList[i]);  //don't forget to free it when destroying a link_map!
+        tail->map->l_name = p_real_name;
+        tail->map->l_phnum = p_ehdr->e_phnum;
+        tail->map->l_phlen = p_maplength;
+        tail->map->l_phoff = p_ehdr->e_phoff;
+        tail->map->l_shoff = p_ehdr->e_shoff;
+        tail->map->l_shstr = p_ehdr->e_shstrndx;
+
+        // the reason why I call d_a_c on tail is that in our situation, preload libraries should 
+        // be stand-alone, or depend on libc at most. Otherwise, we will be appending non-preload
+        // libraries here. The result is undefined.
+        total += dissect_and_calculate(tail);
     }
 
     return total;
