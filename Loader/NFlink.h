@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <sys/types.h>
 
+#define MAX_PRELOAD_NUM 8
+
 struct NF_link_map
 {
     uint64_t l_addr; //the base address of a so
@@ -72,5 +74,8 @@ struct NF_list
 };
 
 extern struct NF_list *head, *tail;
+extern void *libc_handle;
+// WARNING: make sure you clear this list when you finish mapping a so
+extern struct NF_link_map *preloadMap[MAX_PRELOAD_NUM];
 
 #endif

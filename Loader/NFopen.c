@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <dlfcn.h>
+#include <string.h>
 
 #include "NanoNF.h"
 
@@ -33,22 +35,27 @@ extern void map_deps(struct NF_link_map *l);
 extern void NFversion(struct NF_link_map *l);
 extern void NFinit(struct NF_link_map *l, int argc, char *argv[], char **env);
 
-struct NFopen_args {
+void *libc_handle;
+
+struct NFopen_args
+{
     /* parameters */
     const char *file;
     int mode;
     void *addr;
 
     /* return value */
-    void *new;  //point to the base address of the new link map
+    void *new; //point to the base address of the new link map
     int argc;
     char **argv;
     char **env;
 };
 
-void call_init(struct NF_link_map *l, int argc, char *argv[], char **env) {
+void call_init(struct NF_link_map *l, int argc, char *argv[], char **env)
+{
     int i = 0;
-    while (l->l_search_list[i] != l) {
+    while (l->l_search_list[i] != l)
+    {
         if (l->l_search_list[i]->l_init == 0)
             call_init(l->l_search_list[i], argc, argv, env);
         i++;
@@ -61,13 +68,15 @@ void call_init(struct NF_link_map *l, int argc, char *argv[], char **env) {
  * some internal dlopen might call worker directly, e.g. -ldl also dynamically loaded the lib
  * but dlerror cannot be used in this case
  */
-static void NFopen_worker(void *a, const ProxyRecord *records) {
+static void NFopen_worker(void *a, const ProxyRecord *records)
+{
     struct NFopen_args *args = a;
     const char *file = args->file;
     int mode = args->mode;
     void *addr = args->addr;
 
-    if (head == NULL) {
+    if (head == NULL)
+    {
         printf("Fatal error: NFusage not called before NFopen!\n");
         //maybe directly exit here?
         exit(1);
@@ -78,9 +87,10 @@ static void NFopen_worker(void *a, const ProxyRecord *records) {
 
     /* the mapping of dependencies is now controled by the list, so no need for map_deps */
     struct NF_list *tmp = head->next;
-    Elf64_Addr next_addr = (Elf64_Addr) new->l_addr + head->len;  //use l_addr instead of addr in case of 0
+    Elf64_Addr next_addr = (Elf64_Addr) new->l_addr + head->len; //use l_addr instead of addr in case of 0
 
-    while (tmp) {
+    while (tmp)
+    {
         //add interactive querying for address here
         int tmp_mode;
         //printf("shared library:%s needs an open mode:", tmp->map->l_name);
@@ -121,14 +131,22 @@ static void NFopen_worker(void *a, const ProxyRecord *records) {
     }
     */
 
+    // libc is still an indispensable part in my implementation
+    // for the sake of overhead, we only open it once
+    libc_handle = dlopen("libc.so.6", RTLD_LAZY);
+
     tmp = head;
     tmp->map->l_prev = NULL;
-    while (tmp) {
+    while (tmp)
+    {
         NFreloc(tmp->map, records);
-        if (tmp->next) {
+        if (tmp->next)
+        {
             tmp->map->l_next = tmp->next->map;
             tmp->next->map->l_prev = tmp->map;
-        } else {
+        }
+        else
+        {
             tmp->map->l_next = NULL;
         }
 
@@ -137,15 +155,18 @@ static void NFopen_worker(void *a, const ProxyRecord *records) {
 
     //call_init(head->map, args->argc, args->argv, args->env);
 
-    /* destroy the list */
+    /* do some fini job during this call to NFopen */
     tmp = head;
     struct NF_list *late;
-    while (tmp) {
+    while (tmp)
+    {
         close(tmp->fd);
         late = tmp;
         tmp = tmp->next;
         free(late);
     }
+    //make sure to zero out the preloadMap
+    memset(preloadMap, 0, sizeof(struct NF_link_map *) * MAX_PRELOAD_NUM);
 
     //NFreloc(new);
 }
@@ -154,7 +175,8 @@ static void NFopen_worker(void *a, const ProxyRecord *records) {
  * so it's better got passed to every func on call chain
  */
 
-void *NFopen(const char *file, int mode, void *addr, const ProxyRecord *records, int argc, char *argv[], char **env) {
+void *NFopen(const char *file, int mode, void *addr, const ProxyRecord *records, int argc, char *argv[], char **env)
+{
     /* no need for a __NFopen because no static link would be used */
 
     /* TODO: do some mode checking before actual job */
@@ -168,5 +190,5 @@ void *NFopen(const char *file, int mode, void *addr, const ProxyRecord *records,
 
     NFopen_worker(&a, records);
 
-    return a.new;  //the base address of the link_map
+    return a.new; //the base address of the link_map
 }

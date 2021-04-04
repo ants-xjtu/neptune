@@ -258,11 +258,11 @@ int main(int argc, char *argv[], char **env)
     //nids_register_chksum_ctl(&temp, 1);
     /*这段是相关与计算校验和的，比较新的网卡驱动会自动计算校验和，我们要做的就是把它关掉*/
     struct nids_prm *nids_params = NFsym(handle, "nids_params");
-    nids_params->filename = "/home/toney/Pcap/huawei_tcp.pcap";
+    nids_params->filename = "/dev/shm/huawei_tcp.pcap";
     // nids_params.device = "all";
     int (*nids_init)(void) = NFsym(handle, "nids_init");
     char *nids_errbuf = NFsym(handle, "nids_errbuf");
-    //WARNING: THIS FUNCTION REFER TO MAIN STACK VARIABLES!!! FIXME
+
     if (!nids_init()) /* Libnids初始化 */
     {
         printf("Error：%s\n", nids_errbuf);
