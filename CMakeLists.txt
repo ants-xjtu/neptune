@@ -38,7 +38,7 @@ target_link_libraries(neptune INTERFACE
 
 add_custom_target(neptune-pass
     COMMAND make
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/gmem_pass
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/gmem
 )
 add_dependencies(neptune neptune-pass)
 
@@ -54,13 +54,13 @@ target_link_libraries(LoaderTest neptune)
 # moons name: Moon_CamelCase
 add_executable(Moon_Test moon/test.c)
 
-add_executable(StackSwitchBench benchmark/StackSwitchBench.c)
+add_executable(StackSwitchBench StackSwitchBench.c)
 target_link_libraries(StackSwitchBench neptune)
 
-add_executable(Moon_Libnids moon/testLibnids.c)
-# target_compile_options(Moon_Libnids PRIVATE -fno-stack-protector)
-target_link_libraries(Moon_Libnids neptune)
+# add_executable(Moon_Libnids moon/testLibnids.c)
+# # target_compile_options(Moon_Libnids PRIVATE -fno-stack-protector)
+# target_link_libraries(Moon_Libnids neptune)
 
-add_executable(Moon_Libnids-nosfi moon/testLibnids-nosfi.c)
-# target_compile_options(Moon_Libnids-nosfi PRIVATE -fno-stack-protector)
-target_link_libraries(Moon_Libnids-nosfi neptune)
+# add_executable(Moon_Libnids-nosfi moon/testLibnids-nosfi.c)
+# # target_compile_options(Moon_Libnids-nosfi PRIVATE -fno-stack-protector)
+# target_link_libraries(Moon_Libnids-nosfi neptune)

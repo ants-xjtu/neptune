@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#include "../PrivateStack.h"
+#include "PrivateStack.h"
 
 int count = 0;
 
