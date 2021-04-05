@@ -14,7 +14,6 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../Loader/NanoNF.h"
 #include "../PrivateHeap.h"
 #include "../PrivateStack.h"
 
@@ -184,13 +183,10 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
     return;
 }
 
-void (*nids_run_local)();
-
 void nids_run_worker()
 {
     struct timespec ts = {0, 0}, te = {0, 0};
-    clock_gettime(CLOCK_REALTIME, &ts);
-    nids_run_local();
+    nids_run();
     /* Libnids进入循环捕获数据包状态 */
     clock_gettime(CLOCK_REALTIME, &te);
     // I really have no idea why this gives a SIGFPE...
@@ -200,86 +196,25 @@ void nids_run_worker()
     // int nsec_val = sec_val * 1000000000;
     // int real_time = nsec_val + te.tv_nsec - ts.tv_nsec;
     printf("Time elapsed: %d seconds, %ld nanoseconds\n", sec_val, te.tv_nsec - ts.tv_nsec);
-    StackSwitch(-1);
 }
 
 int main(int argc, char *argv[], char **env)
 {
-    // printf("the address of argc is %p, argv is %p, env is %p\n", &argc, &argv, &env);
-    //the approach of early adjust the stack is probably bad...
-    int stackSize = sizeof(unsigned char) * (1 << 18);
-    //change stack size from 4<<10 to 1<<17, for there is a 65535 long array on stack...
-    void *s = malloc(stackSize);
-    printf("allocate stack at %p - %p\n", s, s + stackSize);
-
-    /* SetStack(0, s + stackSize - 0x10);
-    StackSwitch(0); */
-
     struct nids_chksum_ctl temp;
     temp.netaddr = 0;
     temp.mask = 0;
     temp.action = 1;
-#define HEAP_SIZE (1 << 24)
-    void *heap = malloc(sizeof(uint8_t) * HEAP_SIZE);
-    SetHeap(heap, HEAP_SIZE);
-    InitHeap();
-    printf("[mb] allocate heap start at: %p - %p\n", heap, heap + sizeof(uint8_t) * HEAP_SIZE);
-    //after this, all memory allocation functions are intercepted to Heap version
 
-    uint64_t len = NFusage_worker("/home/hypermoon/neptune-yh/binary/libnids.so.1.25", 0);
-    void *lib = memalign(getpagesize(), len);
-    printf("allocate lib at %p - %p\n", lib, lib + len);
-    ProxyRecord records[] = {{"malloc", HeapMalloc},
-                             {"free", HeapFree},
-                             {"realloc", HeapRealloc},
-                             {"calloc", HeapCalloc},
-                             NULL};
-    void *handle = NFopen("/home/hypermoon/neptune-yh/binary/libnids.so.1.25", 0, lib, records, argc, argv, env);
-
-    //setting up heap bound, otherwise no nids function would actually run
-    uintptr_t *Heap_Lower_Bound = NFsym(handle, "_Gmem_Heap_Lower_Bound");
-    uintptr_t *Heap_Upper_Bound = NFsym(handle, "_Gmem_Heap_Upper_Bound");
-    uintptr_t *Stack_Lower_Bound = NFsym(handle, "_Gmem_Stack_Lower_Bound");
-    uintptr_t *Stack_Upper_Bound = NFsym(handle, "_Gmem_Stack_Upper_Bound");
-    uintptr_t *SO_Lower_Bound = NFsym(handle, "_Gmem_SO_Lower_Bound");
-    uintptr_t *SO_Upper_Bound = NFsym(handle, "_Gmem_SO_Upper_Bound");
-
-    *Heap_Lower_Bound = (unsigned long)heap;
-    *Heap_Upper_Bound = (unsigned long)(heap + sizeof(uint8_t) * HEAP_SIZE);
-    // we are tolerate here because I only care about nids_run()
-    *Stack_Lower_Bound = (unsigned long)(0x000000000000);
-    *Stack_Upper_Bound = (unsigned long)(0x7fffffffffff);
-    *SO_Lower_Bound = (unsigned long)lib;
-    *SO_Upper_Bound = (unsigned long)lib + len;
-
-    void (*register_chksum)(struct nids_chksum_ctl *, int) = NFsym(handle, "nids_register_chksum_ctl");
-    register_chksum(&temp, 1);
-
-    //nids_register_chksum_ctl(&temp, 1);
+    nids_register_chksum_ctl(&temp, 1);
     /*这段是相关与计算校验和的，比较新的网卡驱动会自动计算校验和，我们要做的就是把它关掉*/
-    struct nids_prm *nids_params = NFsym(handle, "nids_params");
-    nids_params->filename = "/dev/shm/huawei_tcp.pcap";
+    nids_params.filename = "/dev/shm/huawei_tcp.pcap";
     // nids_params.device = "all";
-    int (*nids_init)(void) = NFsym(handle, "nids_init");
-    char *nids_errbuf = NFsym(handle, "nids_errbuf");
-
     if (!nids_init()) /* Libnids初始化 */
     {
         printf("Error：%s\n", nids_errbuf);
         exit(1);
     }
-    void (*nids_register_tcp)(void *) = NFsym(handle, "nids_register_tcp");
     nids_register_tcp((void *)tcp_protocol_callback);
-
-    nids_run_local = NFsym(handle, "nids_run");
-    /* 注册回调函数 */
-
-    *Stack_Lower_Bound = (unsigned long)s;
-    // have a bit more tolerance here
-    *Stack_Upper_Bound = (unsigned long)(s + stackSize);
-
-    SetStack(0, s, stackSize);
-    StackStart(0, nids_run_worker);
-
+    nids_run_worker();
     return 0;
 }

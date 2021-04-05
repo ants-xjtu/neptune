@@ -1,4 +1,5 @@
 build
 glibc-build
-gmem_pass/**/obj
-binary/
+gmem/**/obj
+*.bc
+*.o

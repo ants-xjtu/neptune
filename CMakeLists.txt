@@ -14,19 +14,20 @@ target_link_libraries(PrivateHeap INTERFACE dlmalloc)
 
 enable_language(ASM)
 add_library(PrivateStack PrivateStack2.c StackSwitch.S)
-# TODO
+
 add_library(PrivateLoad 
-    Loader/NanoNF.h
-    Loader/NFinit.c
-    Loader/NFlink.h
-    Loader/NFmap.c
-    Loader/NFopen.c
-    Loader/NFreloc.c
-    Loader/NFsym.c
-    Loader/NFusage.c
-    Loader/NFversion.c
+    loader/NanoNF.h
+    loader/NFinit.c
+    loader/NFlink.h
+    loader/NFmap.c
+    loader/NFopen.c
+    loader/NFreloc.c
+    loader/NFsym.c
+    loader/NFusage.c
+    loader/NFversion.c
+    PrivateLoad.c
 )
-target_link_libraries(PrivateLoad dl)
+target_link_libraries(PrivateLoad ${CMAKE_DL_LIBS})
 
 add_library(neptune INTERFACE)
 target_link_libraries(neptune INTERFACE 
@@ -46,6 +47,9 @@ target_link_libraries(MallocTest neptune)
 
 add_executable(StackTest StackTest.c)
 target_link_libraries(StackTest neptune)
+
+add_executable(LoaderTest LoaderTest.c)
+target_link_libraries(LoaderTest neptune)
 
 # moons name: Moon_CamelCase
 add_executable(Moon_Test moon/test.c)
