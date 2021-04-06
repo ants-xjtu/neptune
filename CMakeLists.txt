@@ -36,9 +36,11 @@ target_link_libraries(neptune INTERFACE
     PrivateLoad
 )
 
+set(GMEM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gmem)
+
 add_custom_target(neptune-pass
     COMMAND make
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/gmem
+    WORKING_DIRECTORY ${GMEM_DIR}
 )
 add_dependencies(neptune neptune-pass)
 
@@ -48,15 +50,68 @@ target_link_libraries(MallocTest neptune)
 add_executable(StackTest StackTest.c)
 target_link_libraries(StackTest neptune)
 
-add_executable(LoaderTest LoaderTest.c)
-target_link_libraries(LoaderTest neptune)
-
-# moons name: Moon_CamelCase
-add_executable(Moon_Test moon/test.c)
-
 add_executable(StackSwitchBench StackSwitchBench.c)
 target_link_libraries(StackSwitchBench neptune)
 
+add_executable(LoaderTest LoaderTest.c)
+target_link_libraries(LoaderTest neptune)
+
+execute_process(
+    COMMAND pkg-config --libs libdpdk
+    OUTPUT_VARIABLE DPDK_LINK_OPTIONS
+)
+separate_arguments(DPDK_LINK_OPTIONS UNIX_COMMAND)
+list(APPEND DPDK_LINK_OPTIONS -lpcap)
+
+function(add_moon)
+    set(MOON_NAME ${ARGV0})
+    set(SOURCE ${ARGV1})
+    set(BITCODE_OBJECTS ${ARGV})
+    list(REMOVE_AT BITCODE_OBJECTS 0 1)
+
+    set(LINK_BYTECODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-link.bc)
+    set(OPT_BYTECODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-opt.bc)
+    set(OBJ_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}.o)
+    if(MOON_NAME MATCHES "NoSFI$")
+        set(OPT_COMMAND "cp ${LINK_BYTECODE_FILE} ${OPT_BYTECODE_FILE}")
+    else()
+        set(OPT_COMMAND opt-10 
+            -O3 -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
+            -Gmem-rw=w
+            -Gmem-check-method=ifelseall
+            -Gmem-verify-external-call-args=false
+            -Gmem-whitelist-section=safe_functions
+            < ${LINK_BYTECODE_FILE}
+            > ${OPT_BYTECODE_FILE}
+        )
+    endif()
+
+    message("add moon " ${MOON_NAME} "(" ${SOURCE} ") + " ${BITCODE_OBJECTS})
+    add_custom_command(OUTPUT ${OBJ_FILE}
+        DEPENDS neptune-pass
+        COMMAND clang-10 -fPIC -emit-llvm -c -o ${CMAKE_BINARY_DIR}/${MOON_NAME}-source.bc ${SOURCE}
+        COMMAND llvm-link-10 ${CMAKE_BINARY_DIR}/${MOON_NAME}-source.bc ${GMEM_DIR}/obj/Auxiliary.o ${BITCODE_OBJECTS} > ${LINK_BYTECODE_FILE}
+        COMMAND ${OPT_COMMAND}
+        COMMAND clang-10 -c -fPIC ${OPT_BYTECODE_FILE} -o ${OBJ_FILE}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_executable(${MOON_NAME} ${OBJ_FILE})
+    set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
+    target_link_options(${MOON_NAME} PUBLIC ${DPDK_LINK_OPTIONS})
+endfunction(add_moon)
+
+
+# moons name: Moon_CamelCase
+add_moon(Moon_Test moon/test.c)
+
+add_moon(Moon_Libnids moon/testLibnids.c moon/libnids/src/NIDS-link_pic.bc)
+add_custom_target(libnids
+    COMMAND make NIDS-link_pic.bc
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/libnids/src
+)
+add_dependencies(Moon_Libnids libnids)
+target_link_libraries(Moon_Libnids gthread-2.0 nsl glib-2.0 net)
+target_link_options(Moon_Libnids PUBLIC -pthread)
 # add_executable(Moon_Libnids moon/testLibnids.c)
 # # target_compile_options(Moon_Libnids PRIVATE -fno-stack-protector)
 # target_link_libraries(Moon_Libnids neptune)

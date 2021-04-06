@@ -3,6 +3,7 @@
  * 2. suppress printf
 */
 
+#define _GNU_SOURCE
 #include <libnet.h>
 #include <malloc.h>
 #include <nids.h>
