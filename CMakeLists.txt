@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 project(neptune)
 
+# neptune targets
 add_library(dlmalloc dlmalloc.c)
 target_compile_definitions(dlmalloc PUBLIC 
     USE_DL_PREFIX
@@ -58,11 +59,16 @@ target_link_libraries(LoaderTest neptune)
 
 execute_process(
     COMMAND pkg-config --libs libdpdk
-    OUTPUT_VARIABLE DPDK_LINK_OPTIONS
+    OUTPUT_VARIABLE MOON_LINK_OPTIONS
 )
-separate_arguments(DPDK_LINK_OPTIONS UNIX_COMMAND)
-list(APPEND DPDK_LINK_OPTIONS -lpcap)
+separate_arguments(MOON_LINK_OPTIONS UNIX_COMMAND)
+list(APPEND MOON_LINK_OPTIONS -lpcap)
 
+add_executable(RunMoon RunMoon.c)
+target_link_libraries(RunMoon neptune)
+target_link_options(RunMoon PUBLIC ${MOON_LINK_OPTIONS})
+
+# MOON targets
 function(add_moon)
     set(MOON_NAME ${ARGV0})
     set(SOURCE ${ARGV1})
@@ -73,7 +79,7 @@ function(add_moon)
     set(OPT_BYTECODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-opt.bc)
     set(OBJ_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}.o)
     if(MOON_NAME MATCHES "NoSFI$")
-        set(OPT_COMMAND "cp ${LINK_BYTECODE_FILE} ${OPT_BYTECODE_FILE}")
+        set(OPT_COMMAND cp ${LINK_BYTECODE_FILE} ${OPT_BYTECODE_FILE})
     else()
         set(OPT_COMMAND opt-10 
             -O3 -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
@@ -97,12 +103,12 @@ function(add_moon)
     )
     add_executable(${MOON_NAME} ${OBJ_FILE})
     set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
-    target_link_options(${MOON_NAME} PUBLIC ${DPDK_LINK_OPTIONS})
+    target_link_options(${MOON_NAME} PUBLIC ${MOON_LINK_OPTIONS})
 endfunction(add_moon)
-
 
 # moons name: Moon_CamelCase
 add_moon(Moon_Test moon/test.c)
+add_moon(Moon_TestNoSFI moon/test.c)
 
 add_moon(Moon_Libnids moon/testLibnids.c moon/libnids/src/NIDS-link_pic.bc)
 add_custom_target(libnids
@@ -112,10 +118,3 @@ add_custom_target(libnids
 add_dependencies(Moon_Libnids libnids)
 target_link_libraries(Moon_Libnids gthread-2.0 nsl glib-2.0 net)
 target_link_options(Moon_Libnids PUBLIC -pthread)
-# add_executable(Moon_Libnids moon/testLibnids.c)
-# # target_compile_options(Moon_Libnids PRIVATE -fno-stack-protector)
-# target_link_libraries(Moon_Libnids neptune)
-
-# add_executable(Moon_Libnids-nosfi moon/testLibnids-nosfi.c)
-# # target_compile_options(Moon_Libnids-nosfi PRIVATE -fno-stack-protector)
-# target_link_libraries(Moon_Libnids-nosfi neptune)

@@ -36,13 +36,15 @@
 }; */
 
 /* struct to store PT_LOAD info */
-struct loadcmd {
+struct loadcmd
+{
     Elf64_Addr mapstart, mapend, dataend, allocend;
     Elf64_Off mapoff;
     int prot; /* PROT_* bits.  */
 };
 
-static void fill_info(struct NF_link_map *l) {
+static void fill_info(struct NF_link_map *l)
+{
     /* this function fill the l_info member of the link map
      * Also, it is implemented under the logic of trying not to include unnecessary info, like link_map itself
      * 
@@ -52,7 +54,8 @@ static void fill_info(struct NF_link_map *l) {
     Elf64_Dyn *dyn = l->l_ld;
     Elf64_Dyn **info = l->l_info;
 
-    while (dyn->d_tag != DT_NULL) {
+    while (dyn->d_tag != DT_NULL)
+    {
         if ((Elf64_Xword)dyn->d_tag < DT_NUM)
             info[dyn->d_tag] = dyn;
         else if ((Elf64_Xword)dyn->d_tag == DT_RELACOUNT)
@@ -73,7 +76,8 @@ static void fill_info(struct NF_link_map *l) {
     }
 /* at this time, the link map is loaded. So dynamic sections using ptr should be rebased here */
 #define rebase(tag)                             \
-    do {                                        \
+    do                                          \
+    {                                           \
         if (info[tag])                          \
             info[tag]->d_un.d_ptr += l->l_addr; \
     } while (0)
@@ -81,13 +85,14 @@ static void fill_info(struct NF_link_map *l) {
     rebase(DT_STRTAB);
     rebase(DT_RELA);
     rebase(DT_JMPREL);
-    rebase(35);  //DT_GNU_HASH
-    rebase(36);  //DT_VERSYM is an index to all symbols
-    rebase(37);  //DT_VERNEED is a place to store all the version needed
-    rebase(38);  //DT_VERDEF is ... definitions
+    rebase(35); //DT_GNU_HASH
+    rebase(36); //DT_VERSYM is an index to all symbols
+    rebase(37); //DT_VERNEED is a place to store all the version needed
+    rebase(38); //DT_VERDEF is ... definitions
 }
 
-static void setup_hash(struct NF_link_map *l) {
+static void setup_hash(struct NF_link_map *l)
+{
     /* it would be impossible if we don't use hash table when searching
         So I set up the hash table here 
         Currently only support gnu hash */
@@ -124,24 +129,29 @@ static void map_segments(struct NF_link_map *l, void *addr, struct loadcmd *load
     struct loadcmd *c = loadcmds;
     /* I'm not doing this because addr is specified */
     //l->l_map_start = (Elf64_Addr) mmap(addr, maplength, c->prot, MAP_COPY|MAP_FILE, fd, c->mapoff);
-    if (nloadcmds < 2) {
-        printf("Wrong type of shared object or ELF: LOAD segment less than 2\n");
+    if (nloadcmds < 2)
+    {
+        printf("Wrong type of file %s: LOAD segment less than 2\n", l->l_name);
         exit(-1);
     }
 
     void *tmp;
-    if (addr) {
+    if (addr)
+    {
         //mmap(addr, maplength, c->prot, MAP_COPY|MAP_FILE|MAP_FIXED, fd, c->mapoff);
         //pread(fd, addr, maplength, c->mapoff);
         int stat = mprotect(addr, maplength, c->prot | PROT_WRITE);
         //this violate the original protection, which is bad...
         //but we are always legal to write on a heap
-        if (stat) {
+        if (stat)
+        {
             printf("error when calling mprotect, and the error code is %d\n", errno);
             exit(-1);
         }
         l->l_map_start = (Elf64_Addr)addr;
-    } else {
+    }
+    else
+    {
         //tmp = mmap(addr, maplength, c->prot, MAP_COPY|MAP_FILE, fd, c->mapoff);
         //l->l_map_start = (Elf64_Addr)tmp; //deal with addr when it is 0
         printf("please map the so in a malloc'd region\n");
@@ -152,7 +162,8 @@ static void map_segments(struct NF_link_map *l, void *addr, struct loadcmd *load
     l->l_addr = l->l_map_start - c->mapstart;
     //mmap(addr, maplength, c->prot, MAP_COPY|MAP_FILE|MAP_FIXED, fd, c->mapoff);
 
-    if (has_holes) {
+    if (has_holes)
+    {
         /* This is bad because it assume only the first LOAD contains executable pages
          * While in fact it is not
          */
@@ -164,15 +175,17 @@ static void map_segments(struct NF_link_map *l, void *addr, struct loadcmd *load
                  PROT_NONE);
     }
 
-    while (c < &loadcmds[nloadcmds]) {
+    while (c < &loadcmds[nloadcmds])
+    {
         //mmap((void *) (l->l_addr + c->mapstart), c->mapend - c->mapstart, c->prot,
         //    MAP_FILE|MAP_COPY|MAP_FIXED,
         //    fd, c->mapoff);
-        if (pread(fd, (void *)(l->l_addr + c->mapstart), c->mapend - c->mapstart, c->mapoff) < 0) {
+        if (pread(fd, (void *)(l->l_addr + c->mapstart), c->mapend - c->mapstart, c->mapoff) < 0)
+        {
             printf("error when reading library %s, and the errno is %d", l->l_name, errno);
             exit(-1);
         }
-        mprotect((void *)(l->l_addr + c->mapstart), c->mapend - c->mapstart, c->prot | PROT_WRITE);  //may have issues
+        mprotect((void *)(l->l_addr + c->mapstart), c->mapend - c->mapstart, c->prot | PROT_WRITE); //may have issues
 
         if (l->l_phdr == 0 &&
             l->l_phoff >= c->mapoff &&
@@ -182,7 +195,8 @@ static void map_segments(struct NF_link_map *l, void *addr, struct loadcmd *load
             l->l_phdr = (void *)(uintptr_t)(c->mapstart + l->l_phoff - c->mapoff);
 
         /* only .bss will cause this */
-        if (c->allocend > c->dataend) {
+        if (c->allocend > c->dataend)
+        {
             // Elf64_Addr zero, zeroend, zeropage;
             // zero = l->l_addr + c->dataend; //where zero should start
             // zeroend = l->l_addr + c->allocend;
@@ -217,7 +231,8 @@ static void map_segments(struct NF_link_map *l, void *addr, struct loadcmd *load
 
 /* load an NF_link_map specified by nl->map */
 //struct NF_link_map *NF_map(const char *file, int mode, void *addr)
-struct NF_link_map *NF_map(struct NF_list *nl, int mode, void *addr) {
+struct NF_link_map *NF_map(struct NF_list *nl, int mode, void *addr)
+{
     //int fd;
 
     /* TODO: actually serach directories here */
@@ -264,44 +279,47 @@ struct NF_link_map *NF_map(struct NF_list *nl, int mode, void *addr) {
 
     Elf64_Phdr *ph;
     /* travese the segments! */
-    for (ph = phdr; ph < &phdr[l->l_phnum]; ++ph) {
-        switch (ph->p_type) {
-            case PT_LOAD: {
-                /* load and add it to loadcmds */
-                struct loadcmd *c = &loadcmds[nloadcmds++];  //get the current loaction in loadcmds
-                /* TODO: pagesize are set to 4096 for simplicity */
-                c->mapstart = ALIGN_DOWN(ph->p_vaddr, 4096);
-                c->mapend = ALIGN_UP(ph->p_vaddr + ph->p_filesz, 4096);
-                c->dataend = ph->p_vaddr + ph->p_filesz;
-                c->allocend = ph->p_vaddr + ph->p_memsz;
-                c->mapoff = ALIGN_DOWN(ph->p_offset, 4096);
+    for (ph = phdr; ph < &phdr[l->l_phnum]; ++ph)
+    {
+        switch (ph->p_type)
+        {
+        case PT_LOAD:
+        {
+            /* load and add it to loadcmds */
+            struct loadcmd *c = &loadcmds[nloadcmds++]; //get the current loaction in loadcmds
+            /* TODO: pagesize are set to 4096 for simplicity */
+            c->mapstart = ALIGN_DOWN(ph->p_vaddr, 4096);
+            c->mapend = ALIGN_UP(ph->p_vaddr + ph->p_filesz, 4096);
+            c->dataend = ph->p_vaddr + ph->p_filesz;
+            c->allocend = ph->p_vaddr + ph->p_memsz;
+            c->mapoff = ALIGN_DOWN(ph->p_offset, 4096);
 
-                /* hey ELF, is it your last segment? */
-                if (nloadcmds > 1 && c[-1].mapend != c->mapstart)
-                    has_holes = true;
+            /* hey ELF, is it your last segment? */
+            if (nloadcmds > 1 && c[-1].mapend != c->mapstart)
+                has_holes = true;
 
-                /* setting the protection of this segment. may have errors */
-                c->prot = 0;
-                c->prot |= (ph->p_flags & PF_R) >> 2;
-                c->prot |= ph->p_flags & PF_W;
-                c->prot |= (ph->p_flags & PF_X) << 2;
+            /* setting the protection of this segment. may have errors */
+            c->prot = 0;
+            c->prot |= (ph->p_flags & PF_R) >> 2;
+            c->prot |= ph->p_flags & PF_W;
+            c->prot |= (ph->p_flags & PF_X) << 2;
 
-                break;
-            }
-            case PT_PHDR:
-                /* the PHT itself, usually the first one */
-                /* or it may not exist at all, in which case it says "use ld.so to find it in a LOAD segment" */
-                l->l_phdr = (void *)ph->p_vaddr;
-                break;
+            break;
+        }
+        case PT_PHDR:
+            /* the PHT itself, usually the first one */
+            /* or it may not exist at all, in which case it says "use ld.so to find it in a LOAD segment" */
+            l->l_phdr = (void *)ph->p_vaddr;
+            break;
 
-            case PT_DYNAMIC:
-                /* the dynamic section */
-                l->l_ld = (void *)ph->p_vaddr;
-                l->l_ldnum = ph->p_memsz / sizeof(Elf64_Dyn);
-                break;
+        case PT_DYNAMIC:
+            /* the dynamic section */
+            l->l_ld = (void *)ph->p_vaddr;
+            l->l_ldnum = ph->p_memsz / sizeof(Elf64_Dyn);
+            break;
 
-            default:
-                break;
+        default:
+            break;
         }
     }
 
