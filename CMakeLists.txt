@@ -68,6 +68,9 @@ add_executable(RunMoon RunMoon.c)
 target_link_libraries(RunMoon neptune)
 target_link_options(RunMoon PUBLIC ${MOON_LINK_OPTIONS})
 
+# TianGou
+add_library(TianGou SHARED TianGou.c)
+
 # MOON targets
 function(add_moon)
     set(MOON_NAME ${ARGV0})
@@ -101,7 +104,7 @@ function(add_moon)
         COMMAND clang-10 -c -fPIC ${OPT_BYTECODE_FILE} -o ${OBJ_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
-    add_executable(${MOON_NAME} ${OBJ_FILE})
+    add_library(${MOON_NAME} SHARED ${OBJ_FILE})
     set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
     target_link_options(${MOON_NAME} PUBLIC ${MOON_LINK_OPTIONS})
 endfunction(add_moon)

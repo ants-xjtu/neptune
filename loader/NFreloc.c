@@ -103,7 +103,7 @@ static int lookup_linkmap(struct NF_link_map *l, const char *name, struct rela_r
     {
         void *handle = dlopen("libc.so.6", RTLD_LAZY);
         void *res;
-        if (res = dlsym(handle, name))
+        if ((res = dlsym(handle, name)))
         {
             result->addr = (Elf64_Addr)res;
             return 1;
