@@ -7,7 +7,7 @@ void InitLoader(int argc, char *argv[], char *envp[]);
 
 // Globally add preload library
 // the library will be treated as appearing in the front of dependence list of all loaded libraries
-void PreloadLibrary(const char *file);
+void PreloadLibrary(void *handle);
 
 struct PrivateLibrary
 {

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <dlfcn.h>
 
 #include "PrivateHeap.h"
 #include "PrivateStack.h"
@@ -29,8 +30,17 @@ int main(int argc, char *argv[], char *envp[])
     InitLoader(argc, argv, envp);
 
     printf("loading tiangou library %s\n", tiangouPath);
-    PreloadLibrary(tiangouPath);
-    //
+    void *tiangou = dlopen(tiangouPath, RTLD_LAZY);
+    Interface *interface = dlsym(tiangou, "interface");
+    printf("injecting interface functions at %p\n", interface);
+    interface->malloc = HeapMalloc;
+    printf("interface->malloc = %p\n", interface->malloc);
+    interface->realloc = HeapRealloc;
+    interface->calloc = HeapCalloc;
+    interface->free = HeapFree;
+    printf("configure preloading for tiangou\n");
+    PreloadLibrary(tiangou);
+    printf("%s\n", DONE_STRING);
 
     printf("allocating memory for MOON %s\n", moonPath);
     void *arena = aligned_alloc(sysconf(_SC_PAGESIZE), MOON_SIZE);
@@ -81,4 +91,5 @@ void initMoon()
     char *argv[0];
     printf("[initMoon] calling moonStart\n");
     moonStart(0, argv);
+    StackSwitch(-1);
 }

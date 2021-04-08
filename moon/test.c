@@ -10,6 +10,7 @@ int main(int argc, const char *argv[])
         "3. create libtiangou.so, implement malloc APIs with PrivateHeap in it\n"
         "4. create demo executable for runtime, use PrivateLoad to load this MOON with libtiangou.so preloaded\n"
         "5. verify the following malloc is hijacked\n");
-    void *_p = malloc(sizeof(unsigned char) * 64);
+    void *p = malloc(sizeof(unsigned char) * 64);
+    printf("[Moon_Test] p = %p\n", p);
     return 0;
 }

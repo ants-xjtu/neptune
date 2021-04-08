@@ -15,9 +15,9 @@ void InitLoader(int argc, char *argv[], char *envp[])
     loaderEnvp = envp;
 }
 
-void PreloadLibrary(const char *file)
+void PreloadLibrary(void *handle)
 {
-    NFAddPreload(file);
+    NFAddHandle(handle);
 }
 
 void LoadLibrary(struct PrivateLibrary *library)
