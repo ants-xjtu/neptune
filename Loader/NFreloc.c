@@ -99,13 +99,17 @@ static int lookup_linkmap(struct NF_link_map *l, const char *name, struct rela_r
     }
 
     // this is used until moon.so comes into being
-    if (strcmp(l->l_name, "libc.so.6") == 0) {
+    if (strcmp(l->l_name, "libc.so.6") == 0)
+    {
         void *handle = dlopen("libc.so.6", RTLD_LAZY);
         void *res;
-        if (res = dlsym(handle, name)) {
+        if (res = dlsym(handle, name))
+        {
             result->addr = (Elf64_Addr)res;
             return 1;
-        } else {
+        }
+        else
+        {
             return 0;
         }
     }
@@ -227,17 +231,17 @@ static void do_reloc(struct NF_link_map *l, struct uniReloc *ur, const ProxyReco
         // 1. NF_link_map of preload_list objects
         // 2. libc, or other complicated shared object this program fail to load
         // 3. the dependencies of this shared object
-        
+
         // we query a extern array called `preloadMap`, which is filled at NFusage.c
         int preloaded = 0;
-        for(int i = 0; i < MAX_PRELOAD_NUM; i++)
+        for (int i = 0; i < MAX_PRELOAD_NUM; i++)
         {
-            if(preloadMap[i] != NULL)
+            if (preloadMap[i] != NULL)
             {
                 struct rela_result result;
-                if(lookup_linkmap(preloadMap[i], real_name, &result, records))
+                if (lookup_linkmap(preloadMap[i], real_name, &result, records))
                 {
-                    *(Elf64_Addr *)dest = result.addr + it -> r_addend;
+                    *(Elf64_Addr *)dest = result.addr + it->r_addend;
                     preloaded = 1;
                     break;
                 }
@@ -245,7 +249,27 @@ static void do_reloc(struct NF_link_map *l, struct uniReloc *ur, const ProxyReco
             else
                 break;
         }
-        if(preloaded)
+        if (preloaded)
+            continue;
+
+        // note that TianGou is not actually a preloaded object in Qcloud's design
+        // but he decide to keep the interface for future use
+        for (int i = 0; i < MAX_PRELOAD_NUM; i++)
+        {
+            if (preloadHandle[i] != NULL)
+            {
+                void *fetched = dlsym(preloadHandle[i], real_name);
+                if (fetched)
+                {
+                    *(Elf64_Addr *)dest = (Elf64_Addr)fetched + it->r_addend;
+                    preloaded = 1;
+                    break;
+                }
+            }
+            else
+                break;
+        }
+        if (preloaded)
             continue;
 
         // note that this implementation is perfectly correct yet currently suppressed
