@@ -43,8 +43,8 @@ struct NF_link_map
 
     const char **l_runpath;             //user-specified custom search path
     struct NF_link_map **l_search_list; //a list of direct reference of this object
-    Elf64_Word l_verdef[45]; //store the hash of all the defined versions
-    Elf64_Word l_verneed[40]; //store the hash of all the needed versions
+    Elf64_Word l_verdef[45];            //store the hash of all the defined versions
+    Elf64_Word l_verneed[40];           //store the hash of all the needed versions
     //TODO: most of so do not have to include a DT_VERDEF, so lots of space is wasted. FIXME
     //also 45 is just an arbitrary number because libstdc++ define 41 of them
     int l_init;
@@ -77,5 +77,6 @@ extern struct NF_list *head, *tail;
 extern void *libc_handle;
 // WARNING: make sure you clear this list when you finish mapping a so
 extern struct NF_link_map *preloadMap[MAX_PRELOAD_NUM];
+extern void *preloadHandle[MAX_PRELOAD_NUM];
 
 #endif

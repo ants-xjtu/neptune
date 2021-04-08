@@ -35,3 +35,4 @@ void *NFsym(void *l, const char *s);
 uint64_t NFusage(void *l);
 uint64_t NFusage_worker(const char *name, int mode);
 void NFAddPreload(const char *s);
+void NFAddHandle(void *handle);

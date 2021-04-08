@@ -252,6 +252,26 @@ static void do_reloc(struct NF_link_map *l, struct uniReloc *ur, const ProxyReco
         if (preloaded)
             continue;
 
+        // note that TianGou is not actually a preloaded object in Qcloud's design
+        // but he decide to keep the interface for future use
+        for (int i = 0; i < MAX_PRELOAD_NUM; i++)
+        {
+            if (preloadHandle[i] != NULL)
+            {
+                void *fetched = dlsym(preloadHandle[i], real_name);
+                if (fetched)
+                {
+                    *(Elf64_Addr *)dest = (Elf64_Addr)fetched + it->r_addend;
+                    preloaded = 1;
+                    break;
+                }
+            }
+            else
+                break;
+        }
+        if (preloaded)
+            continue;
+
         // note that this implementation is perfectly correct yet currently suppressed
         // this is because we don't actuallt have a libc intercepter
 

@@ -19,6 +19,20 @@ uint64_t dissect_and_calculate(struct NF_list *nl);
 static const char *sys_path[3]; //a quick fix to load the custom libpcre2 without optimization
 static const char *preloadList[MAX_PRELOAD_NUM] = {NULL};
 struct NF_link_map *preloadMap[MAX_PRELOAD_NUM];
+void *preloadHandle[MAX_PRELOAD_NUM] = {NULL}; // TODO: check if we need to remove some of it...
+
+void NFAddHandle(void *handle)
+{
+    for (int i = 0; i < MAX_PRELOAD_NUM; i++)
+    {
+        if (preloadHandle[i] == NULL)
+        {
+            preloadHandle[i] = handle;
+            return;
+        }
+    }
+    fprintf(stderr, "AddHandle error: MAX_PRELOAD_NUM reached\n");
+}
 
 void init_system_path()
 {
@@ -177,8 +191,7 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
     {
         if (ph->p_type == PT_LOAD)
         {
-            //TODO: better method to catch the first time later
-            if (mapstart == -1)
+            if (mapstart < 0)
                 mapstart = ALIGN_DOWN(ph->p_vaddr, 4096);
             mapend = ph->p_vaddr + ph->p_memsz;
         }
@@ -237,10 +250,8 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
         {
             //neededcnt = 0; //neededcnt is DT_NEEDED-wise
             Elf64_Addr offset = dyn->d_un.d_val;
-            char *filename = malloc(128); //store the filename for each dependency
-            // XXX: same reason as above, please fix later
-            // _c = pread(nl->fd, filename, 128, str->d_un.d_ptr + offset); //change from 64 to 128 because the prefix is long
-            _c = pread(nl->fd, filename, 128, str->d_un.d_ptr + offset - mapstart);
+            char *filename = malloc(128);                                //store the filename for each dependency
+            _c = pread(nl->fd, filename, 128, str->d_un.d_ptr + offset); //change from 64 to 128 because the prefix is long
             struct NF_list *tmp = head;
             int found = 0;
             while (tmp != NULL)

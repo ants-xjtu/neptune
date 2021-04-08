@@ -15,8 +15,6 @@ const size_t MOON_SIZE = 32ul << 30;  // 32GB
 const int MOON_ID = 0;
 const char *DONE_STRING = "\xe2\x86\x91 done";
 
-// uintptr_t gmemLowRegionLow, gmemLowRegionHigh, gmemHighRegionLow, gmemHighRegionHigh;
-
 int (*moonStart)(int argc, char *argv[]);
 void initMoon();
 
