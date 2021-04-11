@@ -57,16 +57,12 @@ target_link_libraries(StackSwitchBench neptune)
 add_executable(LoaderTest LoaderTest.c)
 target_link_libraries(LoaderTest neptune)
 
-execute_process(
-    COMMAND pkg-config --libs libdpdk
-    OUTPUT_VARIABLE MOON_LINK_OPTIONS
-)
-separate_arguments(MOON_LINK_OPTIONS UNIX_COMMAND)
-list(APPEND MOON_LINK_OPTIONS -lpcap)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(DPDK REQUIRED IMPORTED_TARGET libdpdk)
 
 add_executable(RunMoon RunMoon.c)
-target_link_libraries(RunMoon neptune)
-target_link_options(RunMoon PUBLIC ${MOON_LINK_OPTIONS})
+target_link_libraries(RunMoon neptune PkgConfig::DPDK pcap)
+target_link_options(RunMoon PUBLIC -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)
 
 # TianGou
 add_library(TianGou SHARED TianGou.c)
@@ -106,7 +102,7 @@ function(add_moon)
     )
     add_library(${MOON_NAME} SHARED ${OBJ_FILE})
     set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
-    target_link_options(${MOON_NAME} PUBLIC ${MOON_LINK_OPTIONS})
+    target_link_libraries(${MOON_NAME} PkgConfig::DPDK pcap)
 endfunction(add_moon)
 
 # moons name: Moon_CamelCase
