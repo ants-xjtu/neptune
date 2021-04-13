@@ -150,7 +150,8 @@ struct l2fwd_port_statistics
 } __rte_cache_aligned;
 struct l2fwd_port_statistics port_statistics;
 
-struct rte_eth_dev_tx_buffer *txBuffer;
+// Qcloud: though we are playing with only 2 ports, we need to give both of them txbuffer
+struct rte_eth_dev_tx_buffer *txBuffer[2];
 Interface *interface;
 uint16_t srcPort, dstPort;
 
@@ -262,22 +263,29 @@ int main(int argc, char *argv[], char *envp[])
             rte_exit(EXIT_FAILURE, "rte_eth_tx_queue_setup:err=%d, port=%u\n",
                      ret, portid);
 
-        txBuffer = rte_zmalloc_socket("tx_buffer",
-                                      RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST), 0,
-                                      rte_eth_dev_socket_id(portid));
-        if (txBuffer == NULL)
+        txBuffer[portid] = rte_zmalloc_socket("tx_buffer",
+                                              RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST), 0,
+                                              rte_eth_dev_socket_id(portid));
+        if (txBuffer[portid] == NULL)
             rte_exit(EXIT_FAILURE, "Cannot allocate buffer for tx on port %u\n",
                      portid);
 
-        rte_eth_tx_buffer_init(txBuffer, MAX_PKT_BURST);
+        rte_eth_tx_buffer_init(txBuffer[portid], MAX_PKT_BURST);
 
-        ret = rte_eth_tx_buffer_set_err_callback(txBuffer,
+        ret = rte_eth_tx_buffer_set_err_callback(txBuffer[portid],
                                                  rte_eth_tx_buffer_count_callback,
                                                  &port_statistics.dropped);
         if (ret < 0)
             rte_exit(EXIT_FAILURE,
                      "Cannot set error callback for tx buffer on port %u\n",
                      portid);
+
+        // This is the function left out by sgdxbc. Is it intentional?
+        ret = rte_eth_dev_set_ptypes(portid, RTE_PTYPE_UNKNOWN, NULL,
+                                     0);
+        if (ret < 0)
+            printf("Port %u, Failed to disable Ptype parsing\n",
+                   portid);
 
         ret = rte_eth_dev_start(portid);
         if (ret < 0)
@@ -434,7 +442,7 @@ void l2fwd_main_loop(void)
         if (unlikely(diff_tsc > drain_tsc))
         {
             portid = dstPort;
-            buffer = txBuffer;
+            buffer = txBuffer[portid];
 
             sent = rte_eth_tx_buffer_flush(portid, 0, buffer);
             if (sent)
@@ -473,5 +481,13 @@ void l2fwd_main_loop(void)
         port_statistics.rx += nb_rx;
         interface->burstSize = nb_rx;
         StackSwitch(MOON_ID);
+        for (i = 0; i < nb_rx; i++)
+        {
+            struct rte_mbuf *m = interface->packetBurst[i];
+            rte_prefetch0(rte_pktmbuf_mtod(m, void *));
+            sent = rte_eth_tx_buffer(dstPort, 0, txBuffer[dstPort], m);
+            if (sent)
+                port_statistics.tx += sent;
+        }
     }
 }
