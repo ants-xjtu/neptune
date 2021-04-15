@@ -93,7 +93,7 @@ function(add_moon)
 
     message("add moon " ${MOON_NAME} "(" ${SOURCE} ") + " ${BITCODE_OBJECTS})
     add_custom_command(OUTPUT ${OBJ_FILE}
-        DEPENDS neptune-pass
+        DEPENDS neptune-pass ${SOURCE}
         COMMAND clang-10 -fPIC -emit-llvm -c -o ${CMAKE_BINARY_DIR}/${MOON_NAME}-source.bc ${SOURCE}
         COMMAND llvm-link-10 ${CMAKE_BINARY_DIR}/${MOON_NAME}-source.bc ${GMEM_DIR}/obj/Auxiliary.o ${BITCODE_OBJECTS} > ${LINK_BYTECODE_FILE}
         COMMAND ${OPT_COMMAND}

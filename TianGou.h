@@ -19,6 +19,8 @@ typedef struct
 
     struct rte_mbuf *packetBurst[MAX_PKT_BURST];
     int burstSize;
+
+    uintptr_t *packetRegionLow, *packetRegionHigh;
 } Interface;
 
 typedef void (*pcap_handler)(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes);

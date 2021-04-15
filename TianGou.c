@@ -32,6 +32,8 @@ void *calloc(size_t size, size_t count)
     GET_MACRO(_0, ##__VA_ARGS__, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE1, MESSAGE0) \
     (__VA_ARGS__)
 
+const char *DONE_STRING = "\xe2\x86\x91 done";
+
 int pcap_setfilter(pcap_t *p, struct bpf_program *fp)
 {
     MESSAGE();
@@ -80,8 +82,13 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             header.len = rte_pktmbuf_pkt_len(interface.packetBurst[i]);
             header.caplen = rte_pktmbuf_data_len(interface.packetBurst[i]);
             memset(&header.ts, 0x0, sizeof(header.ts)); // todo
-            // printf("[tiangou] calling MOON\n");
-            callback(user, &header, rte_pktmbuf_mtod(interface.packetBurst[i], uint8_t *));
+            uintptr_t *packet = rte_pktmbuf_mtod(interface.packetBurst[i], uintptr_t *);
+            *interface.packetRegionLow = (uintptr_t)packet;
+            *interface.packetRegionHigh = *interface.packetRegionLow + header.caplen;
+            MESSAGE("arena region:\t%#lx ..< %#lx", *interface.packetRegionLow, *interface.packetRegionHigh);
+            MESSAGE("start user callback at %p", callback);
+            callback(user, &header, (u_char *)packet);
+            MESSAGE("%s", DONE_STRING);
         }
     }
     return 0;

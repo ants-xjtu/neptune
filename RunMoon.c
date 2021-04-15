@@ -366,11 +366,26 @@ int main(int argc, char *argv[], char *envp[])
     uintptr_t *gmemLowRegionHigh = LibraryFind(&library, "gmemLowRegionHigh");
     uintptr_t *gmemHighRegionLow = LibraryFind(&library, "gmemHighRegionLow");
     uintptr_t *gmemHighRegionHigh = LibraryFind(&library, "gmemHighRegionHigh");
-    *gmemLowRegionLow = *gmemLowRegionHigh = 0;
-    *gmemHighRegionLow = (uintptr_t)arena;
-    *gmemHighRegionHigh = *gmemHighRegionLow + MOON_SIZE;
-    printf("low region:\t%#lx - %#lx\n", *gmemLowRegionLow, *gmemLowRegionHigh);
-    printf("high region:\t%#lx - %#lx\n", *gmemHighRegionLow, *gmemHighRegionHigh);
+    uintptr_t *arenaRegionLow, *arenaRegionHigh;
+    if (arena > pktmbufPool->pool_data)
+    {
+        arenaRegionLow = gmemHighRegionLow;
+        arenaRegionHigh = gmemHighRegionHigh;
+        interface->packetRegionLow = gmemLowRegionLow;
+        interface->packetRegionHigh = gmemLowRegionHigh;
+        printf("low: packet, high: arena\n");
+    }
+    else
+    {
+        arenaRegionLow = gmemLowRegionLow;
+        arenaRegionHigh = gmemLowRegionHigh;
+        interface->packetRegionLow = gmemHighRegionLow;
+        interface->packetRegionHigh = gmemHighRegionHigh;
+        printf("low: arena, high: packet\n");
+    }
+    *arenaRegionLow = (uintptr_t)arena;
+    *arenaRegionHigh = *arenaRegionLow + MOON_SIZE;
+    printf("arena region:\t%#lx ..< %#lx\n", *arenaRegionLow, *arenaRegionHigh);
 
     moonStart = LibraryFind(&library, "main");
     printf("entering MOON for initial running, start = %p\n", moonStart);

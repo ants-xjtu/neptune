@@ -218,5 +218,6 @@ int main(int argc, char *argv[], char **env)
     }
     nids_register_tcp((void *)tcp_protocol_callback);
     nids_run_worker();
+
     return 0;
 }
