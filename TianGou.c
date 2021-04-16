@@ -85,10 +85,10 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             uintptr_t *packet = rte_pktmbuf_mtod(interface.packetBurst[i], uintptr_t *);
             *interface.packetRegionLow = (uintptr_t)packet;
             *interface.packetRegionHigh = *interface.packetRegionLow + header.caplen;
-            MESSAGE("arena region:\t%#lx ..< %#lx", *interface.packetRegionLow, *interface.packetRegionHigh);
-            MESSAGE("start user callback at %p", callback);
+            // MESSAGE("arena region:\t%#lx ..< %#lx", *interface.packetRegionLow, *interface.packetRegionHigh);
+            // MESSAGE("start user callback at %p", callback);
             callback(user, &header, (u_char *)packet);
-            MESSAGE("%s", DONE_STRING);
+            // MESSAGE("%s", DONE_STRING);
         }
     }
     return 0;

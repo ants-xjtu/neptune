@@ -48,7 +48,9 @@
 const size_t STACK_SIZE = 32ul << 20; // 32MB
 const size_t MOON_SIZE = 32ul << 30;  // 32GB
 // Heap size = MOON_SIZE - STACK_SIZE - library.length
-const int MOON_ID = 0;
+
+// we are doing a chain, so no static moon
+// const int MOON_ID = 0;
 const char *DONE_STRING = "\xe2\x86\x91 done";
 #define RTE_TEST_RX_DESC_DEFAULT 1024
 #define RTE_TEST_TX_DESC_DEFAULT 1024
@@ -59,6 +61,8 @@ int (*moonStart)(int argc, char *argv[]);
 void initMoon();
 static volatile bool force_quit;
 void l2fwd_main_loop(void);
+void LoadMoon(char *, struct rte_mempool *, int);
+int MoonNum; //the total number of moons, temporary use
 
 static void
 signal_handler(int signum)
@@ -316,10 +320,11 @@ int main(int argc, char *argv[], char *envp[])
 
     if (argc < 3)
     {
-        printf("usage: %s <tiangou> <moon>\n", argv[0]);
+        printf("usage: %s [EAL options] -- <tiangou> <moon>\n", argv[0]);
         return 0;
     }
-    const char *tiangouPath = argv[1], *moonPath = argv[2];
+    MoonNum = argc - 2;
+    const char *tiangouPath = argv[1];
     InitLoader(argc, argv, envp);
 
     printf("loading tiangou library %s\n", tiangouPath);
@@ -335,6 +340,29 @@ int main(int argc, char *argv[], char *envp[])
     PreloadLibrary(tiangou);
     printf("%s\n", DONE_STRING);
 
+    for (int i = 2; i < argc; i++)
+    {
+        // we give each moon an id here, and it needs to be recycled later
+        printf("loading moon%d...\n", i - 1);
+        LoadMoon(argv[i], pktmbufPool, i - 2);
+    }
+
+    printf("*** START RUNTIME MAIN LOOP ***\n");
+    l2fwd_main_loop();
+
+    return 0;
+}
+
+void initMoon()
+{
+    char *argv[0];
+    printf("[initMoon] calling moonStart\n");
+    moonStart(0, argv);
+    StackSwitch(-1);
+}
+
+void LoadMoon(char *moonPath, struct rte_mempool *pktmbufPool, int MOON_ID)
+{
     printf("allocating memory for MOON %s\n", moonPath);
     void *arena = aligned_alloc(sysconf(_SC_PAGESIZE), MOON_SIZE);
     printf("arena address %p size %#lx\n", arena, MOON_SIZE);
@@ -357,7 +385,7 @@ int main(int argc, char *argv[], char *envp[])
     SetStack(MOON_ID, stackStart, STACK_SIZE);
     library.loadAddress = libraryStart;
     DeployLibrary(&library);
-    SetHeap(heapStart, heapSize);
+    SetHeap(heapStart, heapSize, MOON_ID);
     InitHeap();
     printf("%s\n", DONE_STRING);
 
@@ -391,19 +419,6 @@ int main(int argc, char *argv[], char *envp[])
     printf("entering MOON for initial running, start = %p\n", moonStart);
     StackStart(MOON_ID, initMoon);
     printf("%s\n", DONE_STRING);
-
-    printf("*** START RUNTIME MAIN LOOP ***\n");
-    l2fwd_main_loop();
-
-    return 0;
-}
-
-void initMoon()
-{
-    char *argv[0];
-    printf("[initMoon] calling moonStart\n");
-    moonStart(0, argv);
-    StackSwitch(-1);
 }
 
 static void
@@ -490,11 +505,16 @@ void l2fwd_main_loop(void)
 		 * Read packet from RX queues
 		 */
         portid = srcPort;
+        // potential problems here: are all the MOONs share the same packetBurst inside interface?
         nb_rx = rte_eth_rx_burst(portid, 0, interface->packetBurst, MAX_PKT_BURST);
 
         port_statistics.rx += nb_rx;
         interface->burstSize = nb_rx;
-        StackSwitch(MOON_ID);
+        for (int i = 0; i < MoonNum; i++)
+        {
+            HeapSwitch(i);
+            StackSwitch(i);
+        }
         for (i = 0; i < nb_rx; i++)
         {
             struct rte_mbuf *m = interface->packetBurst[i];

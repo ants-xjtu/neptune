@@ -2463,9 +2463,17 @@ static struct malloc_state av_;  /* never directly referenced */
 static void *heap_start, *heap_end;
 static int morecore_finished;
 
-void SetHeap(void *heap, size_t size) {
+void SetHeap(void *heap, size_t size, int moonId) {
   heap_start = heap;
   heap_end = heap + size;
+  HeapStart[moonId] = heap_start;
+  HeapEnd[moonId] = heap_end;
+}
+
+void HeapSwitch(int moonId)
+{
+  heap_start = HeapStart[moonId];
+  heap_end = HeapEnd[moonId];
 }
 
 void InitHeap() {
