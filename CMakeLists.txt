@@ -117,3 +117,8 @@ add_custom_target(libnids
 add_dependencies(Moon_Libnids libnids)
 target_link_libraries(Moon_Libnids gthread-2.0 nsl glib-2.0 net)
 target_link_options(Moon_Libnids PUBLIC -pthread)
+
+add_moon(Moon_LibnidsNoSFI moon/testLibnids.c moon/libnids/src/NIDS-link_pic.bc)
+add_dependencies(Moon_LibnidsNoSFI libnids)
+target_link_libraries(Moon_LibnidsNoSFI gthread-2.0 nsl glib-2.0 net)
+target_link_options(Moon_LibnidsNoSFI PUBLIC -pthread)

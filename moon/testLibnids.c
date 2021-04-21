@@ -19,6 +19,7 @@
 #include "../PrivateStack.h"
 
 char ascii_string[10000];
+int state[7] = {0};          // a simple statistics on libnids
 char *char_to_ascii(char ch) /* 用于把协议数据进行显示 */
 {
     memset(ascii_string, 0x00, 10000);
@@ -87,21 +88,25 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
         tcp_connection->client.collect_urg++;
         /* 客户端接收紧急数据 */
         // printf("%sTCP连接建立\n", address_string);
+        state[NIDS_JUST_EST]++;
         return;
     case NIDS_CLOSE:
         /* 表示TCP连接正常关闭 */
         // printf("--------------------------------\n");
         // printf("%sTCP连接正常关闭\n", address_string);
+        state[NIDS_CLOSE]++;
         return;
     case NIDS_RESET:
         /* 表示TCP连接被重置关闭 */
         // printf("--------------------------------\n");
         // printf("%sTCP连接被RST关闭\n", address_string);
+        state[NIDS_RESET]++;
         return;
     case NIDS_DATA:
         // 表示有新的数据到达
         //在这个状态可以判断是否有新的数据到达，如果有就可以把数据存储起来，可以在这个状态之中来分析TCP传输的数据，此数据就存储在half_stream数据结构的缓存之中
         {
+            state[NIDS_DATA]++;
             struct half_stream *hlf;
             /* 表示TCP连接的一端的信息，可以是客户端，也可以是服务器端 */
             if (tcp_connection->server.count_new_urg)
@@ -155,6 +160,7 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
                 //    // 输出客户端接收的新的数据，以可打印字符进行显示
                 //}
                 // printf("\n");
+                return;
             }
             else
             {
@@ -177,9 +183,12 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
                 // 输出服务器接收到的新的数据
                 //}
                 // printf("\n");
+                return;
             }
+            return;
         }
     default:
+        state[0]++;
         break;
     }
     return;
