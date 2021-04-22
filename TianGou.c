@@ -4,8 +4,16 @@
 
 Interface interface;
 
+void exit(int stat)
+{
+    int sleeper;
+    printf("function intercepted by Qcloud to see backtrace!\n");
+    scanf("%d", &sleeper);
+}
+
 void *malloc(size_t size)
 {
+    // TODO: manual SFI
     return (interface.malloc)(size);
 }
 
@@ -72,6 +80,8 @@ pcap_t *pcap_open_offline(const char *fname, char *errbuf)
 int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     MESSAGE("callback = %p\n", callback);
+    int sleeper; // Qcloud's favorite way to see memory layout
+    scanf("%d", &sleeper);
     for (;;)
     {
         (interface.StackSwitch)(-1);
@@ -86,7 +96,7 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             *interface.packetRegionLow = (uintptr_t)packet;
             *interface.packetRegionHigh = *interface.packetRegionLow + header.caplen;
             // MESSAGE("arena region:\t%#lx ..< %#lx", *interface.packetRegionLow, *interface.packetRegionHigh);
-            // MESSAGE("start user callback at %p", callback);
+            MESSAGE("start user callback at %p", callback);
             callback(user, &header, (u_char *)packet);
             // MESSAGE("%s", DONE_STRING);
         }
@@ -97,23 +107,23 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 int pcap_compile(pcap_t *p, struct bpf_program *fp,
                  const char *str, int optimize, bpf_u_int32 netmask)
 {
-    MESSAGE("return -1");
-    return -1;
+    MESSAGE("return 0 by Qcloud");
+    return 0;
 }
 
-char *pcap_lookupdev(char *errbuf)
-{
-    MESSAGE("return NULL, errbuf filled");
-    strncpy(errbuf, "not supported", PCAP_ERRBUF_SIZE);
-    return NULL;
-}
+// char *pcap_lookupdev(char *errbuf)
+// {
+//     MESSAGE("return NULL, errbuf filled");
+//     strncpy(errbuf, "not supported", PCAP_ERRBUF_SIZE);
+//     return NULL;
+// }
 
 pcap_t *pcap_open_live(const char *device, int snaplen,
                        int promisc, int to_ms, char *errbuf)
 {
     MESSAGE("return NULL, errbuf filled");
-    strncpy(errbuf, "not supported", PCAP_ERRBUF_SIZE);
-    return NULL;
+    // strncpy(errbuf, "not supported", PCAP_ERRBUF_SIZE);
+    return (pcap_t *)1;
 }
 
 int pcap_datalink(pcap_t *p)

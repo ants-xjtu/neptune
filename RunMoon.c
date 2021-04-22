@@ -338,6 +338,7 @@ int main(int argc, char *argv[], char *envp[])
     interface->calloc = HeapCalloc;
     interface->free = HeapFree;
     interface->StackSwitch = StackSwitch;
+    printf("HeapMalloc at address %p\n", HeapMalloc);
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
     printf("%s\n", DONE_STRING);

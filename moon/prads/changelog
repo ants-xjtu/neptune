@@ -1,0 +1,128 @@
+2014-02-04 0.3.3: loud lemur
+    * performance: avoid calls to ntop
+    * install: don't overwrite conf
+    * documentation: depends, compile options, default privilege drop,
+    * feature: perftools support
+    * bugfix: conntrack output after priv drop
+    * bugfix: endianness inconsistencies
+    * bugfix: sguil log init and rotation
+    * bugfix: RHEL5 libresolv compile
+    * bugfix: connection deallocation
+    * bugfix: multiple memory leaks
+    * bugfix: mac sig hash table indexing
+    * bugfix: close opened files on error
+    * bugfix: wrong packet-byte-count
+    * bugfix: don't compare connections from different protocol versions
+    * bugfix: ip6 netmask debug trace
+    * bugfix: don't core on invalid pcap
+
+2012-12-05 0.3.2-rc3: reud bwai
+    * feature: argument -B enables shared-mem ringbuffer output
+    * utility: example shm-client for reading the shared-mem buffer
+    * bugfix: sancp output (github #30, #31, #32)
+
+2012-11-05 0.3.2-rc2: ya skipped dat one
+    * bugfixes (github #17, #19, #20, #21
+    * bpf_file config param to read BPF filters from file
+    * ever more beautiful code
+
+2012-08-16 0.3.1-rc1: shut your pie
+    * ever more beautiful code
+    * 1000x speed improvement due to leet output and bucket optimizations
+    * feature: argument -P enables DHCP fingerprinting (experimental)
+    * feature: argument -L enables cxtracker like output
+    * feature: support home_nets= in the conf file
+    * prads2db.pl: asset log to database parser
+    * prads.rc: init script now starts with prads-asset.log instead of prads.log
+    * compile: static prads available for those who want it
+    * new signatures (xp, debian, ubuntu, asyncos, openwrt, ++)
+    * more MTU-fu (3G/WAN) 
+    * nicer ARP output
+    * make install no longer overwrites conf and sig files
+    * bugfix: BSD build was broken
+    * bugfix: large user-agents would make garbage appnames in the asset log
+
+2011-09-27 0.3.0: all good things are three
+    * No changes since rc3.
+
+2011-09-22 0.3.0-rc3: nothing good comes to those who wait
+    * Disable ACK fingerprinting by default
+
+2011-09-21 0.3.0-rc2: are we there yet?
+    * bugfix: pid file creation on chroot (ssm)
+    * refactor initialization
+    * better OSX compatibility
+
+2011-08-15 0.3.0-rc1: real chaos one
+    * prads daemon now logs to syslog
+    * experimental SIGHUP support
+    * cleanup default conf file
+    * drop privileges by default
+    * bugfix: sniff device lookup
+    * bugfix: compiler vector optimizing bug
+
+2011-05-30 0.2.6: dev will make rye
+
+    * bugfix: lame stack smasher
+    * bugfix: payload ipv6 packets too
+
+2011-05-13 0.2.5: mori moment
+
+    * setcap: the capabilities needed to run prads non-root
+    * bugfix: avoid crashing in the ditch mac
+    * bugfix: fmask now compiles on gcc 4.6
+    * bugfix: ip4 network filtering reliability
+    * bugfix: another TOS IP4 hack
+
+2011-05-12 0.2.4: memento mori
+
+    * added connections to output plugins
+    * asset output now contains src:dst combo for flow tracking
+    * default to monitor all nets when called with empty -a argument
+    * better SGUIL compatability
+    * sanitized prads.rc init script (take note packagers)
+    * argument -Z: PassiveDNS output (experimental)
+    * bugfix: IPv6 TOS check
+    * bugfix: make prads forget
+    * bugfix: end_sessions() logic error
+    * code and debug cleanups
+
+2011-03-21 0.2.3: the weekend hack
+
+    * argument -O outputs new, expired and ended connections
+    * argument -x dumps per-packet connection updates
+    * argument -s <len> dumps len bytes of payload
+    * arguments -XFRMSAKUTtI for specifying fingerprinting methods on the cli
+    * argument -q gives really quiet while -v for console verbosity, -vv etc..
+    * code cleanup: drastically reduce the amount of globals, copypastitis, complexity
+    * updated man page
+    * cleanup and sanitize output (thanks ssm)
+    * argument -P pidpath removed. -p pidfile sufficient
+    * more sguil-friendly fifo output
+    * bugfix: matching mac when mac db is not loaded
+    * bugfix: expire services even if !print_updates
+    * bugfix: connection tracking regression
+    * bugfix: service matching regression
+
+2011-03-17 0.2.2: "the bump"
+
+    * output plugins, featuring sguil fifo
+    * mac vendor database lookups
+    * chroot to rundir and daemonize by default (initscript)
+    * OSX port and massive cleanups
+    * fix regressions and some bugfixes
+    * logs cxtracking
+    * closes issue 1 (github) segfault with b0gus user
+
+2010-11-24 0.2.1: a point of fact
+
+    * chroot prads
+    * bugfixes
+
+2010-06-21 0.2.0: our two cents
+
+    * Rewrite in C
+
+2009-11-02 0.2: Last perl version
+
+2009-05-19 0.1: Initial version

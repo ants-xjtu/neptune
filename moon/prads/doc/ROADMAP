@@ -1,0 +1,83 @@
+===============
+ PRADS ROADMAP
+===============
+
+Features as of version 0.3.1
+ - parse pcaps/realtime with BPF
+ - TCP SYN/SYNACK/StrayACK/RST/FIN
+ - mac sig matching
+ - ICMP (rudimentary)
+ - UDP (rudimentary)
+ - connection tracking
+ - tos, mtu
+ - vlan support
+ - output plugins: logfile, sguil, fifo output
+ - passiveDNS (experimental)
+ - DHCP fingerprinting (experimental)
+ - network filtering
+ - arp discovery
+ - ANSI + libpcap/pcre, runs on
+   * BSD
+   * OSX (with fink)
+   * Linux ia32 and amd64, mipsel
+   * any platform where dependencies compile!
+ - reload config on the fly [ limited ]
+ - installable via .debs
+
+Features in prads.pl missing as yet in C:
+ - database injector (SQLite,ODBC,..)
+
+Features wanted in 2012 the year of the Dragon
+(since the year of the Rabbit)
+ - scripting with lua
+ - plugin API
+ - [x] DHCP
+ - RPM packages
+ - switch and router discovery (OSPF, RIP, STP etc)
+ - useragent/etc OS matching
+ - asset datastructure that can track changes..
+ - graphical mapping output (a la squert/snoGE)
+ - realtime dynamic mapping...
+ - ARP timing (conntrack + timing fingerprints)
+ - SIMD, OpenCL and CUDA optimizations
+ - use PF_RING or other capture library
+ - filter generic signatures
+ - fuzzy matches
+
+What follows is a rudimentary release plan. Releases are made "when it's ready"
+and may include other features, fixes,
+furthermore, features may come in a different order, but these are our priorities:
+
+Point release 0.3.6
+ - shared memory log {asset,cxtracker}
+ - full banner logging
+
+Point release 0.4.0
+ - feature complete compared to prads.pl
+ that means:
+   -sql insertion (done in prads2db.pl)
+   -better icmp
+   -better udp
+   -cleaner tcp fingerprinting
+
+Point release 0.5.0
+ - DNS, mDNS, passiveDNS (work started)
+ - DHCP                  (work started)
+ - lua?
+
+Point release 0.6.0
+ - graphical mapping
+ - ARP timings
+
+Point release BBQ
+ - OMFG!#@!!!11
+
+Point Release 1.0
+ * When we are satisfied with:
+   - performance
+   - output
+   - functionality
+
+Point Release 2.0
+ * CVE correlation on services, not in prads, but prads GUI ?
+
