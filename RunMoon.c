@@ -565,13 +565,16 @@ void l2fwd_main_loop(void)
     }
     for (int i = 0; i < MoonNum; i++)
     {
-        printf("print state maintained by moon %d\n", i);
-        int *real_state = nf_state[i];
-        printf("unrecognized packets: %d\n", *real_state);
-        printf("setting up connections: %d\n", *(real_state + 1));
-        printf("closing connections: %d\n", *(real_state + 2));
-        printf("resetting connections: %d\n", *(real_state + 3));
-        printf("real data: %d\n\n", *(real_state + 4));
+        if(nf_state[i])
+        {
+            printf("print state maintained by moon %d\n", i);
+            int *real_state = nf_state[i];
+            printf("unrecognized packets: %d\n", *real_state);
+            printf("setting up connections: %d\n", *(real_state + 1));
+            printf("closing connections: %d\n", *(real_state + 2));
+            printf("resetting connections: %d\n", *(real_state + 3));
+            printf("real data: %d\n\n", *(real_state + 4));
+        }
     }
     printf("total bytes processed: %21" PRIu64 "\n", cur_bytes);
     printf("total packets processed: %21" PRIu64 "\n", cur_pkts);

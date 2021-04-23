@@ -8,6 +8,7 @@ void exit(int stat)
 {
     int sleeper;
     printf("function intercepted by Qcloud to see backtrace!\n");
+    printf("input an integer and have a nice segfault! Don't worry, it's expected:)\n");
     scanf("%d", &sleeper);
 }
 
@@ -138,6 +139,12 @@ int pcap_dispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     MESSAGE("return -1");
     return -1;
+}
+
+int	pcap_stats(pcap_t * p, struct pcap_stat * pt)
+{
+    MESSAGE("pcap check always pass");
+    return 1;
 }
 
 char *strdup(const char *str)
