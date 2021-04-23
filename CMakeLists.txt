@@ -77,8 +77,8 @@ function(add_moon)
     set(MOON_NAME ${ADD_MOON_TARGET})
     set(SOURCES ${ADD_MOON_SOURCES})
 
-    set(BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}_link.bc)
-    set(OPT_BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}_opt.bc)
+    set(BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-link.bc)
+    set(OPT_BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-opt.bc)
     set(OPT_COMMAND opt-10 
         -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
         -Gmem-rw=w
@@ -90,6 +90,7 @@ function(add_moon)
     )
 
     message("[AddMoon] " ${MOON_NAME} ": ${SOURCES}")
+    set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE C)
     add_library(${MOON_NAME}_SourceLibrary OBJECT ${SOURCES})
     target_compile_options(${MOON_NAME}_SourceLibrary PUBLIC -emit-llvm)
     set_target_properties(${MOON_NAME}_SourceLibrary PROPERTIES 
@@ -99,7 +100,7 @@ function(add_moon)
 
     add_custom_command(OUTPUT ${BITCODE_FILE}
         DEPENDS neptune-pass $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
-        COMMAND llvm-link-10 $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary> ${GMEM_DIR}/obj/Auxiliary.o > ${BITCODE_FILE}
+        COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` ${GMEM_DIR}/obj/Auxiliary.o > ${BITCODE_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
     add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
