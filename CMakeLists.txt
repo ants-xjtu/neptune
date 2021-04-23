@@ -106,36 +106,34 @@ function(add_moon)
 endfunction(add_moon)
 
 # moons name: Moon_CamelCase
-add_moon(Moon_Test moon/test.c)
-add_moon(Moon_TestNoSFI moon/test.c)
+add_moon(Moon_Test moon/Test.c)
+add_moon(Moon_TestNoSFI moon/Test.c)
 
-add_moon(Moon_Libnids moon/testLibnids.c moon/libnids/src/NIDS-link_pic.bc)
 add_custom_target(libnids
     COMMAND make NIDS-link_pic.bc
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/libnids/src
 )
+add_moon(Moon_Libnids moon/LibnidsMain.c moon/libnids/src/NIDS-link_pic.bc)
 add_dependencies(Moon_Libnids libnids)
 target_link_libraries(Moon_Libnids gthread-2.0 nsl glib-2.0 net)
 target_link_options(Moon_Libnids PUBLIC -pthread)
-
-add_moon(Moon_LibnidsNoSFI moon/testLibnids.c moon/libnids/src/NIDS-link_pic.bc)
+add_moon(Moon_LibnidsNoSFI moon/LibnidsMain.c moon/libnids/src/NIDS-link_pic.bc)
 add_dependencies(Moon_LibnidsNoSFI libnids)
 target_link_libraries(Moon_LibnidsNoSFI gthread-2.0 nsl glib-2.0 net)
 target_link_options(Moon_LibnidsNoSFI PUBLIC -pthread)
 
-add_moon(Moon_prads moon/testPrads.c moon/prads/src/prads-link.bc)
 add_custom_target(prads
     COMMAND make prads-link.bc
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/prads/src
 )
-add_dependencies(Moon_prads prads) # just mean the sequence of building, not implying actual depenencies
-target_link_libraries(Moon_prads pcap pcre resolv)
+add_moon(Moon_Prads moon/Prads.c moon/prads/src/prads-link.bc)
+add_dependencies(Moon_Prads prads) # just mean the sequence of building, not implying actual depenencies
+target_link_libraries(Moon_Prads pcap pcre resolv)
+add_moon(Moon_PradsNoSFI moon/Prads.c moon/prads/src/prads-link.bc)
+add_dependencies(Moon_PradsNoSFI prads) # just mean the sequence of building, not implying actual depenencies
+target_link_libraries(Moon_PradsNoSFI pcap pcre resolv)
 
-add_moon(Moon_pradsNoSFI moon/testPrads.c moon/prads/src/prads-link.bc)
-add_dependencies(Moon_pradsNoSFI prads) # just mean the sequence of building, not implying actual depenencies
-target_link_libraries(Moon_pradsNoSFI pcap pcre resolv)
-
-add_moon(Moon_TestPlusPlus moon/testplusplus.cxx)
+add_moon(Moon_TestPlusPlus moon/Test++.cxx)
 set_target_properties(Moon_TestPlusPlus PROPERTIES LINKER_LANGUAGE CXX)
-add_moon(Moon_TestPlusPlusNoSFI moon/testplusplus.cxx)
+add_moon(Moon_TestPlusPlusNoSFI moon/Test++.cxx)
 set_target_properties(Moon_TestPlusPlusNoSFI PROPERTIES LINKER_LANGUAGE CXX)
