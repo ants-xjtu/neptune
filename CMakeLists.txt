@@ -81,7 +81,7 @@ function(add_moon)
         set(OPT_COMMAND cp ${LINK_BYTECODE_FILE} ${OPT_BYTECODE_FILE})
     else()
         set(OPT_COMMAND opt-10 
-            -O3 -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
+            -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
             -Gmem-rw=w
             -Gmem-check-method=ifelseall
             -Gmem-verify-external-call-args=false
@@ -117,6 +117,23 @@ add_custom_target(libnids
 add_dependencies(Moon_Libnids libnids)
 target_link_libraries(Moon_Libnids gthread-2.0 nsl glib-2.0 net)
 target_link_options(Moon_Libnids PUBLIC -pthread)
+
+add_moon(Moon_LibnidsNoSFI moon/testLibnids.c moon/libnids/src/NIDS-link_pic.bc)
+add_dependencies(Moon_LibnidsNoSFI libnids)
+target_link_libraries(Moon_LibnidsNoSFI gthread-2.0 nsl glib-2.0 net)
+target_link_options(Moon_LibnidsNoSFI PUBLIC -pthread)
+
+add_moon(Moon_prads moon/testPrads.c moon/prads/src/prads-link.bc)
+add_custom_target(prads
+    COMMAND make prads-link.bc
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/prads/src
+)
+add_dependencies(Moon_prads prads) # just mean the sequence of building, not implying actual depenencies
+target_link_libraries(Moon_prads pcap pcre resolv)
+
+add_moon(Moon_pradsNoSFI moon/testPrads.c moon/prads/src/prads-link.bc)
+add_dependencies(Moon_pradsNoSFI prads) # just mean the sequence of building, not implying actual depenencies
+target_link_libraries(Moon_pradsNoSFI pcap pcre resolv)
 
 add_moon(Moon_TestPlusPlus moon/testplusplus.cxx)
 add_moon(Moon_TestPlusPlusNoSFI moon/testplusplus.cxx)

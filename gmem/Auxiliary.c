@@ -32,3 +32,24 @@ abort:
     fprintf(stderr, "Segmentation Fault\n");
     exit(EXIT_FAILURE);
 }
+
+// add by Qcloud1223
+// this is the ideal situation: with some analysis, every memory write has only one branch
+// still borrow the historical name ifelseheap, and use low-low and low-high as prot region
+void *_Gmem_IfElseHeap(void *ptr)
+{
+    uintptr_t p = (uintptr_t)ptr;
+    if (unlikely(p < gmemLowRegionLow))
+    {
+        goto abort;
+    }
+    if (unlikely(p >= gmemLowRegionHigh))
+    {
+        goto abort;
+    }
+    return ptr;
+abort:
+    fprintf(stderr, "Pointer %p illegal access(Not in single protection fields)\n", ptr);
+    fprintf(stderr, "Segmentation Fault\n");
+    exit(EXIT_FAILURE);
+}

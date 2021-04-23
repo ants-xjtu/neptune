@@ -3,7 +3,12 @@
 
 #include <stddef.h>
 
-void SetHeap(void *heap, size_t size);
+#define MAX_MOON_NUM 16
+void *HeapStart[MAX_MOON_NUM], *HeapEnd[MAX_MOON_NUM];
+
+void SetHeap(void *heap, size_t size, int moonId);
+
+void HeapSwitch(int moonId);
 
 void InitHeap(void);
 
