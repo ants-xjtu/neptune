@@ -362,6 +362,8 @@ void initMoon()
     printf("[initMoon] calling moonStart\n");
     moonStart(0, argv);
     StackSwitch(-1);
+    printf("[initMoon] nf exited\n");
+    exit(0);
 }
 
 void LoadMoon(char *moonPath, struct rte_mempool *pktmbufPool, int MOON_ID)

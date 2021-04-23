@@ -98,7 +98,7 @@ function(add_moon)
     )
 
     add_custom_command(OUTPUT ${BITCODE_FILE}
-        DEPENDS neptune-pass ${MOON_NAME}_SourceLibrary
+        DEPENDS neptune-pass $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
         COMMAND llvm-link-10 $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary> ${GMEM_DIR}/obj/Auxiliary.o > ${BITCODE_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
@@ -137,6 +137,11 @@ add_moon(TARGET Moon_Test${P} SOURCES
     moon/Test.c
 )
 
+add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
+    moon/Test++.cxx
+)
+set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
+
 add_moon(TARGET Moon_Libnids${P} SOURCES
     moon/LibnidsMain.c 
     moon/libnids/src/NIDS-link_pic.bc
@@ -151,11 +156,6 @@ add_moon(TARGET Moon_Prads${P} SOURCES
 )
 add_dependencies(Moon_Prads${P} prads)
 target_link_libraries(Moon_Prads${P} pcap pcre resolv)
-
-add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
-    moon/Test++.cxx
-)
-set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
 
 endmacro()
 
