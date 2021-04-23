@@ -103,8 +103,8 @@ void got_packet(u_char *useless, const struct pcap_pkthdr *pheader,
                 const u_char *packet)
 {
     // olog("[*] Qcloud: Do we really step into callback?\n");
-    printf("[*] Qcloud: Do we really step into callback?\n");
-    fflush(stdout);
+    // printf("[*] Qcloud: Do we really step into callback?\n");
+    // fflush(stdout);
     config.pr_s.got_packets++;
     packetinfo pstruct = {0};
     packetinfo *pi = &pstruct;
@@ -149,8 +149,8 @@ packet_end:
         vlog(0x3, "Not our network packet. Tracked, but not logged.\n");
 #endif
     inpacket = 0;
-    olog("[*] Qcloud: safely return from user callback function. Packets received %12u\n", config.pr_s.got_packets);
-    fflush(stdout);
+    // olog("[*] Qcloud: safely return from user callback function. Packets received %12u\n", config.pr_s.got_packets);
+    // fflush(stdout);
     return;
 }
 
@@ -1455,7 +1455,6 @@ int prads_initialize(globalconfig *conf)
             elog("[!] Error pcap_open_live: %s \n", conf->errbuf);
             exit(1);
         }
-        olog("[*] Qcloud: open_live return correctly\n");
         /* * B0rk if we see an error... */
         if (strlen(conf->errbuf) > 0)
         {

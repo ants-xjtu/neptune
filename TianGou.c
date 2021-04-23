@@ -80,8 +80,8 @@ pcap_t *pcap_open_offline(const char *fname, char *errbuf)
 int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     MESSAGE("callback = %p\n", callback);
-    int sleeper; // Qcloud's favorite way to see memory layout
-    scanf("%d", &sleeper);
+    // int sleeper; // Qcloud's favorite way to see memory layout
+    // scanf("%d", &sleeper);
     for (;;)
     {
         (interface.StackSwitch)(-1);
@@ -96,7 +96,7 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             *interface.packetRegionLow = (uintptr_t)packet;
             *interface.packetRegionHigh = *interface.packetRegionLow + header.caplen;
             // MESSAGE("arena region:\t%#lx ..< %#lx", *interface.packetRegionLow, *interface.packetRegionHigh);
-            MESSAGE("start user callback at %p", callback);
+            // MESSAGE("start user callback at %p", callback);
             callback(user, &header, (u_char *)packet);
             // MESSAGE("%s", DONE_STRING);
         }
@@ -111,12 +111,14 @@ int pcap_compile(pcap_t *p, struct bpf_program *fp,
     return 0;
 }
 
-// char *pcap_lookupdev(char *errbuf)
-// {
-//     MESSAGE("return NULL, errbuf filled");
-//     strncpy(errbuf, "not supported", PCAP_ERRBUF_SIZE);
-//     return NULL;
-// }
+char *default_dev = "eno1"; // modify this if things went wrong
+
+char *pcap_lookupdev(char *errbuf)
+{
+    MESSAGE("lookupdev return default device");
+    // strncpy(errbuf, "not supported", PCAP_ERRBUF_SIZE);
+    return default_dev;
+}
 
 pcap_t *pcap_open_live(const char *device, int snaplen,
                        int promisc, int to_ms, char *errbuf)
@@ -136,4 +138,27 @@ int pcap_dispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     MESSAGE("return -1");
     return -1;
+}
+
+char *strdup(const char *str)
+{
+    // toy version of strlen, and duplicate string on private heap
+    const char *curr = str;
+    size_t cnt = 0;
+    while(*curr != '\0')
+    {
+        cnt++;
+        curr++;
+    }
+    char *x = (char *)(interface.malloc)(cnt + 1);
+    curr = str;
+    char *cx = x;
+    while(*curr != '\0')
+    {
+        *cx = *curr;
+        cx++;
+        curr++;
+    }
+    *cx = '\0';
+    return x;
 }
