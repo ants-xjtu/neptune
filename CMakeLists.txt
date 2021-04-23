@@ -67,73 +67,111 @@ target_link_options(RunMoon PUBLIC -Wl,--no-as-needed -L/usr/local/lib64 -lrte_n
 # TianGou
 add_library(TianGou SHARED TianGou.c)
 
-# MOON targets
+# add_moon util and 3rd libraries
 function(add_moon)
-    set(MOON_NAME ${ARGV0})
-    set(SOURCE ${ARGV1})
-    set(BITCODE_OBJECTS ${ARGV})
-    list(REMOVE_AT BITCODE_OBJECTS 0 1)
+    set(options)
+    set(oneValueArgs TARGET)
+    set(multiValueArgs SOURCES)
+    cmake_parse_arguments(ADD_MOON "${option}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    set(LINK_BYTECODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-link.bc)
-    set(OPT_BYTECODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-opt.bc)
-    set(OBJ_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}.o)
-    if(MOON_NAME MATCHES "NoSFI$")
-        set(OPT_COMMAND cp ${LINK_BYTECODE_FILE} ${OPT_BYTECODE_FILE})
-    else()
-        set(OPT_COMMAND opt-10 
-            -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
-            -Gmem-rw=w
-            -Gmem-check-method=ifelseall
-            -Gmem-verify-external-call-args=false
-            -Gmem-whitelist-section=safe_functions
-            < ${LINK_BYTECODE_FILE}
-            > ${OPT_BYTECODE_FILE}
-        )
-    endif()
+    set(MOON_NAME ${ADD_MOON_TARGET})
+    set(SOURCES ${ADD_MOON_SOURCES})
 
-    message("add moon " ${MOON_NAME} "(" ${SOURCE} ") + " ${BITCODE_OBJECTS})
-    add_custom_command(OUTPUT ${OBJ_FILE}
-        DEPENDS neptune-pass ${SOURCE}
-        COMMAND clang-10 -fPIC -emit-llvm -c -o ${CMAKE_BINARY_DIR}/${MOON_NAME}-source.bc ${SOURCE}
-        COMMAND llvm-link-10 ${CMAKE_BINARY_DIR}/${MOON_NAME}-source.bc ${GMEM_DIR}/obj/Auxiliary.o ${BITCODE_OBJECTS} > ${LINK_BYTECODE_FILE}
-        COMMAND ${OPT_COMMAND}
-        COMMAND clang-10 -c -fPIC ${OPT_BYTECODE_FILE} -o ${OBJ_FILE}
+    set(BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}_link.bc)
+    set(OPT_BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}_opt.bc)
+    set(OPT_COMMAND opt-10 
+        -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
+        -Gmem-rw=w
+        -Gmem-check-method=ifelseall
+        -Gmem-verify-external-call-args=false
+        -Gmem-whitelist-section=safe_functions
+        < ${BITCODE_FILE}
+        > ${OPT_BITCODE_FILE}
+    )
+
+    message("[AddMoon] " ${MOON_NAME} ": ${SOURCES}")
+    add_library(${MOON_NAME}_SourceLibrary OBJECT ${SOURCES})
+    target_compile_options(${MOON_NAME}_SourceLibrary PUBLIC -emit-llvm)
+    set_target_properties(${MOON_NAME}_SourceLibrary PROPERTIES 
+        POSITION_INDEPENDENT_CODE True
+        LINKER_LANGUAGE C
+    )
+
+    add_custom_command(OUTPUT ${BITCODE_FILE}
+        DEPENDS neptune-pass ${MOON_NAME}_SourceLibrary
+        COMMAND llvm-link-10 $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary> ${GMEM_DIR}/obj/Auxiliary.o > ${BITCODE_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
-    add_library(${MOON_NAME} SHARED ${OBJ_FILE})
+    add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
+        DEPENDS ${BITCODE_FILE}
+        COMMAND ${OPT_COMMAND}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    set_source_files_properties(${BITCODE_FILE} ${OPT_BITCODE_FILE} PROPERTIES LANGUAGE C)
+
+    if (MOON_NAME MATCHES "_NoSFI$")
+        add_library(${MOON_NAME} SHARED ${BITCODE_FILE})
+    else()
+        add_library(${MOON_NAME} SHARED ${OPT_BITCODE_FILE})
+    endif()
+    target_compile_options(${MOON_NAME} PUBLIC -Wno-unused-command-line-argument)
     set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
     target_link_libraries(${MOON_NAME} PkgConfig::DPDK pcap)
 endfunction(add_moon)
-
-# moons name: Moon_CamelCase
-add_moon(Moon_Test moon/Test.c)
-add_moon(Moon_TestNoSFI moon/Test.c)
 
 add_custom_target(libnids
     COMMAND make NIDS-link_pic.bc
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/libnids/src
 )
-add_moon(Moon_Libnids moon/LibnidsMain.c moon/libnids/src/NIDS-link_pic.bc)
-add_dependencies(Moon_Libnids libnids)
-target_link_libraries(Moon_Libnids gthread-2.0 nsl glib-2.0 net)
-target_link_options(Moon_Libnids PUBLIC -pthread)
-add_moon(Moon_LibnidsNoSFI moon/LibnidsMain.c moon/libnids/src/NIDS-link_pic.bc)
-add_dependencies(Moon_LibnidsNoSFI libnids)
-target_link_libraries(Moon_LibnidsNoSFI gthread-2.0 nsl glib-2.0 net)
-target_link_options(Moon_LibnidsNoSFI PUBLIC -pthread)
-
 add_custom_target(prads
     COMMAND make prads-link.bc
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/prads/src
 )
-add_moon(Moon_Prads moon/Prads.c moon/prads/src/prads-link.bc)
-add_dependencies(Moon_Prads prads) # just mean the sequence of building, not implying actual depenencies
-target_link_libraries(Moon_Prads pcap pcre resolv)
-add_moon(Moon_PradsNoSFI moon/Prads.c moon/prads/src/prads-link.bc)
-add_dependencies(Moon_PradsNoSFI prads) # just mean the sequence of building, not implying actual depenencies
-target_link_libraries(Moon_PradsNoSFI pcap pcre resolv)
 
-add_moon(Moon_TestPlusPlus moon/Test++.cxx)
-set_target_properties(Moon_TestPlusPlus PROPERTIES LINKER_LANGUAGE CXX)
-add_moon(Moon_TestPlusPlusNoSFI moon/Test++.cxx)
-set_target_properties(Moon_TestPlusPlusNoSFI PROPERTIES LINKER_LANGUAGE CXX)
+
+# MOON targets
+# moons name: Moon_CamelCase
+macro(create_moons)
+
+add_moon(TARGET Moon_Test${P} SOURCES 
+    moon/Test.c
+)
+
+add_moon(TARGET Moon_Libnids${P} SOURCES
+    moon/LibnidsMain.c 
+    moon/libnids/src/NIDS-link_pic.bc
+)
+add_dependencies(Moon_Libnids${P} libnids)
+target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
+target_link_options(Moon_Libnids${P} PUBLIC -pthread)
+
+add_moon(TARGET Moon_Prads${P} SOURCES
+    # moon/Prads.c 
+    moon/prads/src/prads-link.bc
+)
+add_dependencies(Moon_Prads${P} prads)
+target_link_libraries(Moon_Prads${P} pcap pcre resolv)
+
+add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
+    moon/Test++.cxx
+)
+set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
+
+endmacro()
+
+set(P "")
+create_moons()
+set(P "_NoSFI")
+create_moons()
+
+# add_moon(Moon_LibnidsNoSFI moon/LibnidsMain.c moon/libnids/src/NIDS-link_pic.bc)
+# add_dependencies(Moon_LibnidsNoSFI libnids)
+# target_link_libraries(Moon_LibnidsNoSFI gthread-2.0 nsl glib-2.0 net)
+# target_link_options(Moon_LibnidsNoSFI PUBLIC -pthread)
+
+# add_moon(Moon_PradsNoSFI moon/Prads.c moon/prads/src/prads-link.bc)
+# add_dependencies(Moon_PradsNoSFI prads) # just mean the sequence of building, not implying actual depenencies
+# target_link_libraries(Moon_PradsNoSFI pcap pcre resolv)
+
+# add_moon(Moon_TestPlusPlusNoSFI moon/Test++.cxx)
+# set_target_properties(Moon_TestPlusPlusNoSFI PROPERTIES LINKER_LANGUAGE CXX)
