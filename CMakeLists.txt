@@ -136,4 +136,6 @@ add_dependencies(Moon_pradsNoSFI prads) # just mean the sequence of building, no
 target_link_libraries(Moon_pradsNoSFI pcap pcre resolv)
 
 add_moon(Moon_TestPlusPlus moon/testplusplus.cxx)
+set_target_properties(Moon_TestPlusPlus PROPERTIES LINKER_LANGUAGE CXX)
 add_moon(Moon_TestPlusPlusNoSFI moon/testplusplus.cxx)
+set_target_properties(Moon_TestPlusPlusNoSFI PROPERTIES LINKER_LANGUAGE CXX)
