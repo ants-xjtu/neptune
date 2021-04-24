@@ -3,7 +3,7 @@ project(neptune)
 
 # neptune targets
 add_library(dlmalloc dlmalloc.c)
-target_compile_definitions(dlmalloc PUBLIC 
+target_compile_definitions(dlmalloc PRIVATE 
     USE_DL_PREFIX
     MORECORE_CANNOT_TRIM
     HAVE_MMAP=0
@@ -62,7 +62,18 @@ pkg_check_modules(DPDK REQUIRED IMPORTED_TARGET libdpdk)
 
 add_executable(RunMoon RunMoon.c)
 target_link_libraries(RunMoon neptune PkgConfig::DPDK pcap)
-target_link_options(RunMoon PUBLIC -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)
+target_link_options(RunMoon PRIVATE -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)
+
+# SwordHolder
+find_package(LLVM REQUIRED CONFIG)
+add_library(SwordHolderPass MODULE
+    SwordHolder/Pass.cxx
+)
+target_compile_features(SwordHolderPass PRIVATE cxx_range_for cxx_auto_type)
+set_target_properties(SwordHolderPass PROPERTIES COMPILE_FLAGS "-fno-rtti")
+target_compile_definitions(SwordHolderPass PRIVATE ${LLVM_DEFINITIONS})
+target_include_directories(SwordHolderPass PRIVATE ${LLVM_INCLUDE_DIRS})
+target_link_directories(SwordHolderPass PRIVATE ${LLVM_LIBRARY_DIRS})
 
 # TianGou
 add_library(TianGou SHARED TianGou.c)
@@ -92,7 +103,7 @@ function(add_moon)
     message("[AddMoon] " ${MOON_NAME} ": ${SOURCES}")
     set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE C)
     add_library(${MOON_NAME}_SourceLibrary OBJECT ${SOURCES})
-    target_compile_options(${MOON_NAME}_SourceLibrary PUBLIC -emit-llvm)
+    target_compile_options(${MOON_NAME}_SourceLibrary PRIVATE -emit-llvm)
     set_target_properties(${MOON_NAME}_SourceLibrary PROPERTIES 
         POSITION_INDEPENDENT_CODE True
         LINKER_LANGUAGE C
@@ -115,7 +126,7 @@ function(add_moon)
     else()
         add_library(${MOON_NAME} SHARED ${OPT_BITCODE_FILE})
     endif()
-    target_compile_options(${MOON_NAME} PUBLIC -Wno-unused-command-line-argument)
+    target_compile_options(${MOON_NAME} PRIVATE -Wno-unused-command-line-argument)
     set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
     target_link_libraries(${MOON_NAME} PkgConfig::DPDK pcap)
 endfunction(add_moon)
@@ -149,7 +160,7 @@ add_moon(TARGET Moon_Libnids${P} SOURCES
 )
 add_dependencies(Moon_Libnids${P} libnids)
 target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
-target_link_options(Moon_Libnids${P} PUBLIC -pthread)
+target_link_options(Moon_Libnids${P} PRIVATE -pthread)
 
 add_moon(TARGET Moon_Prads${P} SOURCES
     # moon/Prads.c 
@@ -168,7 +179,7 @@ create_moons()
 # add_moon(Moon_LibnidsNoSFI moon/LibnidsMain.c moon/libnids/src/NIDS-link_pic.bc)
 # add_dependencies(Moon_LibnidsNoSFI libnids)
 # target_link_libraries(Moon_LibnidsNoSFI gthread-2.0 nsl glib-2.0 net)
-# target_link_options(Moon_LibnidsNoSFI PUBLIC -pthread)
+# target_link_options(Moon_LibnidsNoSFI PRIVATE -pthread)
 
 # add_moon(Moon_PradsNoSFI moon/Prads.c moon/prads/src/prads-link.bc)
 # add_dependencies(Moon_PradsNoSFI prads) # just mean the sequence of building, not implying actual depenencies
