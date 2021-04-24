@@ -1,6 +1,8 @@
 {
     "cmake.configureOnOpen": false,
     "files.associations": {
-        "rte_common.h": "c"
+        "*.c": "c",
+        "*.h": "c",
+        "*.def": "cpp"
     }
 }
