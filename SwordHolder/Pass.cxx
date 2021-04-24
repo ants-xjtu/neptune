@@ -1,8 +1,11 @@
-#include <llvm/Pass.h>
-#include <llvm/IR/Function.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/IR/LegacyPassManager.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
+#include "llvm/Pass.h"
+#include "llvm/IR/Function.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 using namespace llvm;
 
@@ -15,8 +18,45 @@ namespace
 
         virtual bool runOnFunction(Function &F) override
         {
-            errs() << "I saw a function called " << F.getName() << "!\n";
-            return false;
+            if (F.getName() == "SwordHolder_CheckWriteMemory")
+            {
+                return false;
+            }
+
+            bool modified = false;
+
+            LLVMContext &Ctx = F.getContext();
+            FunctionCallee checkFunc = F.getParent()->getOrInsertFunction(
+                "SwordHolder_CheckWriteMemory", Type::getVoidTy(Ctx), Type::getInt64Ty(Ctx));
+
+            for (auto &B : F)
+            {
+                for (auto &I : B)
+                {
+                    if (auto *op = dyn_cast<StoreInst>(&I))
+                    {
+                        errs() << *op << "\n";
+                        Value *pointer = op->getPointerOperand();
+                        errs() << *pointer << "\n";
+                        if (dyn_cast<AllocaInst>(pointer))
+                        {
+                            errs() << "...ignore alloca store\n";
+                            continue;
+                        }
+
+                        IRBuilder<> builder(op);
+                        Value *casted = builder.CreatePtrToInt(pointer, Type::getInt64Ty(Ctx));
+                        Value *args[] = {casted};
+                        builder.CreateCall(checkFunc, args);
+                        modified = true;
+                    }
+                }
+            }
+
+            errs() << "After:\n"
+                   << F;
+
+            return modified;
         }
     };
 }
@@ -28,7 +68,4 @@ static void loadPass(const PassManagerBuilder &Builder, legacy::PassManagerBase 
 {
     PM.add(new SwordHolderPass());
 }
-// These constructors add our pass to a list of global extensions.
-static RegisterStandardPasses Y_Ox(PassManagerBuilder::EP_ModuleOptimizerEarly, loadPass);
-// If the pass is enabled at any other points other than EP_EarlyAsPossible, we have to use EP_EnabledOnOptLevel0
-static RegisterStandardPasses Y_O0(PassManagerBuilder::EP_EnabledOnOptLevel0, loadPass);
+static RegisterStandardPasses Y_Ox(PassManagerBuilder::EP_EarlyAsPossible, loadPass);

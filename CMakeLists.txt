@@ -99,16 +99,23 @@ function(add_moon)
     #     < ${BITCODE_FILE}
     #     > ${OPT_BITCODE_FILE}
     # )
-    set(OPT_COMMAND opt-10
-        -load $<TARGET_FILE:SwordHolderPass> -SwordHolder
-        < ${BITCODE_FILE}
-        > ${OPT_BITCODE_FILE}
-    )
+    if (MOON_NAME MATCHES "_NoSFI$")
+        set(OPT_COMMAND opt-10 -O3 -strip-debug
+            -o ${OPT_BITCODE_FILE}
+            ${BITCODE_FILE}
+        )
+    else()
+        set(OPT_COMMAND opt-10 -O3 -strip-debug
+            -load $<TARGET_FILE:SwordHolderPass>
+            -o ${OPT_BITCODE_FILE}
+            ${BITCODE_FILE}
+        )
+    endif()
 
     message("[AddMoon] " ${MOON_NAME} ": ${SOURCES}")
     set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE C)
-    add_library(${MOON_NAME}_SourceLibrary OBJECT ${SOURCES})
-    target_compile_options(${MOON_NAME}_SourceLibrary PRIVATE -emit-llvm)
+    add_library(${MOON_NAME}_SourceLibrary OBJECT ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/SwordHolder/RuntimeLibrary.c)
+    target_compile_options(${MOON_NAME}_SourceLibrary PRIVATE -emit-llvm -Xclang -disable-O0-optnone)
     set_target_properties(${MOON_NAME}_SourceLibrary PROPERTIES 
         POSITION_INDEPENDENT_CODE True
         LINKER_LANGUAGE C
@@ -122,20 +129,17 @@ function(add_moon)
     add_custom_command(OUTPUT ${BITCODE_FILE}
         DEPENDS $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
         COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` > ${BITCODE_FILE}
+        COMMAND llvm-dis ${BITCODE_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
     add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
         DEPENDS ${BITCODE_FILE} neptune-pass SwordHolderPass
         COMMAND ${OPT_COMMAND}
+        COMMAND llvm-dis ${OPT_BITCODE_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
-    set_source_files_properties(${BITCODE_FILE} ${OPT_BITCODE_FILE} PROPERTIES LANGUAGE C)
-
-    if (MOON_NAME MATCHES "_NoSFI$")
-        add_library(${MOON_NAME} SHARED ${BITCODE_FILE})
-    else()
-        add_library(${MOON_NAME} SHARED ${OPT_BITCODE_FILE})
-    endif()
+    set_source_files_properties(${OPT_BITCODE_FILE} PROPERTIES LANGUAGE C)
+    add_library(${MOON_NAME} SHARED ${OPT_BITCODE_FILE})
     target_compile_options(${MOON_NAME} PRIVATE -Wno-unused-command-line-argument)
     set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
     target_link_libraries(${MOON_NAME} PkgConfig::DPDK pcap)
