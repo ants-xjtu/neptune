@@ -90,12 +90,17 @@ function(add_moon)
 
     set(BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-link.bc)
     set(OPT_BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-opt.bc)
-    set(OPT_COMMAND opt-10 
-        -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
-        -Gmem-rw=w
-        -Gmem-check-method=ifelseall
-        -Gmem-verify-external-call-args=false
-        -Gmem-whitelist-section=safe_functions
+    # set(OPT_COMMAND opt-10 
+    #     -load ${GMEM_DIR}/obj/libGmem-pass.so -gmem
+    #     -Gmem-rw=w
+    #     -Gmem-check-method=ifelseall
+    #     -Gmem-verify-external-call-args=false
+    #     -Gmem-whitelist-section=safe_functions
+    #     < ${BITCODE_FILE}
+    #     > ${OPT_BITCODE_FILE}
+    # )
+    set(OPT_COMMAND opt-10
+        -load $<TARGET_FILE:SwordHolderPass> -SwordHolder
         < ${BITCODE_FILE}
         > ${OPT_BITCODE_FILE}
     )
@@ -109,13 +114,18 @@ function(add_moon)
         LINKER_LANGUAGE C
     )
 
+    # add_custom_command(OUTPUT ${BITCODE_FILE}
+    #     DEPENDS $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
+    #     COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` ${GMEM_DIR}/obj/Auxiliary.o > ${BITCODE_FILE}
+    #     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    # )
     add_custom_command(OUTPUT ${BITCODE_FILE}
-        DEPENDS neptune-pass $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
-        COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` ${GMEM_DIR}/obj/Auxiliary.o > ${BITCODE_FILE}
+        DEPENDS $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
+        COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` > ${BITCODE_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
     add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
-        DEPENDS ${BITCODE_FILE}
+        DEPENDS ${BITCODE_FILE} neptune-pass SwordHolderPass
         COMMAND ${OPT_COMMAND}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
@@ -149,25 +159,25 @@ add_moon(TARGET Moon_Test${P} SOURCES
     moon/Test.c
 )
 
-add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
-    moon/Test++.cxx
-)
-set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
+# add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
+#     moon/Test++.cxx
+# )
+# set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
 
-add_moon(TARGET Moon_Libnids${P} SOURCES
-    moon/LibnidsMain.c 
-    moon/libnids/src/NIDS-link_pic.bc
-)
-add_dependencies(Moon_Libnids${P} libnids)
-target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
-target_link_options(Moon_Libnids${P} PRIVATE -pthread)
+# add_moon(TARGET Moon_Libnids${P} SOURCES
+#     moon/LibnidsMain.c 
+#     moon/libnids/src/NIDS-link_pic.bc
+# )
+# add_dependencies(Moon_Libnids${P} libnids)
+# target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
+# target_link_options(Moon_Libnids${P} PRIVATE -pthread)
 
-add_moon(TARGET Moon_Prads${P} SOURCES
-    # moon/Prads.c 
-    moon/prads/src/prads-link.bc
-)
-add_dependencies(Moon_Prads${P} prads)
-target_link_libraries(Moon_Prads${P} pcap pcre resolv)
+# add_moon(TARGET Moon_Prads${P} SOURCES
+#     # moon/Prads.c 
+#     moon/prads/src/prads-link.bc
+# )
+# add_dependencies(Moon_Prads${P} prads)
+# target_link_libraries(Moon_Prads${P} pcap pcre resolv)
 
 endmacro()
 
@@ -175,15 +185,3 @@ set(P "")
 create_moons()
 set(P "_NoSFI")
 create_moons()
-
-# add_moon(Moon_LibnidsNoSFI moon/LibnidsMain.c moon/libnids/src/NIDS-link_pic.bc)
-# add_dependencies(Moon_LibnidsNoSFI libnids)
-# target_link_libraries(Moon_LibnidsNoSFI gthread-2.0 nsl glib-2.0 net)
-# target_link_options(Moon_LibnidsNoSFI PRIVATE -pthread)
-
-# add_moon(Moon_PradsNoSFI moon/Prads.c moon/prads/src/prads-link.bc)
-# add_dependencies(Moon_PradsNoSFI prads) # just mean the sequence of building, not implying actual depenencies
-# target_link_libraries(Moon_PradsNoSFI pcap pcre resolv)
-
-# add_moon(Moon_TestPlusPlusNoSFI moon/Test++.cxx)
-# set_target_properties(Moon_TestPlusPlusNoSFI PROPERTIES LINKER_LANGUAGE CXX)
