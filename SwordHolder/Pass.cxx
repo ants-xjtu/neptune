@@ -1,13 +1,14 @@
 #include <unordered_map>
 
 #include "llvm/Pass.h"
-#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 using namespace std;
 using namespace llvm;
@@ -19,15 +20,6 @@ namespace
         int storeInstCount = 0, allocaOperandCount = 0, constantOperandCount = 0;
         unordered_map<const char *, int> operandCountMap;
         bool printedModuleName = false;
-
-        void onFunction(Function &F)
-        {
-            if (!printedModuleName)
-            {
-                outs() << "module name: " << F.getParent()->getName() << "\n";
-                printedModuleName = true;
-            }
-        }
 
         void onStoreInst()
         {
@@ -61,64 +53,61 @@ namespace
             }
         }
     };
-    struct SwordHolderPass : public FunctionPass
+    struct SwordHolderPass : public ModulePass
     {
         static char ID;
-        SwordHolderPass() : FunctionPass(ID)
+        SwordHolderPass() : ModulePass(ID)
         {
             outs() << "[SwordHolder] pass start\n";
         }
 
-        Stat stat;
-
-        virtual bool runOnFunction(Function &F) override
+        virtual bool runOnModule(Module &M) override
         {
-            stat.onFunction(F);
-            if (F.getName().startswith("SwordHolder_"))
+            Stat stat;
+            for (auto &F : M)
             {
-                return false;
-            }
-
-            bool modified = false;
-
-            LLVMContext &Ctx = F.getContext();
-            FunctionCallee checkFunc = F.getParent()->getOrInsertFunction(
-                "SwordHolder_CheckWriteMemory", Type::getVoidTy(Ctx), Type::getInt64Ty(Ctx));
-
-            for (auto &B : F)
-            {
-                for (auto &I : B)
+                if (F.getName().startswith("SwordHolder_"))
                 {
-                    if (auto *op = dyn_cast<StoreInst>(&I))
+                    continue;
+                }
+
+                LLVMContext &Ctx = F.getContext();
+                FunctionCallee checkFunc = F.getParent()->getOrInsertFunction(
+                    "SwordHolder_CheckWriteMemory", Type::getVoidTy(Ctx), Type::getInt64Ty(Ctx));
+
+                for (auto &B : F)
+                {
+                    for (auto &I : B)
                     {
-                        stat.onStoreInst();
-                        Value *pointer = op->getPointerOperand();
-                        if (isa<AllocaInst>(pointer))
+                        if (auto *op = dyn_cast<StoreInst>(&I))
                         {
-                            stat.onAllocaOperand();
-                            continue;
-                        }
-                        else if (isa<Constant>(pointer))
-                        {
-                            stat.onConstant();
-                        }
+                            stat.onStoreInst();
+                            Value *pointer = op->getPointerOperand();
+                            if (isa<AllocaInst>(pointer))
+                            {
+                                stat.onAllocaOperand();
+                                continue;
+                            }
+                            else if (isa<Constant>(pointer))
+                            {
+                                stat.onConstant();
+                            }
 
-                        stat.onInsertCall(pointer);
-                        IRBuilder<> builder(op);
-                        Value *casted = builder.CreateBitCast(pointer, Type::getVoidTy(Ctx)->getPointerTo());
-                        Value *args[] = {casted};
-
-                        builder.CreateCall(checkFunc, args);
-                        modified = true;
+                            stat.onInsertCall(pointer);
+                            IRBuilder<> builder(op);
+                            Value *casted = builder.CreatePtrToInt(pointer, Type::getInt64Ty(Ctx));
+                            Value *args[] = {casted};
+                            CallInst *call = builder.CreateCall(checkFunc, args);
+                            // InlineFunctionInfo ifi;
+                            // InlineFunction(call, ifi);
+                        }
                     }
                 }
             }
-            return modified;
-        }
-
-        ~SwordHolderPass()
-        {
+            outs() << "[SwordHolder] pass stat:\n";
             stat.print();
+            // M.print(outs(), nullptr);
+            return true;
         }
     };
 }
@@ -130,4 +119,4 @@ static void loadPass(const PassManagerBuilder &Builder, legacy::PassManagerBase 
 {
     PM.add(new SwordHolderPass());
 }
-static RegisterStandardPasses Y_Ox(PassManagerBuilder::EP_EarlyAsPossible, loadPass);
+static RegisterStandardPasses Y_Ox(PassManagerBuilder::EP_ModuleOptimizerEarly, loadPass);

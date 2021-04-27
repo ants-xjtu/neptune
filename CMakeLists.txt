@@ -76,7 +76,7 @@ function(add_moon)
     # step 1: *.c/*.bc + RuntimeLibrary.c -> *.bc
     set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE C)
     add_library(${MOON_NAME}_SourceLibrary OBJECT ${SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/SwordHolder/RuntimeLibrary.c)
-    target_compile_options(${MOON_NAME}_SourceLibrary PRIVATE -emit-llvm -Xclang -disable-O0-optnone)
+    target_compile_options(${MOON_NAME}_SourceLibrary PRIVATE -emit-llvm -Xclang -disable-O0-optnone -Wno-unused-command-line-argument)
     set_target_properties(${MOON_NAME}_SourceLibrary PROPERTIES 
         POSITION_INDEPENDENT_CODE True
         LINKER_LANGUAGE C
@@ -86,42 +86,45 @@ function(add_moon)
     add_custom_command(OUTPUT ${BITCODE_FILE}
         DEPENDS $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
         COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` > ${BITCODE_FILE}
-        # COMMAND llvm-dis ${BITCODE_FILE}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMAND llvm-dis ${BITCODE_FILE}
     )
 
     # step 3: link.bc -> opt.bc
+    set(OPT_COMMAND opt-10 -O3 -o ${OPT_BITCODE_FILE} ${BITCODE_FILE})
+    set(OPT2_COMMAND opt-10 -O3 -o ${OPT_BITCODE_FILE} ${OPT_BITCODE_FILE})
+    set(SFI_COMMAND opt-10
+        -load $<TARGET_FILE:SwordHolderPass> -SwordHolder
+        -o ${OPT_BITCODE_FILE} ${BITCODE_FILE}
+    )
     if (MOON_NAME MATCHES "_NoSFI$")
-        set(OPT_COMMAND opt-10 -O3
-            -o ${OPT_BITCODE_FILE} ${BITCODE_FILE}
+        add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
+            DEPENDS ${BITCODE_FILE} SwordHolderPass
+            COMMAND ${OPT_COMMAND}
+            # COMMAND llvm-dis ${OPT_BITCODE_FILE}
         )
     else()
-        set(OPT_COMMAND opt-10 -O3
-            -load $<TARGET_FILE:SwordHolderPass>
-            -o ${OPT_BITCODE_FILE} ${BITCODE_FILE}
+        add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
+            DEPENDS ${BITCODE_FILE} SwordHolderPass
+            COMMAND ${SFI_COMMAND}
+            COMMAND ${OPT2_COMMAND}
+            # COMMAND llvm-dis ${OPT_BITCODE_FILE}
         )
     endif()
-    add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
-        DEPENDS ${BITCODE_FILE} SwordHolderPass
-        COMMAND ${OPT_COMMAND}
-        # COMMAND llvm-dis ${OPT_BITCODE_FILE}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    )
 
     # step 4: opt.bc -> MOON.so
     # additional options could be applied after target is created
     set_source_files_properties(${OPT_BITCODE_FILE} PROPERTIES LANGUAGE C)
-    add_library(${MOON_NAME} MODULE ${OPT_BITCODE_FILE})
+    add_library(${MOON_NAME} SHARED ${OPT_BITCODE_FILE})
     target_compile_options(${MOON_NAME} PRIVATE -Wno-unused-command-line-argument)
     set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
     target_link_libraries(${MOON_NAME} PkgConfig::DPDK pcap)
 endfunction(add_moon)
 
-add_custom_target(libnids
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/moon/libnids/src/NIDS-link_pic.bc
     COMMAND make NIDS-link_pic.bc
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/libnids/src
 )
-add_custom_target(prads
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/moon/prads/src/prads-link.bc
     COMMAND make prads-link.bc
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/prads/src
 )
@@ -144,15 +147,12 @@ add_moon(TARGET Moon_Libnids${P} SOURCES
     moon/LibnidsMain.c 
     moon/libnids/src/NIDS-link_pic.bc
 )
-add_dependencies(Moon_Libnids${P} libnids)
 target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
 target_link_options(Moon_Libnids${P} PRIVATE -pthread)
 
 add_moon(TARGET Moon_Prads${P} SOURCES
-    # moon/Prads.c 
     moon/prads/src/prads-link.bc
 )
-add_dependencies(Moon_Prads${P} prads)
 target_link_libraries(Moon_Prads${P} pcap pcre resolv)
 
 endmacro()
