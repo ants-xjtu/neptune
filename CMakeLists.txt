@@ -134,3 +134,8 @@ target_link_libraries(Moon_prads pcap pcre resolv)
 add_moon(Moon_pradsNoSFI moon/testPrads.c moon/prads/src/prads-link.bc)
 add_dependencies(Moon_pradsNoSFI prads) # just mean the sequence of building, not implying actual depenencies
 target_link_libraries(Moon_pradsNoSFI pcap pcre resolv)
+
+# ensure the trimmed version of l2fwd still runs can an executable
+add_executable(L2fwd moon/L2fwd.c)
+target_link_libraries(L2fwd PkgConfig::DPDK)
+target_link_options(L2fwd PUBLIC -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)

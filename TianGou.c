@@ -1,13 +1,16 @@
 #include "TianGou.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
+#include <rte_ethdev.h>
+#include <rte_mempool.h>
 
 Interface interface;
 
 void exit(int stat)
 {
     int sleeper;
-    printf("function intercepted by Qcloud to see backtrace!\n");
+    printf("exit(int) intercepted by Qcloud to see backtrace!\n");
     printf("input an integer and have a nice segfault! Don't worry, it's expected:)\n");
     scanf("%d", &sleeper);
 }
@@ -147,6 +150,8 @@ int	pcap_stats(pcap_t * p, struct pcap_stat * pt)
     return 1;
 }
 
+/***    libc blacklist functions begin    ***/ 
+
 char *strdup(const char *str)
 {
     // toy version of strlen, and duplicate string on private heap
@@ -168,4 +173,145 @@ char *strdup(const char *str)
     }
     *cx = '\0';
     return x;
+}
+
+/***    vDPDK begins    ***/
+int rte_eal_init(int argc, char **argv)
+{
+    MESSAGE("return 1(EAL already parsed)");
+    return 1;
+}
+
+void rte_exit(int exit_code, const char *format, ...)
+{
+    va_list ap;
+    fprintf(stderr, "[tiangou] rte_exit with exit_code %d: ", exit_code);
+    va_start(ap, format);
+    vfprintf(stderr, format, ap);
+    va_end(ap);
+    exit(exit_code);
+}
+
+uint16_t rte_eth_dev_count_avail()
+{
+    MESSAGE("return 2 ports");
+    return 2;
+}
+
+struct rte_mempool *rte_pktmbuf_pool_create(const char *name, unsigned int n, 
+        unsigned int cache_size, uint16_t priv_size, uint16_t data_room_size, 
+        int socket_id)
+{
+    MESSAGE("return a trivial mempool pointer");
+    return (struct rte_mempool *)1;
+}
+
+int rte_eth_dev_configure(uint16_t port_id, uint16_t nb_rx_queue, 
+        uint16_t nb_tx_queue, const struct rte_eth_conf *eth_conf)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_dev_adjust_nb_rx_tx_desc(uint16_t port_id, 
+        uint16_t *nb_rx_desc, uint16_t *nb_tx_desc)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_rx_queue_setup(uint16_t port_id, uint16_t rx_queue_id, 
+        uint16_t nb_rx_desc, unsigned int socket_id, 
+        const struct rte_eth_rxconf *rx_conf, struct rte_mempool *mb_pool)
+{
+    MESSAGE("rx_queue is previously initialized");
+    return 0;
+}
+
+int rte_eth_tx_queue_setup(uint16_t port_id, uint16_t tx_queue_id, 
+        uint16_t nb_tx_desc, unsigned int socket_id, 
+        const struct rte_eth_txconf *tx_conf)
+{
+    MESSAGE("tx_queue is previously initialized");
+    return 0;
+}
+
+void *rte_zmalloc_socket(const char *type, size_t size, unsigned int align, int socket)
+{
+    // all ports shared one txBuffer
+    MESSAGE("zmalloc currently unimplemented");
+    return NULL;
+}
+
+int
+rte_eth_tx_buffer_init(struct rte_eth_dev_tx_buffer *buffer, uint16_t size)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_tx_buffer_set_err_callback(struct rte_eth_dev_tx_buffer *buffer, 
+        buffer_tx_error_fn callback, void *userdata)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_dev_start(uint16_t port_id)
+{
+    MESSAGE("return 0(device already up)");
+    return 0;
+}
+
+int rte_eth_promiscuous_enable(uint16_t port_id)
+{
+    MESSAGE("return 0(promisc mode on)");
+    return 0;
+}
+
+int rte_eth_dev_stop(uint16_t port_id)
+{
+    MESSAGE("return 0(moon doesn't stop device)");
+    return 0;
+}
+
+int rte_eth_dev_close(uint16_t port_id)
+{
+    MESSAGE("return 0(moon doesn't close device)");
+    return 0;
+}
+
+/*  tx/rx control  */
+int consumed = 0;
+uint16_t rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id, 
+        struct rte_mbuf **rx_pkts, const uint16_t nb_pkts)
+{
+    if(!consumed)
+    {
+        consumed = 1;
+        // Do we prefetch the packets here, or let the moon do this seemingly harmless job?
+        rx_pkts = interface.packetBurst;
+        return interface.burstSize;
+    }
+    else
+    {
+        consumed = 0;
+        (interface.StackSwitch)(-1);
+        return rte_eth_rx_burst(port_id, queue_id, rx_pkts, nb_pkts);
+    }
+}
+
+uint16_t rte_eth_tx_buffer(uint16_t port_id, uint16_t queue_id, 
+        struct rte_eth_dev_tx_buffer *buffer, struct rte_mbuf *tx_pkt)
+{
+    // MESSAGE("packet buffered into txBuffer in RunTime");
+    // note that each call to tx_buffer will only buffer one mbuf, so we return 1
+    return 1;
+}
+
+uint16_t rte_eth_tx_buffer_flush(uint16_t port_id, 
+        uint16_t queue_id, struct rte_eth_dev_tx_buffer *buffer)
+{
+    // MESSAGE("flush singleton txBuffer");
+    return 0;
 }
