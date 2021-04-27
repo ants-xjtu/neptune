@@ -1,3 +1,5 @@
+#include <unordered_map>
+
 #include "llvm/Pass.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
@@ -7,18 +9,72 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
+using namespace std;
 using namespace llvm;
 
 namespace
 {
+    struct Stat
+    {
+        int storeInstCount = 0, allocaOperandCount = 0, constantOperandCount = 0;
+        unordered_map<const char *, int> operandCountMap;
+        bool printedModuleName = false;
+
+        void onFunction(Function &F)
+        {
+            if (!printedModuleName)
+            {
+                outs() << "module name: " << F.getParent()->getName() << "\n";
+                printedModuleName = true;
+            }
+        }
+
+        void onStoreInst()
+        {
+            storeInstCount += 1;
+        }
+        void onAllocaOperand()
+        {
+            allocaOperandCount += 1;
+        }
+        void onConstant()
+        {
+            constantOperandCount += 1;
+        }
+        void onInsertCall(Value *operand)
+        {
+            auto *inst = dyn_cast<Instruction>(operand);
+            const char *name = !inst ? "non-instruction operand" : inst->getOpcodeName();
+            int count = operandCountMap.count(name) == 0 ? 0 : operandCountMap[name];
+            operandCountMap[name] = count + 1;
+        }
+
+        void print()
+        {
+            outs() << "Total StoreInst: " << storeInstCount << "\n";
+            outs() << "Ignored to-Alloca storing: " << allocaOperandCount << "\n";
+            outs() << "Dangerous to-Constant storing: " << constantOperandCount << "\n";
+            outs() << "Kinds of StoreInst operand\n";
+            for (auto const &item : operandCountMap)
+            {
+                outs() << "  " << item.first << ": " << item.second << "\n";
+            }
+        }
+    };
     struct SwordHolderPass : public FunctionPass
     {
         static char ID;
-        SwordHolderPass() : FunctionPass(ID) {}
+        SwordHolderPass() : FunctionPass(ID)
+        {
+            outs() << "[SwordHolder] pass start\n";
+        }
+
+        Stat stat;
 
         virtual bool runOnFunction(Function &F) override
         {
-            if (F.getName() == "SwordHolder_CheckWriteMemory")
+            stat.onFunction(F);
+            if (F.getName().startswith("SwordHolder_"))
             {
                 return false;
             }
@@ -35,28 +91,34 @@ namespace
                 {
                     if (auto *op = dyn_cast<StoreInst>(&I))
                     {
-                        errs() << *op << "\n";
+                        stat.onStoreInst();
                         Value *pointer = op->getPointerOperand();
-                        errs() << *pointer << "\n";
-                        if (dyn_cast<AllocaInst>(pointer))
+                        if (isa<AllocaInst>(pointer))
                         {
-                            errs() << "...ignore alloca store\n";
+                            stat.onAllocaOperand();
                             continue;
                         }
+                        else if (isa<Constant>(pointer))
+                        {
+                            stat.onConstant();
+                        }
 
+                        stat.onInsertCall(pointer);
                         IRBuilder<> builder(op);
-                        Value *casted = builder.CreatePtrToInt(pointer, Type::getInt64Ty(Ctx));
+                        Value *casted = builder.CreateBitCast(pointer, Type::getVoidTy(Ctx)->getPointerTo());
                         Value *args[] = {casted};
+
                         builder.CreateCall(checkFunc, args);
                         modified = true;
                     }
                 }
             }
-
-            errs() << "After:\n"
-                   << F;
-
             return modified;
+        }
+
+        ~SwordHolderPass()
+        {
+            stat.print();
         }
     };
 }

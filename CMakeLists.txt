@@ -86,17 +86,17 @@ function(add_moon)
     add_custom_command(OUTPUT ${BITCODE_FILE}
         DEPENDS $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
         COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` > ${BITCODE_FILE}
-        COMMAND llvm-dis ${BITCODE_FILE}
+        # COMMAND llvm-dis ${BITCODE_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
     # step 3: link.bc -> opt.bc
     if (MOON_NAME MATCHES "_NoSFI$")
-        set(OPT_COMMAND opt-10 -O3 -strip-debug
+        set(OPT_COMMAND opt-10 -O3
             -o ${OPT_BITCODE_FILE} ${BITCODE_FILE}
         )
     else()
-        set(OPT_COMMAND opt-10 -O3 -strip-debug
+        set(OPT_COMMAND opt-10 -O3
             -load $<TARGET_FILE:SwordHolderPass>
             -o ${OPT_BITCODE_FILE} ${BITCODE_FILE}
         )
@@ -104,7 +104,7 @@ function(add_moon)
     add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
         DEPENDS ${BITCODE_FILE} SwordHolderPass
         COMMAND ${OPT_COMMAND}
-        COMMAND llvm-dis ${OPT_BITCODE_FILE}
+        # COMMAND llvm-dis ${OPT_BITCODE_FILE}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 
@@ -135,25 +135,25 @@ add_moon(TARGET Moon_Test${P} SOURCES
     moon/Test.c
 )
 
-# add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
-#     moon/Test++.cxx
-# )
-# set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
+add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
+    moon/Test++.cxx
+)
+set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
 
-# add_moon(TARGET Moon_Libnids${P} SOURCES
-#     moon/LibnidsMain.c 
-#     moon/libnids/src/NIDS-link_pic.bc
-# )
-# add_dependencies(Moon_Libnids${P} libnids)
-# target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
-# target_link_options(Moon_Libnids${P} PRIVATE -pthread)
+add_moon(TARGET Moon_Libnids${P} SOURCES
+    moon/LibnidsMain.c 
+    moon/libnids/src/NIDS-link_pic.bc
+)
+add_dependencies(Moon_Libnids${P} libnids)
+target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
+target_link_options(Moon_Libnids${P} PRIVATE -pthread)
 
-# add_moon(TARGET Moon_Prads${P} SOURCES
-#     # moon/Prads.c 
-#     moon/prads/src/prads-link.bc
-# )
-# add_dependencies(Moon_Prads${P} prads)
-# target_link_libraries(Moon_Prads${P} pcap pcre resolv)
+add_moon(TARGET Moon_Prads${P} SOURCES
+    # moon/Prads.c 
+    moon/prads/src/prads-link.bc
+)
+add_dependencies(Moon_Prads${P} prads)
+target_link_libraries(Moon_Prads${P} pcap pcre resolv)
 
 endmacro()
 

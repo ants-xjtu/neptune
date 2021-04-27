@@ -1,24 +1,20 @@
 #include <stdint.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-extern struct
-{
-    uint64_t low, high;
-} SwordHolder_Region;
+uintptr_t SwordHolder_MainPrefix;
+#define SwordHolder_MainAlign (32ul << 30ul)
+uintptr_t SwordHolder_ExtraLow, SwordHolder_ExtraHigh;
 
-__attribute__((always_inline)) void SwordHolder_CheckWriteMemory(uint64_t pointer)
+__attribute__((always_inline)) void SwordHolder_CheckWriteMemory(void *pointer)
 {
-    if (pointer < SwordHolder_Region.low)
+    uintptr_t p = (uintptr_t)pointer;
+    // todo Main region
+
+    if (p >= SwordHolder_ExtraLow && p < SwordHolder_ExtraHigh)
     {
-        goto error;
+        return;
     }
-    if (pointer >= SwordHolder_Region.high)
-    {
-        goto error;
-    }
-    return;
-error:
-    fprintf(stderr, "[SwordHolder] invalid pointer writing at %p\n", (void *)pointer);
+    fprintf(stderr, "[SwordHolder] invalid pointer writing at %p\n", pointer);
     abort();
 }
