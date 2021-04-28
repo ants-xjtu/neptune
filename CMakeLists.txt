@@ -61,7 +61,7 @@ target_link_directories(SwordHolderPass PRIVATE ${LLVM_LIBRARY_DIRS})
 # TianGou target - runtime interface bridger
 add_library(TianGou MODULE TianGou.c)
 
-# add_moon util and 3rd libraries
+# add_moon util
 function(add_moon)
     set(options)
     set(oneValueArgs TARGET)
@@ -120,16 +120,6 @@ function(add_moon)
     target_link_libraries(${MOON_NAME} PkgConfig::DPDK pcap)
 endfunction(add_moon)
 
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/moon/libnids/src/NIDS-link_pic.bc
-    COMMAND make NIDS-link_pic.bc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/libnids/src
-)
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/moon/prads/src/prads-link.bc
-    COMMAND make prads-link.bc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/prads/src
-)
-
-
 # MOON targets
 # moons name: Moon_CamelCase
 macro(create_moons)
@@ -155,6 +145,10 @@ add_moon(TARGET Moon_Prads${P} SOURCES
 )
 target_link_libraries(Moon_Prads${P} pcap pcre resolv)
 
+add_moon(TARGET Moon_L2Fwd${P} SOURCES
+    moon/L2Fwd.c
+)
+
 endmacro()
 
 set(P "")
@@ -162,6 +156,17 @@ create_moons()
 set(P "_NoSFI")
 create_moons()
 
+# 3rd party targets depend by MOONs
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/moon/libnids/src/NIDS-link_pic.bc
+    COMMAND make NIDS-link_pic.bc
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/libnids/src
+)
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/moon/prads/src/prads-link.bc
+    COMMAND make prads-link.bc
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/prads/src
+)
+
+# Other test and bench targets
 add_executable(MallocTest MallocTest.c)
 target_link_libraries(MallocTest neptune)
 

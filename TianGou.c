@@ -282,36 +282,36 @@ int rte_eth_dev_close(uint16_t port_id)
 }
 
 /*  tx/rx control  */
-int consumed = 0;
-uint16_t rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id, 
-        struct rte_mbuf **rx_pkts, const uint16_t nb_pkts)
-{
-    if(!consumed)
-    {
-        consumed = 1;
-        // Do we prefetch the packets here, or let the moon do this seemingly harmless job?
-        rx_pkts = interface.packetBurst;
-        return interface.burstSize;
-    }
-    else
-    {
-        consumed = 0;
-        (interface.StackSwitch)(-1);
-        return rte_eth_rx_burst(port_id, queue_id, rx_pkts, nb_pkts);
-    }
-}
+// int consumed = 0;
+// uint16_t rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id, 
+//         struct rte_mbuf **rx_pkts, const uint16_t nb_pkts)
+// {
+//     if(!consumed)
+//     {
+//         consumed = 1;
+//         // Do we prefetch the packets here, or let the moon do this seemingly harmless job?
+//         rx_pkts = interface.packetBurst;
+//         return interface.burstSize;
+//     }
+//     else
+//     {
+//         consumed = 0;
+//         (interface.StackSwitch)(-1);
+//         return rte_eth_rx_burst(port_id, queue_id, rx_pkts, nb_pkts);
+//     }
+// }
 
-uint16_t rte_eth_tx_buffer(uint16_t port_id, uint16_t queue_id, 
-        struct rte_eth_dev_tx_buffer *buffer, struct rte_mbuf *tx_pkt)
-{
-    // MESSAGE("packet buffered into txBuffer in RunTime");
-    // note that each call to tx_buffer will only buffer one mbuf, so we return 1
-    return 1;
-}
+// uint16_t rte_eth_tx_buffer(uint16_t port_id, uint16_t queue_id, 
+//         struct rte_eth_dev_tx_buffer *buffer, struct rte_mbuf *tx_pkt)
+// {
+//     // MESSAGE("packet buffered into txBuffer in RunTime");
+//     // note that each call to tx_buffer will only buffer one mbuf, so we return 1
+//     return 1;
+// }
 
-uint16_t rte_eth_tx_buffer_flush(uint16_t port_id, 
-        uint16_t queue_id, struct rte_eth_dev_tx_buffer *buffer)
-{
-    // MESSAGE("flush singleton txBuffer");
-    return 0;
-}
+// uint16_t rte_eth_tx_buffer_flush(uint16_t port_id, 
+//         uint16_t queue_id, struct rte_eth_dev_tx_buffer *buffer)
+// {
+//     // MESSAGE("flush singleton txBuffer");
+//     return 0;
+// }
