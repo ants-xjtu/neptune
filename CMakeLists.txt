@@ -86,7 +86,7 @@ function(add_moon)
     add_custom_command(OUTPUT ${BITCODE_FILE}
         DEPENDS $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>
         COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` > ${BITCODE_FILE}
-        COMMAND llvm-dis ${BITCODE_FILE}
+        # COMMAND llvm-dis ${BITCODE_FILE}
     )
 
     # step 3: link.bc -> opt.bc
@@ -98,7 +98,7 @@ function(add_moon)
     )
     if (MOON_NAME MATCHES "_NoSFI$")
         add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
-            DEPENDS ${BITCODE_FILE} SwordHolderPass
+            DEPENDS ${BITCODE_FILE}
             COMMAND ${OPT_COMMAND}
             # COMMAND llvm-dis ${OPT_BITCODE_FILE}
         )
@@ -145,9 +145,9 @@ add_moon(TARGET Moon_Prads${P} SOURCES
 )
 target_link_libraries(Moon_Prads${P} pcap pcre resolv)
 
-add_moon(TARGET Moon_L2Fwd${P} SOURCES
-    moon/L2Fwd.c
-)
+# add_moon(TARGET Moon_L2Fwd${P} SOURCES
+#     moon/L2Fwd.c
+# )
 
 endmacro()
 

@@ -36,7 +36,7 @@ namespace
         void onInsertCall(Value *operand)
         {
             auto *inst = dyn_cast<Instruction>(operand);
-            const char *name = !inst ? "non-instruction operand" : inst->getOpcodeName();
+            const char *name = !inst ? "function argument" : inst->getOpcodeName();
             int count = operandCountMap.count(name) == 0 ? 0 : operandCountMap[name];
             operandCountMap[name] = count + 1;
         }
@@ -45,7 +45,7 @@ namespace
         {
             outs() << "Total StoreInst: " << storeInstCount << "\n";
             outs() << "Ignored to-Alloca storing: " << allocaOperandCount << "\n";
-            outs() << "Dangerous to-Constant storing: " << constantOperandCount << "\n";
+            outs() << "Ignored to-Constant storing: " << constantOperandCount << "\n";
             outs() << "Kinds of StoreInst operand\n";
             for (auto const &item : operandCountMap)
             {
@@ -75,12 +75,18 @@ namespace
                 FunctionCallee checkFunc = F.getParent()->getOrInsertFunction(
                     "SwordHolder_CheckWriteMemory", Type::getVoidTy(Ctx), Type::getInt64Ty(Ctx));
 
+                vector<CallInst *> checkCalls;
                 for (auto &B : F)
                 {
                     for (auto &I : B)
                     {
-                        if (auto *op = dyn_cast<StoreInst>(&I))
+                        if (I.mayWriteToMemory() && !isa<CallInst>(I) && !isa<InvokeInst>(I))
                         {
+                            auto *op = dyn_cast<StoreInst>(&I);
+                            if (!op) {
+                                outs() << "skipped: " << I << "\n";
+                                continue;
+                            }
                             stat.onStoreInst();
                             Value *pointer = op->getPointerOperand();
                             if (isa<AllocaInst>(pointer))
@@ -91,6 +97,7 @@ namespace
                             else if (isa<Constant>(pointer))
                             {
                                 stat.onConstant();
+                                continue;
                             }
 
                             stat.onInsertCall(pointer);
@@ -98,10 +105,14 @@ namespace
                             Value *casted = builder.CreatePtrToInt(pointer, Type::getInt64Ty(Ctx));
                             Value *args[] = {casted};
                             CallInst *call = builder.CreateCall(checkFunc, args);
-                            // InlineFunctionInfo ifi;
-                            // InlineFunction(call, ifi);
+                            checkCalls.push_back(call);
                         }
                     }
+                }
+                for (CallInst *call : checkCalls)
+                {
+                    InlineFunctionInfo ifi;
+                    InlineFunction(call, ifi);
                 }
             }
             outs() << "[SwordHolder] pass stat:\n";
