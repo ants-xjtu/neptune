@@ -369,7 +369,7 @@ void initMoon()
 void LoadMoon(char *moonPath, struct rte_mempool *pktmbufPool, int MOON_ID)
 {
     printf("allocating memory for MOON %s\n", moonPath);
-    void *arena = aligned_alloc(sysconf(_SC_PAGESIZE), MOON_SIZE);
+    void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
     printf("arena address %p size %#lx\n", arena, MOON_SIZE);
 
     struct PrivateLibrary library;
@@ -395,30 +395,11 @@ void LoadMoon(char *moonPath, struct rte_mempool *pktmbufPool, int MOON_ID)
     printf("%s\n", DONE_STRING);
 
     printf("setting protection region for MOON\n");
-    uintptr_t *gmemLowRegionLow = LibraryFind(&library, "gmemLowRegionLow");
-    uintptr_t *gmemLowRegionHigh = LibraryFind(&library, "gmemLowRegionHigh");
-    uintptr_t *gmemHighRegionLow = LibraryFind(&library, "gmemHighRegionLow");
-    uintptr_t *gmemHighRegionHigh = LibraryFind(&library, "gmemHighRegionHigh");
-    uintptr_t *arenaRegionLow, *arenaRegionHigh;
-    if (arena > pktmbufPool->pool_data)
-    {
-        arenaRegionLow = gmemHighRegionLow;
-        arenaRegionHigh = gmemHighRegionHigh;
-        interface->packetRegionLow = gmemLowRegionLow;
-        interface->packetRegionHigh = gmemLowRegionHigh;
-        printf("low: packet, high: arena\n");
-    }
-    else
-    {
-        arenaRegionLow = gmemLowRegionLow;
-        arenaRegionHigh = gmemLowRegionHigh;
-        interface->packetRegionLow = gmemHighRegionLow;
-        interface->packetRegionHigh = gmemHighRegionHigh;
-        printf("low: arena, high: packet\n");
-    }
-    *arenaRegionLow = (uintptr_t)arena;
-    *arenaRegionHigh = *arenaRegionLow + MOON_SIZE;
-    printf("arena region:\t%#lx ..< %#lx\n", *arenaRegionLow, *arenaRegionHigh);
+    uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
+    *mainPrefix = (uintptr_t)arena;
+    printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
+    interface->packetRegionLow = LibraryFind(&library, "SwordHolder_ExtraLow");
+    interface->packetRegionHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
     // below is a quick implement for 1 prot region, comment 2 lines if you are doing 2 regions
     // *gmemLowRegionLow = (uintptr_t)arena;
     // *gmemLowRegionHigh = *gmemLowRegionLow + MOON_SIZE;
@@ -567,7 +548,7 @@ void l2fwd_main_loop(void)
     }
     for (int i = 0; i < MoonNum; i++)
     {
-        if(nf_state[i])
+        if (nf_state[i])
         {
             printf("print state maintained by moon %d\n", i);
             int *real_state = nf_state[i];

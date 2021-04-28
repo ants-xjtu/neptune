@@ -8,8 +8,9 @@ uintptr_t SwordHolder_ExtraLow, SwordHolder_ExtraHigh;
 
 void SwordHolder_CheckWriteMemory(uintptr_t p)
 {
-    // todo Main region
-
+    if ((p ^ SwordHolder_MainPrefix) < SwordHolder_MainAlign) {
+        return;
+    }
     if (p >= SwordHolder_ExtraLow && p < SwordHolder_ExtraHigh)
     {
         return;

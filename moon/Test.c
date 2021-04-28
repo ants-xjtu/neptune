@@ -16,9 +16,9 @@ int main(int argc, const char *argv[])
     scanf("%d", &i);
     printf("Input an offset: ");
     int off;
-    scanf("%d", &off);
+    scanf("%x", &off);
 
-    printf("Attempt to write %p + (%d)...", choices[i], off);
+    printf("Attempt to write %p + (%#x)...", choices[i], off);
     choices[i][off] = 42;
     printf(" done\n");
 
