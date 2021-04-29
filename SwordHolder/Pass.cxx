@@ -21,6 +21,7 @@ namespace
     {
         int storeInstCount = 0;
         int constantOperandCount = 0;
+        int indirect = 0;
         unordered_map<string, int> protectedOperandMap, ignoredMap;
 
         Stat()
@@ -36,6 +37,10 @@ namespace
         void onIgnoredStoreInst(const char *reason)
         {
             ignoredMap[reason] += 1;
+        }
+        void onBitcastOperand()
+        {
+            indirect += 1;
         }
         void onInsertCall(Value *operand)
         {
@@ -68,7 +73,7 @@ namespace
         void print()
         {
             outs() << "Total StoreInst: " << storeInstCount << "\n";
-            outs() << "Ignored StoreInst\n";
+            outs() << "Ignored StoreInst (indirect checking: " << indirect << ")\n";
             for (auto const &item : ignoredMap)
             {
                 outs() << "  " << item.first << ": " << item.second << "\n";
@@ -81,15 +86,14 @@ namespace
         }
     };
 
-    bool isSafeStore(StoreInst *op, Stat &stat)
+    bool isSafeStoreOperand(Value *operand, Stat &stat)
     {
-        Value *pointer = op->getPointerOperand();
-        if (isa<AllocaInst>(pointer))
+        if (isa<AllocaInst>(operand))
         {
             stat.onIgnoredStoreInst(REASON_ALLOCA);
             return true;
         }
-        if (auto *gep = dyn_cast<GetElementPtrInst>(pointer))
+        if (auto *gep = dyn_cast<GetElementPtrInst>(operand))
         {
             if (gep->hasAllConstantIndices())
             {
@@ -97,7 +101,7 @@ namespace
                 return true;
             }
         }
-        if (auto *gepExpr = dyn_cast<GEPOperator>(pointer))
+        if (auto *gepExpr = dyn_cast<GEPOperator>(operand))
         {
             if (gepExpr->hasAllConstantIndices())
             {
@@ -105,8 +109,27 @@ namespace
                 return true;
             }
         }
+        if (auto *bitcast = dyn_cast<BitCastInst>(operand))
+        {
+            stat.onBitcastOperand();
+            return isSafeStoreOperand(bitcast->getOperand(0), stat);
+        }
+        if (auto *bitcast_expr = dyn_cast<BitCastOperator>(operand))
+        {
+            stat.onBitcastOperand();
+            return isSafeStoreOperand(bitcast_expr->getOperand(0), stat);
+        }
+        return false;
+    }
+
+    bool isSafeStore(StoreInst *op, Stat &stat)
+    {
+        if (isSafeStoreOperand(op->getPointerOperand(), stat))
+        {
+            return true;
+        }
         // TODO
-        if (auto *global = dyn_cast<GlobalVariable>(pointer))
+        if (auto *global = dyn_cast<GlobalVariable>(op->getPointerOperand()))
         {
             if (global->hasExternalLinkage())
             {

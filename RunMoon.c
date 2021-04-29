@@ -430,7 +430,7 @@ print_stats(void)
 #define MEMPOOL_CACHE_SIZE 256
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
 
-static uint64_t timer_period = 1; /* default period is 10 seconds */
+static uint64_t timer_period = 5; /* default period is 10 seconds */
 
 void l2fwd_main_loop(void)
 {
@@ -492,32 +492,21 @@ void l2fwd_main_loop(void)
                     /* do this only on main core */
                     if (lcore_id == rte_get_main_lcore())
                     {
-                        // print_stats();
-                        // printf("pps: %fKpps\n", (double)(cur_pkts - prev_pkts) / 1e3);
-                        // printf("Bps: %fMBps\n", (double)(cur_bytes - prev_bytes) / 1e6);
-                        // fflush(stdout);
                         /* reset the timer */
                         timer_tsc = 0;
-                        // prev_pkts = cur_pkts;
-                        // prev_bytes = cur_bytes;
+                        gettimeofday(&te, NULL);
+                        time_t s = te.tv_sec - ts.tv_sec;
+                        suseconds_t u = s * 1000000 + te.tv_usec - ts.tv_usec;
+                        double throughput = (double)(cur_bytes - prev_bytes) * 8 / u;
+                        printf("%f\n", throughput);
+                        prev_bytes = cur_bytes;
+                        prev_pkts = cur_pkts;
+                        gettimeofday(&ts, NULL);
                     }
                 }
             }
 
             prev_tsc = cur_tsc;
-        }
-        if (unlikely(pkt_interval > 5000000))
-        {
-            gettimeofday(&te, NULL);
-            time_t s = te.tv_sec - ts.tv_sec;
-            suseconds_t u = s * 1000000 + te.tv_usec - ts.tv_usec;
-            double throughput = (double)(cur_bytes - prev_bytes) / u / 1.048576;
-            printf("Bps: %fMBps\n", throughput);
-            fflush(stdout);
-            prev_bytes = cur_bytes;
-            prev_pkts = cur_pkts;
-            pkt_interval = 0;
-            gettimeofday(&ts, NULL);
         }
 
         /*

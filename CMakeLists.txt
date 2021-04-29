@@ -124,30 +124,30 @@ endfunction(add_moon)
 # moons name: Moon_CamelCase
 macro(create_moons)
 
-# add_moon(TARGET Moon_Test${P} SOURCES 
-#     moon/Test.c
-# )
+add_moon(TARGET Moon_Test${P} SOURCES 
+    moon/Test.c
+)
 
-# add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
-#     moon/Test++.cxx
-# )
-# set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
+add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
+    moon/Test++.cxx
+)
+set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
 
-# add_moon(TARGET Moon_Libnids${P} SOURCES
-#     moon/LibnidsMain.c 
-#     moon/libnids/src/NIDS-link_pic.bc
-# )
-# target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
-# target_link_options(Moon_Libnids${P} PRIVATE -pthread)
+add_moon(TARGET Moon_Libnids${P} SOURCES
+    moon/LibnidsMain.c 
+    moon/libnids/src/NIDS-link_pic.bc
+)
+target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
+target_link_options(Moon_Libnids${P} PRIVATE -pthread)
 
 add_moon(TARGET Moon_Prads${P} SOURCES
     moon/prads/src/prads-link.bc
 )
 target_link_libraries(Moon_Prads${P} pcap pcre resolv)
 
-# add_moon(TARGET Moon_L2Fwd${P} SOURCES
-#     moon/L2Fwd.c
-# )
+add_moon(TARGET Moon_L2Fwd${P} SOURCES
+    moon/L2Fwd.c
+)
 
 endmacro()
 
