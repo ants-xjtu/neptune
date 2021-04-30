@@ -59,7 +59,7 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
     // printf("tcp_protocol_callback\n");
     int i;
     char address_string[1024];
-    char content[65535];
+    static char content[65535];
     // char content_urgent[65535];
     struct tuple4 ip_and_port = tcp_connection->addr;
     /* 获取TCP连接的地址和端口对 */
@@ -160,7 +160,7 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
                 //    // 输出客户端接收的新的数据，以可打印字符进行显示
                 //}
                 // printf("\n");
-                return;
+                // return;
             }
             else
             {
@@ -183,7 +183,10 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
                 // 输出服务器接收到的新的数据
                 //}
                 // printf("\n");
-                return;
+                // return;
+            }
+            for (int i = 10; i < 20; i += 1) {
+                memcpy(&content[i * 1024], &content[(i - 10) * 1024], 1024);
             }
             return;
         }

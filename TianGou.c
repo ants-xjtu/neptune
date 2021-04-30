@@ -1,7 +1,9 @@
 #include "TianGou.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <rte_ethdev.h>
 #include <rte_mempool.h>
 
@@ -13,11 +15,11 @@ void exit(int stat)
     printf("exit(int) intercepted by Qcloud to see backtrace!\n");
     printf("input an integer and have a nice segfault! Don't worry, it's expected:)\n");
     scanf("%d", &sleeper);
+    abort();
 }
 
 void *malloc(size_t size)
 {
-    // TODO: manual SFI
     return (interface.malloc)(size);
 }
 

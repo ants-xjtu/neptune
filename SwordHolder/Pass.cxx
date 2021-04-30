@@ -17,6 +17,9 @@ namespace
 {
     const char *REASON_ALLOCA = "alloca";
     const char *REASON_GEP_WITH_CONST_INDICES = "gep w/ const indices";
+    const char *REASON_CONST_EXPR = "const expr";
+    const char *REASON_CALL_MALLOC = "malloc";
+
     struct Stat
     {
         int storeInstCount = 0;
@@ -42,6 +45,10 @@ namespace
         {
             indirect += 1;
         }
+        void onGEPOperand()
+        {
+            indirect += 1;
+        }
         void onInsertCall(Value *operand)
         {
             string name;
@@ -55,11 +62,7 @@ namespace
             }
             else if (auto *inst = dyn_cast<Instruction>(operand))
             {
-                name = inst->getOpcodeName() + string("<inst>");
-            }
-            else if (auto *expr = dyn_cast<ConstantExpr>(operand))
-            {
-                name = expr->getOpcodeName() + string("<expr>");
+                name = inst->getOpcodeName();
             }
             else
             {
@@ -97,27 +100,34 @@ namespace
         {
             if (gep->hasAllConstantIndices())
             {
+                // stat.onGEPOperand();
+                // if (isSafeStoreOperand(gep->getPointerOperand(), stat)) {
+                //     return true;
+                // }
+                // outs() << *gep->getPointerOperand() << "\n";
+                // return false;
                 stat.onIgnoredStoreInst(REASON_GEP_WITH_CONST_INDICES);
                 return true;
             }
         }
-        if (auto *gepExpr = dyn_cast<GEPOperator>(operand))
+        if (isa<ConstantExpr>(operand))
         {
-            if (gepExpr->hasAllConstantIndices())
-            {
-                stat.onIgnoredStoreInst(REASON_GEP_WITH_CONST_INDICES);
-                return true;
-            }
+            stat.onIgnoredStoreInst(REASON_CONST_EXPR);
+            return true;
         }
         if (auto *bitcast = dyn_cast<BitCastInst>(operand))
         {
             stat.onBitcastOperand();
             return isSafeStoreOperand(bitcast->getOperand(0), stat);
         }
-        if (auto *bitcast_expr = dyn_cast<BitCastOperator>(operand))
+        if (auto *call = dyn_cast<CallInst>(operand))
         {
-            stat.onBitcastOperand();
-            return isSafeStoreOperand(bitcast_expr->getOperand(0), stat);
+            if (call->getCalledFunction()->getName() == "malloc" ||
+                call->getCalledFunction()->getName() == "calloc")
+            {
+                stat.onIgnoredStoreInst(REASON_CALL_MALLOC);
+                return true;
+            }
         }
         return false;
     }
@@ -133,10 +143,10 @@ namespace
         {
             if (global->hasExternalLinkage())
             {
-                outs() << "Skip external:\n  " << *global << "\nIn\n";
-                outs() << *op << "\n";
+                // outs() << "Skip external:\n  " << *global << "\nIn\n";
+                // outs() << *op << "\n";
+                return true;
             }
-            return true;
         }
         return false;
     }
