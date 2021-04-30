@@ -1,4 +1,3 @@
 build
-gmem/**/obj
 *.bc
 *.o

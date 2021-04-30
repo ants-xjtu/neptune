@@ -18,15 +18,15 @@ enable_language(ASM)
 add_library(PrivateStack PrivateStack2.c StackSwitch.S)
 
 add_library(PrivateLoad 
-    loader/NanoNF.h
-    loader/NFinit.c
-    loader/NFlink.h
-    loader/NFmap.c
-    loader/NFopen.c
-    loader/NFreloc.c
-    loader/NFsym.c
-    loader/NFusage.c
-    loader/NFversion.c
+    Loader/NanoNF.h
+    Loader/NFinit.c
+    Loader/NFlink.h
+    Loader/NFmap.c
+    Loader/NFopen.c
+    Loader/NFreloc.c
+    Loader/NFsym.c
+    Loader/NFusage.c
+    Loader/NFversion.c
     PrivateLoad.c
 )
 target_link_libraries(PrivateLoad ${CMAKE_DL_LIBS})
@@ -129,28 +129,28 @@ endfunction(add_moon)
 macro(create_moons)
 
 add_moon(TARGET Moon_Test${P} SOURCES 
-    moon/Test.c
+    Moon/Test.c
 )
 
 add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
-    moon/Test++.cxx
+    Moon/Test++.cxx
 )
 set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
 
 add_moon(TARGET Moon_Libnids${P} SOURCES
-    moon/LibnidsMain.c 
-    moon/libnids/src/NIDS-link_pic.bc
+    Moon/LibnidsMain.c 
+    Moon/libnids/src/NIDS-link_pic.bc
 )
 target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
 target_link_options(Moon_Libnids${P} PRIVATE -pthread)
 
 add_moon(TARGET Moon_Prads${P} SOURCES
-    moon/prads/src/prads-link.bc
+    Moon/prads/src/prads-link.bc
 )
 target_link_libraries(Moon_Prads${P} pcap pcre resolv)
 
 add_moon(TARGET Moon_L2Fwd${P} SOURCES
-    moon/L2Fwd.c
+    Moon/L2Fwd.c
 )
 target_compile_definitions(Moon_L2Fwd${P} PRIVATE ALLOW_EXPERIMENTAL_API)
 
@@ -162,13 +162,13 @@ set(P "_NoSFI")
 create_moons()
 
 # 3rd party targets depend by MOONs
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/moon/libnids/src/NIDS-link_pic.bc
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/Moon/libnids/src/NIDS-link_pic.bc
     COMMAND make NIDS-link_pic.bc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/libnids/src
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Moon/libnids/src
 )
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/moon/prads/src/prads-link.bc
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/Moon/prads/src/prads-link.bc
     COMMAND make prads-link.bc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/moon/prads/src
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Moon/prads/src
 )
 
 # Other test and bench targets

@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 
 #include "PrivateLoad.h"
-#include "loader/NanoNF.h"
+#include "Loader/NanoNF.h"
 
 static int loaderArgc;
 static char **loaderArgv;
