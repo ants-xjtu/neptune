@@ -42,8 +42,12 @@ target_link_libraries(neptune INTERFACE
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(DPDK REQUIRED IMPORTED_TARGET libdpdk)
 
-add_executable(RunMoon RunMoon.c)
+add_executable(RunMoon 
+    RunMoon/Main.c
+    RunMoon/Aux.c
+)
 target_compile_definitions(RunMoon PRIVATE ALLOW_EXPERIMENTAL_API)
+target_include_directories(RunMoon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(RunMoon neptune PkgConfig::DPDK pcap)
 # patch to link drivers
 target_link_options(RunMoon PRIVATE -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)

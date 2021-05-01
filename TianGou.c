@@ -86,28 +86,7 @@ pcap_t *pcap_open_offline(const char *fname, char *errbuf)
 int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     MESSAGE("callback = %p\n", callback);
-    // int sleeper; // Qcloud's favorite way to see memory layout
-    // scanf("%d", &sleeper);
-    for (;;)
-    {
-        (interface.StackSwitch)(-1);
-        for (int i = 0; i < interface.burstSize; i += 1)
-        {
-            rte_prefetch0(rte_pktmbuf_mtod(interface.packetBurst[i], void *));
-            struct pcap_pkthdr header;
-            header.len = rte_pktmbuf_pkt_len(interface.packetBurst[i]);
-            header.caplen = rte_pktmbuf_data_len(interface.packetBurst[i]);
-            memset(&header.ts, 0x0, sizeof(header.ts)); // todo
-            uintptr_t *packet = rte_pktmbuf_mtod(interface.packetBurst[i], uintptr_t *);
-            *interface.packetRegionLow = (uintptr_t)packet;
-            *interface.packetRegionHigh = *interface.packetRegionLow + header.caplen;
-            // MESSAGE("arena region:\t%#lx ..< %#lx", *interface.packetRegionLow, *interface.packetRegionHigh);
-            // MESSAGE("start user callback at %p", callback);
-            callback(user, &header, (u_char *)packet);
-            // MESSAGE("%s", DONE_STRING);
-        }
-    }
-    return 0;
+    return (interface.pcapLoop)(p, cnt, callback, user);
 }
 
 int pcap_compile(pcap_t *p, struct bpf_program *fp,

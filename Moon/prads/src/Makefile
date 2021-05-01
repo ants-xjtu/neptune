@@ -92,7 +92,7 @@ CFLAGS+=-I/opt/local/include/ -DOSX
 CONFDIR=/opt/etc/prads
 else
 CFLAGS+=-D__USE_GNU
-CONFDIR=/home/hypermoon/neptune-yh/moon/prads/etc
+CONFDIR=${CURDIR}/../etc
 endif
 # LDFLAGS+= -lpthread
 SERVICE_OBJ = servicefp/servicefp.o servicefp/tcpc.o servicefp/tcps.o servicefp/udps.o 
