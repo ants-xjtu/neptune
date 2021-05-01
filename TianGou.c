@@ -146,20 +146,20 @@ int pcap_dispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
     return -1;
 }
 
-int	pcap_stats(pcap_t * p, struct pcap_stat * pt)
+int pcap_stats(pcap_t *p, struct pcap_stat *pt)
 {
     MESSAGE("pcap check always pass");
     return 1;
 }
 
-/***    libc blacklist functions begin    ***/ 
+/***    libc blacklist functions begin    ***/
 
 char *strdup(const char *str)
 {
     // toy version of strlen, and duplicate string on private heap
     const char *curr = str;
     size_t cnt = 0;
-    while(*curr != '\0')
+    while (*curr != '\0')
     {
         cnt++;
         curr++;
@@ -167,7 +167,7 @@ char *strdup(const char *str)
     char *x = (char *)(interface.malloc)(cnt + 1);
     curr = str;
     char *cx = x;
-    while(*curr != '\0')
+    while (*curr != '\0')
     {
         *cx = *curr;
         cx++;
@@ -200,39 +200,39 @@ uint16_t rte_eth_dev_count_avail()
     return 2;
 }
 
-struct rte_mempool *rte_pktmbuf_pool_create(const char *name, unsigned int n, 
-        unsigned int cache_size, uint16_t priv_size, uint16_t data_room_size, 
-        int socket_id)
+struct rte_mempool *rte_pktmbuf_pool_create(const char *name, unsigned int n,
+                                            unsigned int cache_size, uint16_t priv_size, uint16_t data_room_size,
+                                            int socket_id)
 {
     MESSAGE("return a trivial mempool pointer");
     return (struct rte_mempool *)1;
 }
 
-int rte_eth_dev_configure(uint16_t port_id, uint16_t nb_rx_queue, 
-        uint16_t nb_tx_queue, const struct rte_eth_conf *eth_conf)
+int rte_eth_dev_configure(uint16_t port_id, uint16_t nb_rx_queue,
+                          uint16_t nb_tx_queue, const struct rte_eth_conf *eth_conf)
 {
     MESSAGE("return 0");
     return 0;
 }
 
-int rte_eth_dev_adjust_nb_rx_tx_desc(uint16_t port_id, 
-        uint16_t *nb_rx_desc, uint16_t *nb_tx_desc)
+int rte_eth_dev_adjust_nb_rx_tx_desc(uint16_t port_id,
+                                     uint16_t *nb_rx_desc, uint16_t *nb_tx_desc)
 {
     MESSAGE("return 0");
     return 0;
 }
 
-int rte_eth_rx_queue_setup(uint16_t port_id, uint16_t rx_queue_id, 
-        uint16_t nb_rx_desc, unsigned int socket_id, 
-        const struct rte_eth_rxconf *rx_conf, struct rte_mempool *mb_pool)
+int rte_eth_rx_queue_setup(uint16_t port_id, uint16_t rx_queue_id,
+                           uint16_t nb_rx_desc, unsigned int socket_id,
+                           const struct rte_eth_rxconf *rx_conf, struct rte_mempool *mb_pool)
 {
     MESSAGE("rx_queue is previously initialized");
     return 0;
 }
 
-int rte_eth_tx_queue_setup(uint16_t port_id, uint16_t tx_queue_id, 
-        uint16_t nb_tx_desc, unsigned int socket_id, 
-        const struct rte_eth_txconf *tx_conf)
+int rte_eth_tx_queue_setup(uint16_t port_id, uint16_t tx_queue_id,
+                           uint16_t nb_tx_desc, unsigned int socket_id,
+                           const struct rte_eth_txconf *tx_conf)
 {
     MESSAGE("tx_queue is previously initialized");
     return 0;
@@ -245,15 +245,14 @@ void *rte_zmalloc_socket(const char *type, size_t size, unsigned int align, int 
     return NULL;
 }
 
-int
-rte_eth_tx_buffer_init(struct rte_eth_dev_tx_buffer *buffer, uint16_t size)
+int rte_eth_tx_buffer_init(struct rte_eth_dev_tx_buffer *buffer, uint16_t size)
 {
     MESSAGE("return 0");
     return 0;
 }
 
-int rte_eth_tx_buffer_set_err_callback(struct rte_eth_dev_tx_buffer *buffer, 
-        buffer_tx_error_fn callback, void *userdata)
+int rte_eth_tx_buffer_set_err_callback(struct rte_eth_dev_tx_buffer *buffer,
+                                       buffer_tx_error_fn callback, void *userdata)
 {
     MESSAGE("return 0");
     return 0;
@@ -285,7 +284,7 @@ int rte_eth_dev_close(uint16_t port_id)
 
 /*  tx/rx control  */
 // int consumed = 0;
-// uint16_t rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id, 
+// uint16_t rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id,
 //         struct rte_mbuf **rx_pkts, const uint16_t nb_pkts)
 // {
 //     if(!consumed)
@@ -303,7 +302,7 @@ int rte_eth_dev_close(uint16_t port_id)
 //     }
 // }
 
-// uint16_t rte_eth_tx_buffer(uint16_t port_id, uint16_t queue_id, 
+// uint16_t rte_eth_tx_buffer(uint16_t port_id, uint16_t queue_id,
 //         struct rte_eth_dev_tx_buffer *buffer, struct rte_mbuf *tx_pkt)
 // {
 //     // MESSAGE("packet buffered into txBuffer in RunTime");
@@ -311,7 +310,7 @@ int rte_eth_dev_close(uint16_t port_id)
 //     return 1;
 // }
 
-// uint16_t rte_eth_tx_buffer_flush(uint16_t port_id, 
+// uint16_t rte_eth_tx_buffer_flush(uint16_t port_id,
 //         uint16_t queue_id, struct rte_eth_dev_tx_buffer *buffer)
 // {
 //     // MESSAGE("flush singleton txBuffer");

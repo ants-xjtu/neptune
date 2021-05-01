@@ -398,8 +398,8 @@ void LoadMoon(char *moonPath, struct rte_mempool *pktmbufPool, int MOON_ID)
     uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
     *mainPrefix = (uintptr_t)arena;
     printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
-    interface->packetRegionLow = LibraryFind(&library, "SwordHolder_ExtraLow");
-    interface->packetRegionHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
+    // interface->packetRegionLow = LibraryFind(&library, "SwordHolder_ExtraLow");
+    // interface->packetRegionHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
     // below is a quick implement for 1 prot region, comment 2 lines if you are doing 2 regions
     // *gmemLowRegionLow = (uintptr_t)arena;
     // *gmemLowRegionHigh = *gmemLowRegionLow + MOON_SIZE;
@@ -522,6 +522,7 @@ void l2fwd_main_loop(void)
         for (int i = 0; i < MoonNum; i++)
         {
             HeapSwitch(i);
+            // TODO: switch interface->packetRegion*
             StackSwitch(i);
         }
         for (i = 0; i < nb_rx; i++)
