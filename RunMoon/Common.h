@@ -101,4 +101,8 @@ uint16_t srcPort, dstPort;
 void SetupDpdk();
 void RedirectEthDevices(struct rte_eth_dev *devices);
 
+// bench
+uint64_t numberTimerSecond;
+void PrintBench();
+
 #endif
