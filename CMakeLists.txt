@@ -142,7 +142,8 @@ add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
 set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
 
 add_moon(TARGET Moon_Libnids${P} SOURCES
-    Moon/LibnidsMain.c 
+    # Moon/LibnidsMain.c 
+    Moon/LibnidsWtf.c
     Moon/libnids/src/NIDS-link_pic.bc
 )
 target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)

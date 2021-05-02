@@ -4,7 +4,7 @@ void signal_handler(int signum)
 {
     if (signum == SIGINT || signum == SIGTERM)
     {
-        printf("\n\nSignal %d received, preparing to exit...\n",
+        printf("\nSignal %d received, preparing to exit...\n",
                signum);
         force_quit = true;
     }
@@ -75,7 +75,7 @@ void check_all_ports_link_status(uint32_t port_mask)
         if (all_ports_up == 1 || count == (MAX_CHECK_TIME - 1))
         {
             print_flag = 1;
-            printf("%s\n", DONE_STRING);
+            printf("\n%s\n", DONE_STRING);
         }
     }
 }

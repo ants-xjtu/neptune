@@ -48,6 +48,10 @@ int main(int argc, char *argv[], char *envp[])
         LoadMoon(argv[i], i - 2);
     }
 
+    // according to pkey(7), "The default key is assigned to any memory region 
+    // for which a pkey has not been explicitly assigned via pkey_mprotect(2)."
+    // However, pkey_set(0, ...) seems do not have any affect
+    // so use a non-default key to protect runtime for now
     runtimePkey = pkey_alloc(0, 0);
     printf("Allocate pkey #%d for runtime\n", runtimePkey);
     // dummy page for being protected
@@ -62,18 +66,18 @@ int main(int argc, char *argv[], char *envp[])
     // dummy[42] = 42;
 
     printf("*** START RUNTIME MAIN LOOP ***\n");
-    l2fwd_main_loop();
+    MainLoop();
 
     return 0;
 }
 
-void initMoon()
+void InitMoon()
 {
     char *argv[0];
     printf("[initMoon] calling moonStart\n");
     moonStart(0, argv);
     StackSwitch(-1);
-    printf("[initMoon] nf exited\n");
+    printf("[initMoon] nf exited before blocking on packets, intended?\n");
     exit(0);
 }
 
@@ -110,11 +114,9 @@ void LoadMoon(char *moonPath, int MOON_ID)
     *mainPrefix = (uintptr_t)arena;
     printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
 
-    nf_state[MOON_ID] = LibraryFind(&library, "state");
-
     moonStart = LibraryFind(&library, "main");
     printf("entering MOON for initial running, start = %p\n", moonStart);
-    StackStart(MOON_ID, initMoon);
+    StackStart(MOON_ID, InitMoon);
     printf("%s\n", DONE_STRING);
 }
 
@@ -124,7 +126,7 @@ void LoadMoon(char *moonPath, int MOON_ID)
 
 static uint64_t timer_period = 5; /* default period is 10 seconds */
 
-void l2fwd_main_loop(void)
+void MainLoop(void)
 {
     int sent;
     unsigned lcore_id;
@@ -219,14 +221,14 @@ void l2fwd_main_loop(void)
             continue;
         }
 
-        pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
+        // pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
         for (int i = 0; i < MoonNum; i++)
         {
             HeapSwitch(i);
             // TODO: switch interface->packetRegion*
             StackSwitch(i);
         }
-        pkey_set(runtimePkey, 0);
+        // pkey_set(runtimePkey, 0);
 
         for (i = 0; i < nb_rx; i++)
         {
@@ -239,22 +241,7 @@ void l2fwd_main_loop(void)
             cur_bytes += rte_pktmbuf_pkt_len(m);
         }
     }
-    for (int i = 0; i < MoonNum; i++)
-    {
-        if (nf_state[i])
-        {
-            printf("print state maintained by moon %d\n", i);
-            int *real_state = nf_state[i];
-            printf("unrecognized packets: %d\n", *real_state);
-            printf("setting up connections: %d\n", *(real_state + 1));
-            printf("closing connections: %d\n", *(real_state + 2));
-            printf("resetting connections: %d\n", *(real_state + 3));
-            printf("real data: %d\n\n", *(real_state + 4));
-        }
-    }
-    printf("total bytes processed: %21" PRIu64 "\n", cur_bytes);
-    printf("total packets processed: %21" PRIu64 "\n", cur_pkts);
-    printf(" Packets dropped: %21" PRIu64 "\n", port_statistics.dropped);
+    printf("Keep calm and definitely full-force fighting for SOSP.\n");
 }
 
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)

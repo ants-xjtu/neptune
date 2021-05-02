@@ -63,9 +63,9 @@ static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
 static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 
 int (*moonStart)(int argc, char *argv[]);
-void initMoon();
+void InitMoon();
 volatile bool force_quit;
-void l2fwd_main_loop(void);
+void MainLoop(void);
 void LoadMoon(char *, int);
 int MoonNum;       //the total number of moons, temporary use
 void *nf_state[2]; //the state information of the list of moon, temporary use

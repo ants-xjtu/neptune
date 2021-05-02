@@ -64,6 +64,11 @@ namespace
             {
                 name = inst->getOpcodeName();
             }
+            else if (auto *expr = dyn_cast<ConstantExpr>(operand))
+            {
+                name = expr->getOpcodeName();
+                name += "/expr";
+            }
             else
             {
                 errs() << "unknown value: " << *operand << "\n";
@@ -100,12 +105,6 @@ namespace
         {
             if (gep->hasAllConstantIndices())
             {
-                // stat.onGEPOperand();
-                // if (isSafeStoreOperand(gep->getPointerOperand(), stat)) {
-                //     return true;
-                // }
-                // outs() << *gep->getPointerOperand() << "\n";
-                // return false;
                 stat.onIgnoredStoreInst(REASON_GEP_WITH_CONST_INDICES);
                 return true;
             }

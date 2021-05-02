@@ -7,17 +7,19 @@
 #include <rte_ethdev.h>
 #include <rte_mempool.h>
 
+#define MESSAGE0() MESSAGE1("")
+#define MESSAGE1(extra_str) printf("[tiangou] %s " extra_str "\n", __func__)
+#define MESSAGE_(extra_str, extra_args...) printf("[tiangou] %s: " extra_str "\n", __func__, ##extra_args)
+#define GET_MACRO(_0, _1, _2, _3, _4, _5, _6, _7, NAME, ...) NAME
+#define MESSAGE(...)                                                                                             \
+    GET_MACRO(_0, ##__VA_ARGS__, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE0) \
+    (__VA_ARGS__)
+
+const char *DONE_STRING = "\xe2\x86\x91 done";
+
 Interface interface;
 
-void exit(int stat)
-{
-    int sleeper;
-    printf("exit(int) intercepted by Qcloud to see backtrace!\n");
-    printf("input an integer and have a nice segfault! Don't worry, it's expected:)\n");
-    scanf("%d", &sleeper);
-    abort();
-}
-
+// malloc
 void *malloc(size_t size)
 {
     return (interface.malloc)(size);
@@ -38,16 +40,43 @@ void *calloc(size_t size, size_t count)
     return (interface.calloc)(size, count);
 }
 
-#define MESSAGE0() MESSAGE1("")
-#define MESSAGE1(extra_str) printf("[tiangou] %s " extra_str "\n", __func__)
-#define MESSAGE_(extra_str, extra_args...) printf("[tiangou] %s: " extra_str "\n", __func__, ##extra_args)
-#define GET_MACRO(_0, _1, _2, _3, _4, _5, _6, _7, NAME, ...) NAME
-#define MESSAGE(...)                                                                                             \
-    GET_MACRO(_0, ##__VA_ARGS__, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE_, MESSAGE1, MESSAGE0) \
-    (__VA_ARGS__)
+// crucial part of glibc
+void exit(int stat)
+{
+    MESSAGE("nf recovering is not implemented");
+    abort();
+}
 
-const char *DONE_STRING = "\xe2\x86\x91 done";
+sighandler_t signal(int signum, sighandler_t handler)
+{
+    MESSAGE("nf try to set handler for signal %d (ignored)", signum);
+    return NULL;
+}
 
+char *strdup(const char *str)
+{
+    // toy version of strlen, and duplicate string on private heap
+    const char *curr = str;
+    size_t cnt = 0;
+    while (*curr != '\0')
+    {
+        cnt++;
+        curr++;
+    }
+    char *x = (char *)(interface.malloc)(cnt + 1);
+    curr = str;
+    char *cx = x;
+    while (*curr != '\0')
+    {
+        *cx = *curr;
+        cx++;
+        curr++;
+    }
+    *cx = '\0';
+    return x;
+}
+
+// pcap
 int pcap_setfilter(pcap_t *p, struct bpf_program *fp)
 {
     MESSAGE();
@@ -131,32 +160,13 @@ int pcap_stats(pcap_t *p, struct pcap_stat *pt)
     return 1;
 }
 
-/***    libc blacklist functions begin    ***/
+// dpdk
 
-char *strdup(const char *str)
-{
-    // toy version of strlen, and duplicate string on private heap
-    const char *curr = str;
-    size_t cnt = 0;
-    while (*curr != '\0')
-    {
-        cnt++;
-        curr++;
-    }
-    char *x = (char *)(interface.malloc)(cnt + 1);
-    curr = str;
-    char *cx = x;
-    while (*curr != '\0')
-    {
-        *cx = *curr;
-        cx++;
-        curr++;
-    }
-    *cx = '\0';
-    return x;
-}
+// two devices for src/dst ports
+// this cannot go into interface, because I cannot "sync" it when assign to
+// fields in interface
+struct rte_eth_dev rte_eth_devices[2];
 
-/***    vDPDK begins    ***/
 int rte_eal_init(int argc, char **argv)
 {
     MESSAGE("return 1(EAL already parsed)");
@@ -179,9 +189,10 @@ uint16_t rte_eth_dev_count_avail()
     return 2;
 }
 
-struct rte_mempool *rte_pktmbuf_pool_create(const char *name, unsigned int n,
-                                            unsigned int cache_size, uint16_t priv_size, uint16_t data_room_size,
-                                            int socket_id)
+struct rte_mempool *rte_pktmbuf_pool_create(
+    const char *name, unsigned int n,
+    unsigned int cache_size, uint16_t priv_size, uint16_t data_room_size,
+    int socket_id)
 {
     MESSAGE("return a trivial mempool pointer");
     return (struct rte_mempool *)1;
@@ -260,41 +271,3 @@ int rte_eth_dev_close(uint16_t port_id)
     MESSAGE("return 0(moon doesn't close device)");
     return 0;
 }
-
-/*  tx/rx control  */
-// int consumed = 0;
-// uint16_t rte_eth_rx_burst(uint16_t port_id, uint16_t queue_id,
-//         struct rte_mbuf **rx_pkts, const uint16_t nb_pkts)
-// {
-//     if(!consumed)
-//     {
-//         consumed = 1;
-//         // Do we prefetch the packets here, or let the moon do this seemingly harmless job?
-//         rx_pkts = interface.packetBurst;
-//         return interface.burstSize;
-//     }
-//     else
-//     {
-//         consumed = 0;
-//         (interface.StackSwitch)(-1);
-//         return rte_eth_rx_burst(port_id, queue_id, rx_pkts, nb_pkts);
-//     }
-// }
-
-// uint16_t rte_eth_tx_buffer(uint16_t port_id, uint16_t queue_id,
-//         struct rte_eth_dev_tx_buffer *buffer, struct rte_mbuf *tx_pkt)
-// {
-//     // MESSAGE("packet buffered into txBuffer in RunTime");
-//     // note that each call to tx_buffer will only buffer one mbuf, so we return 1
-//     return 1;
-// }
-
-// uint16_t rte_eth_tx_buffer_flush(uint16_t port_id,
-//         uint16_t queue_id, struct rte_eth_dev_tx_buffer *buffer)
-// {
-//     // MESSAGE("flush singleton txBuffer");
-//     return 0;
-// }
-
-// two devices for src/dst ports
-struct rte_eth_dev rte_eth_devices[2];
