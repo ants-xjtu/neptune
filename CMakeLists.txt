@@ -89,7 +89,7 @@ function(add_moon)
 
     # step 2: *.bc -> link.bc
     add_custom_command(OUTPUT ${BITCODE_FILE}
-        DEPENDS ${MOON_NAME}_SourceLibrary
+        DEPENDS ${MOON_NAME}_SourceLibrary $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary> 
         COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` > ${BITCODE_FILE}
         # COMMAND llvm-dis ${BITCODE_FILE}
     )
@@ -157,6 +157,10 @@ add_moon(TARGET Moon_L2Fwd${P} SOURCES
     Moon/L2Fwd.c
 )
 target_compile_definitions(Moon_L2Fwd${P} PRIVATE ALLOW_EXPERIMENTAL_API)
+
+add_moon(TARGET Moon_RxBurstTest${P} SOURCES
+    Moon/RxBurstTest.c
+)
 
 endmacro()
 

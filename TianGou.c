@@ -295,3 +295,6 @@ int rte_eth_dev_close(uint16_t port_id)
 //     // MESSAGE("flush singleton txBuffer");
 //     return 0;
 // }
+
+// two devices for src/dst ports
+struct rte_eth_dev rte_eth_devices[2];

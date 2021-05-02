@@ -70,9 +70,6 @@ void LoadMoon(char *, int);
 int MoonNum;       //the total number of moons, temporary use
 void *nf_state[2]; //the state information of the list of moon, temporary use
 
-void signal_handler(int signum);
-void check_all_ports_link_status(uint32_t port_mask);
-
 struct l2fwd_port_statistics
 {
     uint64_t tx;
@@ -92,5 +89,9 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 #define MAX_PKT_BURST 32
 struct rte_mbuf *packetBurst[MAX_PKT_BURST];
 unsigned int burstSize;
+
+uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts);
+
+void SetupEthDevices(struct rte_eth_dev *devices);
 
 #endif

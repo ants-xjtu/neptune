@@ -35,7 +35,8 @@ int main(int argc, char *argv[], char *envp[])
     interface->calloc = HeapCalloc;
     interface->free = HeapFree;
     interface->pcapLoop = PcapLoop;
-    printf("HeapMalloc at address %p\n", HeapMalloc);
+    struct rte_eth_dev *rteEthDevices = dlsym(tiangou, "rte_eth_devices");
+    SetupEthDevices(rteEthDevices);
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
     printf("%s\n", DONE_STRING);
@@ -108,8 +109,6 @@ void LoadMoon(char *moonPath, int MOON_ID)
     uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
     *mainPrefix = (uintptr_t)arena;
     printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
-    // interface->packetRegionLow = LibraryFind(&library, "SwordHolder_ExtraLow");
-    // interface->packetRegionHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
 
     nf_state[MOON_ID] = LibraryFind(&library, "state");
 
@@ -220,22 +219,14 @@ void l2fwd_main_loop(void)
             continue;
         }
 
-        int status = pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
-        // if (status)
-        // {
-        //     fprintf(stderr, "pkey_set: %d\n", status);
-        // }
+        pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
         for (int i = 0; i < MoonNum; i++)
         {
             HeapSwitch(i);
             // TODO: switch interface->packetRegion*
             StackSwitch(i);
         }
-        status = pkey_set(runtimePkey, 0);
-        // if (status)
-        // {
-        //     fprintf(stderr, "pkey_set: %d\n", status);
-        // }
+        pkey_set(runtimePkey, 0);
 
         for (i = 0; i < nb_rx; i++)
         {
@@ -284,4 +275,10 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             callback(user, &header, (u_char *)packet);
         }
     }
+}
+
+uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
+{
+    printf("[RunMoon] RxBurst: sucess\n");
+    exit(0);
 }

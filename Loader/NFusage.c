@@ -16,7 +16,7 @@ uint64_t dissect_and_calculate(struct NF_list *nl);
 #define ALIGN_DOWN(base, size) ((base) & -((__typeof__(base))(size)))
 #define ALIGN_UP(base, size) ALIGN_DOWN((base) + (size)-1, (size))
 //static const char *sys_path[2];
-static const char *sys_path[3]; //a quick fix to load the custom libpcre2 without optimization
+static const char *sys_path[32]; //a quick fix to load the custom libpcre2 without optimization
 static const char *preloadList[MAX_PRELOAD_NUM] = {NULL};
 struct NF_link_map *preloadMap[MAX_PRELOAD_NUM];
 void *preloadHandle[MAX_PRELOAD_NUM] = {NULL}; // TODO: check if we need to remove some of it...
@@ -40,6 +40,11 @@ void init_system_path()
     sys_path[0] = "/usr/lib/x86_64-linux-gnu/";
     sys_path[1] = "/lib/x86_64-linux-gnu/";
     sys_path[2] = "/usr/local/lib/"; //this is for libnids
+
+    // sgdxbc: for DPDK (librte_*)
+    // should always in RPATH, don't know why be absent sometime
+    sys_path[3] = "/usr/local/lib/x86_64-linux-gnu/";
+    sys_path[4] = NULL;  // sgdxbc: end of list
 }
 
 uint64_t NFusage(void *ll)
@@ -182,6 +187,7 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
     Elf64_Dyn *ld;
     // i forgot Elf64_Addr should be a unsigned value and assign -1 to it for granted
     // i didn't use 0 because mapstart can actually starts at 0
+    // sgdxbc: WTF, why assign -1 to an unsigned
     Elf64_Addr mapstart = -1, mapend;
 
     /* now dealing with the program headers, from which we need to 
@@ -201,6 +207,10 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
             /* though it is not the same time, but it is the same fd... */
             _c = pread(nl->fd, (void *)ld, ph->p_memsz, ph->p_offset); //note that offset and paddr are not the same
         }
+    }
+    // some random fix added by sgdxbc
+    if (mapstart + 1 == 0) {
+        mapstart = 0;
     }
 
     Elf64_Dyn *str, *dyn = ld, *curr = ld;
@@ -266,6 +276,7 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
             }
             if (!found)
             {
+                // printf("[Loader] %s\n", filename);
                 int fd = open(filename, O_RDONLY);
                 /* XXX problems here
                  * open will successfully deal with file under the current directory
@@ -283,6 +294,7 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
                         *ptr = '/'; //add a "/" to make it a path
                         ptr++;
                         memcpy(ptr, filename, strlen(filename) + 1); //+1 to copy \0. memcpy only copy num bytes
+                        // printf("[Loader] %s\n", buf);
                         if ((fd = open(buf, O_RDONLY)) != -1)
                             break;
                     }
@@ -290,15 +302,18 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
                     if (fd == -1)
                     {
                         //for (int i = 0; i < 2; i++)
-                        for (int i = 0; i < 3; i++)
+                        for (int i = 0; sys_path[i]; i++)
                         {
                             char *ptr = mempcpy(buf, sys_path[i], strlen(sys_path[i]));
                             memcpy(ptr, filename, strlen(filename) + 1);
+                            // printf("[Loader] %s\n", buf);
                             if ((fd = open(buf, O_RDONLY)) != -1)
                                 break;
                         }
-                        if (fd == -1)
+                        if (fd == -1) {
                             printf("In mapping %s as a dependency: file not found\n", filename);
+                            exit(1);
+                        }
                     }
                 }
                 struct NF_list *tmp = calloc(sizeof(struct NF_list), 1);

@@ -236,3 +236,18 @@ void SetupDpdk()
     portMask |= (1 << dstPort);
     check_all_ports_link_status(portMask);
 }
+
+static const size_t NumberQueue = 16;
+
+void SetupEthDevices(struct rte_eth_dev *devices)
+{
+    printf("setup eth devices at: %p\n", devices);
+    for (int i = 0; i < 2; i += 1)
+    {
+        struct rte_eth_dev *dev = &devices[i];
+        printf("setup device: %p\n", dev);
+        dev->rx_pkt_burst = RxBurst;
+        dev->data = malloc(sizeof(struct rte_eth_dev_data));
+        dev->data->rx_queues = malloc(sizeof(void *) * NumberQueue);
+    }
+}
