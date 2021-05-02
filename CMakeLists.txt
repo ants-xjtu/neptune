@@ -44,7 +44,7 @@ pkg_check_modules(DPDK REQUIRED IMPORTED_TARGET libdpdk)
 
 add_executable(RunMoon 
     RunMoon/Main.c
-    RunMoon/Aux.c
+    RunMoon/Support.c
 )
 target_compile_definitions(RunMoon PRIVATE ALLOW_EXPERIMENTAL_API)
 target_include_directories(RunMoon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

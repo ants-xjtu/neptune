@@ -57,6 +57,8 @@ int main(int argc, char *argv[], char *envp[])
     {
         rte_exit(EXIT_FAILURE, "pkey_mprotect: %d", ret);
     }
+    // int status = pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
+    // dummy[42] = 42;
 
     printf("*** START RUNTIME MAIN LOOP ***\n");
     l2fwd_main_loop();
