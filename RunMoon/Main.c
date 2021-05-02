@@ -246,6 +246,9 @@ void MainLoop(void)
 #define CYCLE_SIZE 99
     double cycle[CYCLE_SIZE], prevAvg = -1;
     int cycleIndex = 0;
+#define AVG_DELTA_CYCLE_SIZE 24
+    int avgDeltaCycle[AVG_DELTA_CYCLE_SIZE];
+    int avgDeltaCycleIndex = 0;
 
     while (!force_quit)
     {
@@ -298,7 +301,23 @@ void MainLoop(void)
                         sum += cycle[i];
                     }
                     double avg = sum / count;
-                    printf("avg(over past %2d): %fK\n", count, avg);
+                    printf("avg(over past %2d): %fK\t", count, avg);
+
+                    avgDeltaCycle[avgDeltaCycleIndex % AVG_DELTA_CYCLE_SIZE] = prevAvg < avg;
+                    avgDeltaCycleIndex += 1;
+                    int go[] = {0, 0};
+                    for (int i = 0; i < avgDeltaCycleIndex; i += 1)
+                    {
+                        if (i >= AVG_DELTA_CYCLE_SIZE)
+                        {
+                            break;
+                        }
+                        go[avgDeltaCycle[i]] += 1;
+                    }
+                    printf(
+                        "%2d go up, %2d go down in last %2d avg\n",
+                        go[0], go[1],
+                        avgDeltaCycleIndex > AVG_DELTA_CYCLE_SIZE ? AVG_DELTA_CYCLE_SIZE : avgDeltaCycleIndex);
                     prevAvg = avg;
                 }
             }

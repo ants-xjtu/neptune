@@ -1,9 +1,9 @@
 #!/bin/bash
 
-PKU_FLAG=" --pku"
-# PKU_FLAG=""
+# PKU_FLAG=" --pku"
+PKU_FLAG=""
 MOON_SO="./build/libMoon_Libnids_NoSFI.so"
-COUNT=5
+COUNT=10
 
 SUBCOMMAND="printf '${MOON_SO} %.0s' {1..${COUNT}}"
 MOON_ARGS=`eval ${SUBCOMMAND}`
