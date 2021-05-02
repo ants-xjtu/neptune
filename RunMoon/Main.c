@@ -1,12 +1,5 @@
 #include "RunMoon.h"
 
-struct MoonData
-{
-    //
-};
-
-int runtimePkey;
-
 int main(int argc, char *argv[], char *envp[])
 {
     int ret = rte_eal_init(argc, argv);
@@ -34,9 +27,10 @@ int main(int argc, char *argv[], char *envp[])
     interface->realloc = HeapRealloc;
     interface->calloc = HeapCalloc;
     interface->free = HeapFree;
+    interface->signal = signal;
     interface->pcapLoop = PcapLoop;
     struct rte_eth_dev *rteEthDevices = dlsym(tiangou, "rte_eth_devices");
-    SetupEthDevices(rteEthDevices);
+    RedirectEthDevices(rteEthDevices);
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
     printf("%s\n", DONE_STRING);
@@ -48,7 +42,7 @@ int main(int argc, char *argv[], char *envp[])
         LoadMoon(argv[i], i - 2);
     }
 
-    // according to pkey(7), "The default key is assigned to any memory region 
+    // according to pkey(7), "The default key is assigned to any memory region
     // for which a pkey has not been explicitly assigned via pkey_mprotect(2)."
     // However, pkey_set(0, ...) seems do not have any affect
     // so use a non-default key to protect runtime for now
@@ -74,14 +68,14 @@ int main(int argc, char *argv[], char *envp[])
 void InitMoon()
 {
     char *argv[0];
-    printf("[initMoon] calling moonStart\n");
+    printf("[InitMoon] calling moonStart\n");
     moonStart(0, argv);
     StackSwitch(-1);
-    printf("[initMoon] nf exited before blocking on packets, intended?\n");
+    printf("[InitMoon] nf exited before blocking on packets, intended?\n");
     exit(0);
 }
 
-void LoadMoon(char *moonPath, int MOON_ID)
+void LoadMoon(char *moonPath, int moonId)
 {
     printf("allocating memory for MOON %s\n", moonPath);
     void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
@@ -102,10 +96,10 @@ void LoadMoon(char *moonPath, int MOON_ID)
     printf("\n");
 
     printf("initializing regions\n");
-    SetStack(MOON_ID, stackStart, STACK_SIZE);
+    SetStack(moonId, stackStart, STACK_SIZE);
     library.loadAddress = libraryStart;
     DeployLibrary(&library);
-    SetHeap(heapStart, heapSize, MOON_ID);
+    SetHeap(heapStart, heapSize, moonId);
     InitHeap();
     printf("%s\n", DONE_STRING);
 
@@ -116,7 +110,7 @@ void LoadMoon(char *moonPath, int MOON_ID)
 
     moonStart = LibraryFind(&library, "main");
     printf("entering MOON for initial running, start = %p\n", moonStart);
-    StackStart(MOON_ID, InitMoon);
+    StackStart(moonId, InitMoon);
     printf("%s\n", DONE_STRING);
 }
 
@@ -124,7 +118,7 @@ void LoadMoon(char *moonPath, int MOON_ID)
 #define MEMPOOL_CACHE_SIZE 256
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
 
-static uint64_t timer_period = 5; /* default period is 10 seconds */
+static uint64_t timer_period = 1; /* default period is 10 seconds */
 
 void MainLoop(void)
 {
@@ -135,29 +129,22 @@ void MainLoop(void)
     const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S *
                                BURST_TX_DRAIN_US;
     struct rte_eth_dev_tx_buffer *buffer;
-    uint64_t prev_pkts, cur_pkts;
-    uint64_t prev_bytes, cur_bytes;
-    struct timeval ts, te;
-    int pkt_interval = 0;
 
     prev_tsc = 0;
     timer_tsc = 0;
-    prev_pkts = 0;
-    cur_pkts = 0;
-    prev_bytes = 0;
-    cur_bytes = 0;
-    gettimeofday(&ts, NULL);
-
     lcore_id = rte_lcore_id();
+    uint64_t numberTimerSecond = timer_period;
     timer_period *= rte_get_timer_hz();
 
     RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u\n", lcore_id);
 
+#define CYCLE_SIZE 128
+    double cycle[CYCLE_SIZE], prevAvg = -1;
+    int cycleIndex = 0;
+
     while (!force_quit)
     {
-
         cur_tsc = rte_rdtsc();
-        cur_pkts = port_statistics.rx;
 
         /*
 		 * TX burst queue drain
@@ -182,21 +169,31 @@ void MainLoop(void)
                 /* if timer has reached its timeout */
                 if (unlikely(timer_tsc >= timer_period))
                 {
+                    /* reset the timer */
+                    timer_tsc = 0;
+                    double pps = (double)port_statistics.tx / numberTimerSecond / 1000 / 1000;
+                    printf("pps: %fM", pps);
+                    memset(&port_statistics, 0, sizeof(port_statistics));
 
-                    /* do this only on main core */
-                    if (lcore_id == rte_get_main_lcore())
+                    cycle[cycleIndex % CYCLE_SIZE] = pps;
+                    if (pps != 0.0 && !(prevAvg >= 0.0 && pps < 0.8 * prevAvg))
                     {
-                        /* reset the timer */
-                        timer_tsc = 0;
-                        gettimeofday(&te, NULL);
-                        time_t s = te.tv_sec - ts.tv_sec;
-                        suseconds_t u = s * 1000000 + te.tv_usec - ts.tv_usec;
-                        double throughput = (double)(cur_bytes - prev_bytes) * 8 / u;
-                        printf("%f\n", throughput);
-                        prev_bytes = cur_bytes;
-                        prev_pkts = cur_pkts;
-                        gettimeofday(&ts, NULL);
+                        cycleIndex += 1;
                     }
+                    else
+                    {
+                        printf(" (ignored)");
+                    }
+                    printf("\n");
+                    double sum = 0.0;
+                    int count = cycleIndex >= CYCLE_SIZE ? CYCLE_SIZE : cycleIndex;
+                    for (int i = 0; i < count; i += 1)
+                    {
+                        sum += cycle[i];
+                    }
+                    double avg = sum / count;
+                    printf("avg(over past %3d): %fM\n", count, avg);
+                    prevAvg = avg;
                 }
             }
 
@@ -207,12 +204,9 @@ void MainLoop(void)
 		 * Read packet from RX queues
 		 */
         portid = srcPort;
-        // potential problems here: are all the MOONs share the same packetBurst inside interface?
         nb_rx = rte_eth_rx_burst(portid, 0, packetBurst, MAX_PKT_BURST);
-
         port_statistics.rx += nb_rx;
         burstSize = nb_rx;
-        pkt_interval += nb_rx;
 
         // prevent unnecessary pkey overhead
         // IMPORTANT: careful when change code below here
@@ -233,12 +227,9 @@ void MainLoop(void)
         for (i = 0; i < nb_rx; i++)
         {
             struct rte_mbuf *m = packetBurst[i];
-            rte_prefetch0(rte_pktmbuf_mtod(m, void *));
             sent = rte_eth_tx_buffer(dstPort, 0, txBuffer, m);
             if (sent)
                 port_statistics.tx += sent;
-            // pkt len or data len?
-            cur_bytes += rte_pktmbuf_pkt_len(m);
         }
     }
     printf("Keep calm and definitely full-force fighting for SOSP.\n");

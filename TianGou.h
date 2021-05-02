@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <stddef.h>
 #include <pcap/pcap.h>
+#include <rte_ethdev.h>
 
 typedef struct
 {
@@ -13,7 +14,12 @@ typedef struct
     void *(*calloc)(size_t, size_t);
     void (*free)(void *);
 
+    sighandler_t (*signal)(int signum, sighandler_t handler);
+
     int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
 } Interface;
+
+// the variable `interface` and `rte_eth_dev` is defined in TianGou.c
+// because they must not be defined as extern
 
 #endif

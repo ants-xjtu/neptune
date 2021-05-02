@@ -54,22 +54,16 @@ static const size_t STACK_SIZE = 32ul << 20; // 32MB
 static const size_t MOON_SIZE = 32ul << 30;  // 32GB
 // Heap size = MOON_SIZE - STACK_SIZE - library.length
 
-// we are doing a chain, so no static moon
-// const int MOON_ID = 0;
 static const char *DONE_STRING = "\xe2\x86\x91 done";
 #define RTE_TEST_RX_DESC_DEFAULT 1024
 #define RTE_TEST_TX_DESC_DEFAULT 1024
 static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
 static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 
+// global variables of runtime main
+// most of them are passing information between runtime/parivate stacks
 int (*moonStart)(int argc, char *argv[]);
-void InitMoon();
-volatile bool force_quit;
-void MainLoop(void);
-void LoadMoon(char *, int);
-int MoonNum;       //the total number of moons, temporary use
-void *nf_state[2]; //the state information of the list of moon, temporary use
-
+int MoonNum; //the total number of moons, temporary use
 struct l2fwd_port_statistics
 {
     uint64_t tx;
@@ -77,21 +71,32 @@ struct l2fwd_port_statistics
     uint64_t dropped;
 } __rte_cache_aligned;
 struct l2fwd_port_statistics port_statistics;
-
 struct rte_eth_dev_tx_buffer *txBuffer;
 Interface *interface;
-uint16_t srcPort, dstPort;
-
-void SetupDpdk();
-
-int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
-
 #define MAX_PKT_BURST 32
 struct rte_mbuf *packetBurst[MAX_PKT_BURST];
 unsigned int burstSize;
+int runtimePkey;
+struct MoonData
+{
+    int id;
+    int pkey;
+    uintptr_t *extraLowPtr, *extraHighPtr;
+    int switchTo;
+};
+struct MoonData moonDataList[16];
 
+// forward decalrations for runtime main
+void InitMoon();
+void MainLoop(void);
+void LoadMoon(char *, int);
+int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts);
 
-void SetupEthDevices(struct rte_eth_dev *devices);
+// support library APIs and global shared with main
+volatile bool force_quit;
+uint16_t srcPort, dstPort;
+void SetupDpdk();
+void RedirectEthDevices(struct rte_eth_dev *devices);
 
 #endif

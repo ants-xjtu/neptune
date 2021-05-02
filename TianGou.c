@@ -49,7 +49,11 @@ void exit(int stat)
 
 sighandler_t signal(int signum, sighandler_t handler)
 {
-    MESSAGE("nf try to set handler for signal %d (ignored)", signum);
+    MESSAGE("nf try to set handler for signal %d", signum);
+    if (signum != SIGINT && signum != SIGTERM)
+    {
+        return (interface.signal)(signum, handler);
+    }
     return NULL;
 }
 
@@ -114,7 +118,7 @@ pcap_t *pcap_open_offline(const char *fname, char *errbuf)
 
 int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
-    MESSAGE("callback = %p\n", callback);
+    MESSAGE("callback = %p", callback);
     return (interface.pcapLoop)(p, cnt, callback, user);
 }
 

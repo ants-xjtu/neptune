@@ -239,7 +239,7 @@ void SetupDpdk()
 
 static const size_t NumberQueue = 16;
 
-void SetupEthDevices(struct rte_eth_dev *devices)
+void RedirectEthDevices(struct rte_eth_dev *devices)
 {
     printf("setup eth devices at: %p\n", devices);
     for (int i = 0; i < 2; i += 1)

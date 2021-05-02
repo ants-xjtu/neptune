@@ -157,7 +157,7 @@ target_link_libraries(Moon_Prads${P} pcap pcre resolv)
 add_moon(TARGET Moon_L2Fwd${P} SOURCES
     Moon/L2Fwd.c
 )
-target_compile_definitions(Moon_L2Fwd${P} PRIVATE ALLOW_EXPERIMENTAL_API)
+target_compile_definitions(Moon_L2Fwd${P}_SourceLibrary PRIVATE ALLOW_EXPERIMENTAL_API)
 
 add_moon(TARGET Moon_RxBurstTest${P} SOURCES
     Moon/RxBurstTest.c
