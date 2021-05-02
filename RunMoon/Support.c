@@ -1,9 +1,13 @@
-#include "RunMoon.h"
+#include "RunMoon/Common.h"
 
 void signal_handler(int signum)
 {
     if (signum == SIGINT || signum == SIGTERM)
     {
+        if (force_quit) {
+            printf("Exit ungracefully now.\n");
+            abort();
+        }
         printf("\nSignal %d received, preparing to exit...\n",
                signum);
         force_quit = true;

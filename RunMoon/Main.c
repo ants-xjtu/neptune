@@ -1,4 +1,4 @@
-#include "RunMoon.h"
+#include "RunMoon/Common.h"
 
 int main(int argc, char *argv[], char *envp[])
 {
@@ -12,13 +12,12 @@ int main(int argc, char *argv[], char *envp[])
 
     if (argc < 3)
     {
-        printf("usage: %s [EAL options] -- <tiangou> <moon>\n", argv[0]);
+        printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon> [<moons>]\n", argv[0]);
         return 0;
     }
-    MoonNum = argc - 2;
-    const char *tiangouPath = argv[1];
     InitLoader(argc, argv, envp);
 
+    const char *tiangouPath = argv[1];
     printf("loading tiangou library %s\n", tiangouPath);
     void *tiangou = dlopen(tiangouPath, RTLD_LAZY);
     interface = dlsym(tiangou, "interface");
@@ -35,12 +34,22 @@ int main(int argc, char *argv[], char *envp[])
     PreloadLibrary(tiangou);
     printf("%s\n", DONE_STRING);
 
-    for (int i = 2; i < argc; i++)
+    int i = 2;
+    enablePku = 0;
+    if (strcmp(argv[2], "--pku") == 0)
     {
-        // we give each moon an id here, and it needs to be recycled later
-        printf("loading moon%d...\n", i - 1);
-        LoadMoon(argv[i], i - 2);
+        i += 1;
+        enablePku = 1;
     }
+
+    loading = 1;
+    for (int moonId = 0; i < argc; moonId += 1, i += 1)
+    {
+        char *moonPath = argv[i];
+        printf("[RunMoon] moon#%d START\n", moonId);
+        LoadMoon(argv[i], moonId);
+    }
+    loading = 0;
 
     // according to pkey(7), "The default key is assigned to any memory region
     // for which a pkey has not been explicitly assigned via pkey_mprotect(2)."
@@ -70,7 +79,6 @@ void InitMoon()
     char *argv[0];
     printf("[InitMoon] calling moonStart\n");
     moonStart(0, argv);
-    StackSwitch(-1);
     printf("[InitMoon] nf exited before blocking on packets, intended?\n");
     exit(0);
 }
@@ -112,6 +120,103 @@ void LoadMoon(char *moonPath, int moonId)
     printf("entering MOON for initial running, start = %p\n", moonStart);
     StackStart(moonId, InitMoon);
     printf("%s\n", DONE_STRING);
+
+    printf("finalize moon setup\n");
+    moonDataList[moonId].id = moonId;
+    moonDataList[moonId + 1].id = -1;
+    moonDataList[moonId].extraLowPtr = LibraryFind(&library, "SwordHolder_ExtraLow");
+    moonDataList[moonId].extraHighPtr = LibraryFind(&library, "SwordHolder_ExtraHigh");
+    if (!moonDataList[moonId].extraLowPtr || !moonDataList[moonId].extraHighPtr)
+    {
+        rte_exit(EXIT_FAILURE, "cannot resolve extra region variables");
+    }
+    moonDataList[moonId].pkey = pkey_alloc(0, 0);
+    moonDataList[moonId].switchTo = -1;
+    if (moonId != 0)
+    {
+        moonDataList[moonId - 1].switchTo = moonId;
+    }
+    // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
+    printf("%s\n", DONE_STRING);
+}
+
+// https://code.woboq.org/userspace/glibc/sysdeps/unix/sysv/linux/x86/arch-pkey.h.html
+/* Return the value of the PKRU register.  */
+static inline unsigned int
+pkey_read(void)
+{
+    unsigned int result;
+    __asm__ volatile(".byte 0x0f, 0x01, 0xee"
+                     : "=a"(result)
+                     : "c"(0)
+                     : "rdx");
+    return result;
+}
+
+/* Overwrite the PKRU register with VALUE.  */
+static inline void
+pkey_write(unsigned int value)
+{
+    __asm__ volatile(".byte 0x0f, 0x01, 0xef"
+                     :
+                     : "a"(value), "c"(0), "d"(0));
+}
+
+unsigned int pkru;
+int pkey_set(int key, unsigned int rights)
+{
+    if (key < 0 || key > 15 || rights > 3)
+    {
+        // __set_errno(EINVAL);
+        return -1;
+    }
+    unsigned int mask = 3 << (2 * key);
+    // unsigned int pkru = pkey_read();
+    pkru = (pkru & ~mask) | (rights << (2 * key));
+    // pkey_write(pkru);
+    return 0;
+}
+
+void UpdatePkey()
+{
+    if (!enablePku)
+    {
+        return;
+    }
+    pkru = pkey_read();
+    pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
+    for (int i = 0; moonDataList[i].id != -1; i += 1)
+    {
+        pkey_set(
+            moonDataList[i].pkey,
+            moonDataList[i].id == currentMoonId ? 0 : PKEY_DISABLE_WRITE);
+    }
+    pkey_write(pkru);
+}
+
+void DisablePkey()
+{
+    if (!enablePku)
+    {
+        return;
+    }
+    pkru = pkey_read();
+    pkey_set(runtimePkey, 0);
+    for (int i = 0; moonDataList[i].id != -1; i += 1)
+    {
+        pkey_set(moonDataList[i].pkey, 0);
+    }
+    pkey_write(pkru);
+}
+
+void MoonSwitch()
+{
+    if (currentMoonId != -1)
+    {
+        HeapSwitch(currentMoonId);
+        UpdatePkey();
+    }
+    StackSwitch(currentMoonId); // maybe -1
 }
 
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
@@ -138,7 +243,7 @@ void MainLoop(void)
 
     RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u\n", lcore_id);
 
-#define CYCLE_SIZE 128
+#define CYCLE_SIZE 99
     double cycle[CYCLE_SIZE], prevAvg = -1;
     int cycleIndex = 0;
 
@@ -171,20 +276,21 @@ void MainLoop(void)
                 {
                     /* reset the timer */
                     timer_tsc = 0;
-                    double pps = (double)port_statistics.tx / numberTimerSecond / 1000 / 1000;
-                    printf("pps: %fM", pps);
+                    double pps = (double)port_statistics.tx / numberTimerSecond / 1000;
+                    printf("pps: %.3fK", pps);
                     memset(&port_statistics, 0, sizeof(port_statistics));
 
                     cycle[cycleIndex % CYCLE_SIZE] = pps;
                     if (pps != 0.0 && !(prevAvg >= 0.0 && pps < 0.8 * prevAvg))
                     {
                         cycleIndex += 1;
+                        printf("        ");
                     }
                     else
                     {
                         printf(" (ignored)");
                     }
-                    printf("\n");
+                    printf("\t");
                     double sum = 0.0;
                     int count = cycleIndex >= CYCLE_SIZE ? CYCLE_SIZE : cycleIndex;
                     for (int i = 0; i < count; i += 1)
@@ -192,7 +298,7 @@ void MainLoop(void)
                         sum += cycle[i];
                     }
                     double avg = sum / count;
-                    printf("avg(over past %3d): %fM\n", count, avg);
+                    printf("avg(over past %2d): %fK\n", count, avg);
                     prevAvg = avg;
                 }
             }
@@ -215,14 +321,9 @@ void MainLoop(void)
             continue;
         }
 
-        // pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
-        for (int i = 0; i < MoonNum; i++)
-        {
-            HeapSwitch(i);
-            // TODO: switch interface->packetRegion*
-            StackSwitch(i);
-        }
-        // pkey_set(runtimePkey, 0);
+        currentMoonId = 0;
+        MoonSwitch();
+        DisablePkey();
 
         for (i = 0; i < nb_rx; i++)
         {
@@ -239,7 +340,16 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     for (;;)
     {
-        StackSwitch(-1);
+        if (loading)
+        {
+            StackSwitch(-1);
+        }
+        else
+        {
+            currentMoonId = moonDataList[currentMoonId].switchTo;
+            MoonSwitch();
+        }
+
         for (int i = 0; i < burstSize; i += 1)
         {
             rte_prefetch0(rte_pktmbuf_mtod(packetBurst[i], void *));
@@ -248,8 +358,8 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             header.caplen = rte_pktmbuf_data_len(packetBurst[i]);
             memset(&header.ts, 0x0, sizeof(header.ts)); // todo
             uintptr_t *packet = rte_pktmbuf_mtod(packetBurst[i], uintptr_t *);
-            // *interface.packetRegionLow = (uintptr_t)packet;
-            // *interface.packetRegionHigh = *interface.packetRegionLow + header.caplen;
+            // *moonDataList[currentMoonId].extraLowPtr = (uintptr_t)packet;
+            // *moonDataList[currentMoonId].extraHighPtr = (uintptr_t)packet + header.caplen;
             callback(user, &header, (u_char *)packet);
         }
     }

@@ -63,7 +63,6 @@ static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 // global variables of runtime main
 // most of them are passing information between runtime/parivate stacks
 int (*moonStart)(int argc, char *argv[]);
-int MoonNum; //the total number of moons, temporary use
 struct l2fwd_port_statistics
 {
     uint64_t tx;
@@ -85,6 +84,9 @@ struct MoonData
     int switchTo;
 };
 struct MoonData moonDataList[16];
+int enablePku;
+int currentMoonId;
+int loading;
 
 // forward decalrations for runtime main
 void InitMoon();
