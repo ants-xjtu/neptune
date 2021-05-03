@@ -90,7 +90,7 @@ int loading;
 
 // forward decalrations for runtime main
 void InitMoon();
-void MainLoop(void);
+int MainLoop(void *);
 void LoadMoon(char *, int);
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts);

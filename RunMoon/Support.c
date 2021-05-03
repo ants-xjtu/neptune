@@ -1,14 +1,16 @@
-#include "RunMoon/Common.h"
+#include "Common.h"
 
 void signal_handler(int signum)
 {
     if (signum == SIGINT || signum == SIGTERM)
     {
+        fflush(stdout);
+        fflush(stderr);
         if (force_quit) {
-            printf("Exit ungracefully now, should check for blocking/looping in code.\n");
+            printf("\nExit ungracefully now, should check for blocking/looping in code.\n");
             abort();
         }
-        fprintf(stderr, "\nSignal %d received, preparing to exit...\n",
+        printf("\nSignal %d received, preparing to exit...\n",
                signum);
         force_quit = true;
     }
@@ -18,14 +20,15 @@ void signal_handler(int signum)
 void check_all_ports_link_status(uint32_t port_mask)
 {
 #define CHECK_INTERVAL 100 /* 100ms */
-#define MAX_CHECK_TIME 90  /* 9s (90 * 100ms) in total */
+// #define MAX_CHECK_TIME 90  /* 9s (90 * 100ms) in total */
+#define MAX_CHECK_TIME 1
     uint16_t portid;
     uint8_t count, all_ports_up, print_flag = 0;
     struct rte_eth_link link;
     int ret;
     char link_status_text[RTE_ETH_LINK_MAX_STR_LEN];
 
-    printf("Checking link status\n");
+    printf("Checking link status");
     fflush(stdout);
     for (count = 0; count <= MAX_CHECK_TIME; count++)
     {

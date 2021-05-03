@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
     for (int moonId = 0; i < argc; moonId += 1, i += 1)
     {
         char *moonPath = argv[i];
-        printf("[RunMoon] moon#%d START\n", moonId);
+        printf("[RunMoon] moon#%d START LOADING\n", moonId);
         LoadMoon(argv[i], moonId);
     }
     loading = 0;
@@ -67,8 +67,15 @@ int main(int argc, char *argv[])
     }
 
     printf("*** START RUNTIME MAIN LOOP ***\n");
-    MainLoop();
+    unsigned int workerId;
+    RTE_LCORE_FOREACH_WORKER(workerId)
+    {
+        rte_eal_remote_launch(MainLoop, NULL, workerId);
+        rte_eal_wait_lcore(workerId);
+        break;
+    }
 
+    printf("Keep calm and definitely full-force fighting for SOSP.\n");
     return 0;
 }
 
@@ -145,7 +152,7 @@ void MoonSwitch()
 
 static uint64_t timer_period = 1; /* default period is 10 seconds */
 
-void MainLoop(void)
+int MainLoop(void *_arg)
 {
     int sent;
     unsigned lcore_id;
@@ -221,7 +228,8 @@ void MainLoop(void)
                 port_statistics.tx += sent;
         }
     }
-    printf("Keep calm and definitely full-force fighting for SOSP.\n");
+    printf("[RunMoon] worker on lcore#%d exit\n", lcore_id);
+    return 0;
 }
 
 // the following functions are executed in MOON env
