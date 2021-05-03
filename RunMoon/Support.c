@@ -5,10 +5,10 @@ void signal_handler(int signum)
     if (signum == SIGINT || signum == SIGTERM)
     {
         if (force_quit) {
-            printf("Exit ungracefully now.\n");
+            printf("Exit ungracefully now, should check for blocking/looping in code.\n");
             abort();
         }
-        printf("\nSignal %d received, preparing to exit...\n",
+        fprintf(stderr, "\nSignal %d received, preparing to exit...\n",
                signum);
         force_quit = true;
     }

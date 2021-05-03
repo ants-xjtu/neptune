@@ -105,4 +105,8 @@ void RedirectEthDevices(struct rte_eth_dev *devices);
 uint64_t numberTimerSecond;
 void PrintBench();
 
+// pkey
+void UpdatePkey();
+void DisablePkey();
+
 #endif

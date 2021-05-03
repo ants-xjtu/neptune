@@ -19,34 +19,38 @@
 #include "../PrivateStack.h"
 
 char ascii_string[10000];
-int state[8] = {0};          // a simple statistics on libnids
-char *char_to_ascii(char ch) /* 用于把协议数据进行显示 */
+int state[8] = {0};         // a simple statistics on libnids
+char char_to_ascii(char ch) /* 用于把协议数据进行显示 */
 {
-    memset(ascii_string, 0x00, 10000);
-    ascii_string[0] = 0;
-    char *string = ascii_string;
+    // memset(ascii_string, 0x00, 10000);
+    // ascii_string[0] = 0;
+    // char *string = ascii_string;
     if (isgraph(ch))
     /* 可打印字符 */
     {
-        *string++ = ch;
+        // *string++ = ch;
+        return ch;
     }
     else if (ch == ' ')
     /* 空格 */
     {
-        *string++ = ch;
+        // *string++ = ch;
+        return ch;
     }
     else if (ch == '\n' || ch == '\r')
     /* 回车和换行 */
     {
-        *string++ = ch;
+        // *string++ = ch;
+        return ch;
     }
     else
     /* 其它字符以点"."表示 */
     {
-        *string++ = '.';
+        // *string++ = '.';
+        return '.';
     }
-    *string = 0;
-    return ascii_string;
+    // *string = 0;
+    // return ascii_string;
 }
 /*
  * ====================================================================================
@@ -139,7 +143,7 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
                 // printf("%s", address_string);
                 return;
             }
-            
+
             char str_content[65535];
             if (tcp_connection->client.count_new)
             {
@@ -157,10 +161,11 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
                 memcpy(content, hlf->data, hlf->count_new);
                 content[hlf->count_new] = '\0';
                 // printf("客户端接收数据\n");
-                for (i = 0; i < hlf->count_new; i++) {
-                      str_content[i] = char_to_ascii(content[i]);
-                //    printf("%s", char_to_ascii(content[i]));
-                //    // 输出客户端接收的新的数据，以可打印字符进行显示
+                for (i = 0; i < hlf->count_new; i++)
+                {
+                    str_content[i] = char_to_ascii(content[i]);
+                    //    printf("%s", char_to_ascii(content[i]));
+                    //    // 输出客户端接收的新的数据，以可打印字符进行显示
                 }
                 str_content[hlf->count_new] = '\0';
                 // printf("\n");
@@ -182,24 +187,28 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
                 memcpy(content, hlf->data, hlf->count_new);
                 content[hlf->count_new] = '\0';
                 // printf("服务器端接收数据:\n");
-                for (i = 0; i < hlf->count_new; i++) {
+                for (i = 0; i < hlf->count_new; i++)
+                {
                     str_content[i] = char_to_ascii(content[i]);
-                //    printf("%s", char_to_ascii(content[i]));
-                // 输出服务器接收到的新的数据
+                    //    printf("%s", char_to_ascii(content[i]));
+                    // 输出服务器接收到的新的数据
                 }
-		str_content[hlf->count_new] = '\0';
+                str_content[hlf->count_new] = '\0';
                 // printf("\n");
                 // return;
             }
-            for (int i = 10; i < 20; i += 1) {
+            for (int i = 10; i < 20; i += 1)
+            {
                 memcpy(&content[i * 1024], &content[(i - 10) * 1024], 1024);
             }
-            char *str_to_find[] = {"DIoOryxuetwPGYr","Q0dYkVUVamxiR1d","fYoyhUrsDkMTAil","VjGPhjsjRMNshX7","12TUAoKqAduggQh","PiJA4Q0jCOpll9l","U7UqL4DJGI06ijO","7R1tGon54hbo919","uqHOgTowx7kw8Bz","2qOYudy8caMS6Ac"};
-            
-            for (int i = 0; i < 10; i +=1 ) {
+            char *str_to_find[] = {"DIoOryxuetwPGYr", "Q0dYkVUVamxiR1d", "fYoyhUrsDkMTAil", "VjGPhjsjRMNshX7", "12TUAoKqAduggQh", "PiJA4Q0jCOpll9l", "U7UqL4DJGI06ijO", "7R1tGon54hbo919", "uqHOgTowx7kw8Bz", "2qOYudy8caMS6Ac"};
+
+            for (int i = 0; i < 10; i += 1)
+            {
                 char *ptr;
-                ptr = (char*)strstr(str_content, str_to_find[i]);
-                if (ptr != NULL) state[7]++;
+                ptr = (char *)strstr(str_content, str_to_find[i]);
+                if (ptr != NULL)
+                    state[7]++;
             }
             return;
         }

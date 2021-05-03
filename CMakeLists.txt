@@ -46,6 +46,7 @@ add_executable(RunMoon
     RunMoon/Main.c
     RunMoon/Support.c
     RunMoon/Bench.c
+    RunMoon/Pkey.c
 )
 target_compile_definitions(RunMoon PRIVATE ALLOW_EXPERIMENTAL_API)
 target_include_directories(RunMoon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

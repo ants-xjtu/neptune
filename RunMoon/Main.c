@@ -65,22 +65,11 @@ int main(int argc, char *argv[], char *envp[])
     {
         rte_exit(EXIT_FAILURE, "pkey_mprotect: %d", ret);
     }
-    // int status = pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
-    // dummy[42] = 42;
 
     printf("*** START RUNTIME MAIN LOOP ***\n");
     MainLoop();
 
     return 0;
-}
-
-void InitMoon()
-{
-    char *argv[0];
-    printf("[InitMoon] calling moonStart\n");
-    moonStart(0, argv);
-    printf("[InitMoon] nf exited before blocking on packets, intended?\n");
-    exit(0);
 }
 
 void LoadMoon(char *moonPath, int moonId)
@@ -140,78 +129,9 @@ void LoadMoon(char *moonPath, int moonId)
     printf("%s\n", DONE_STRING);
 }
 
-// https://code.woboq.org/userspace/glibc/sysdeps/unix/sysv/linux/x86/arch-pkey.h.html
-/* Return the value of the PKRU register.  */
-static inline unsigned int
-pkey_read(void)
-{
-    unsigned int result;
-    __asm__ volatile(".byte 0x0f, 0x01, 0xee"
-                     : "=a"(result)
-                     : "c"(0)
-                     : "rdx");
-    return result;
-}
-
-/* Overwrite the PKRU register with VALUE.  */
-static inline void
-pkey_write(unsigned int value)
-{
-    __asm__ volatile(".byte 0x0f, 0x01, 0xef"
-                     :
-                     : "a"(value), "c"(0), "d"(0));
-}
-
-unsigned int pkru;
-int pkey_set(int key, unsigned int rights)
-{
-    if (key < 0 || key > 15 || rights > 3)
-    {
-        // __set_errno(EINVAL);
-        return -1;
-    }
-    unsigned int mask = 3 << (2 * key);
-    // unsigned int pkru = pkey_read();
-    pkru = (pkru & ~mask) | (rights << (2 * key));
-    // pkey_write(pkru);
-    return 0;
-}
-
-void UpdatePkey()
-{
-    if (!enablePku)
-    {
-        return;
-    }
-    pkru = pkey_read();
-    pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
-    for (int i = 0; moonDataList[i].id != -1; i += 1)
-    {
-        pkey_set(
-            moonDataList[i].pkey,
-            moonDataList[i].id == currentMoonId ? 0 : PKEY_DISABLE_WRITE);
-    }
-    pkey_write(pkru);
-}
-
-void DisablePkey()
-{
-    if (!enablePku)
-    {
-        return;
-    }
-    pkru = pkey_read();
-    pkey_set(runtimePkey, 0);
-    for (int i = 0; moonDataList[i].id != -1; i += 1)
-    {
-        pkey_set(moonDataList[i].pkey, 0);
-    }
-    pkey_write(pkru);
-}
-
 void MoonSwitch()
 {
-    if (currentMoonId != -1)
+    if (currentMoonId != -1) // not switching back to runtime
     {
         HeapSwitch(currentMoonId);
         UpdatePkey();
@@ -231,8 +151,8 @@ void MainLoop(void)
     unsigned lcore_id;
     uint64_t prev_tsc, diff_tsc, cur_tsc, timer_tsc;
     unsigned i, j, portid, nb_rx;
-    const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S *
-                               BURST_TX_DRAIN_US;
+    const uint64_t drain_tsc =
+        (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S * BURST_TX_DRAIN_US;
     struct rte_eth_dev_tx_buffer *buffer;
 
     prev_tsc = 0;
@@ -242,7 +162,6 @@ void MainLoop(void)
     timer_period *= rte_get_timer_hz();
 
     RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u\n", lcore_id);
-
 
     while (!force_quit)
     {
@@ -264,7 +183,6 @@ void MainLoop(void)
             /* if timer is enabled */
             if (timer_period > 0)
             {
-
                 /* advance the timer */
                 timer_tsc += diff_tsc;
 
@@ -289,7 +207,7 @@ void MainLoop(void)
         burstSize = nb_rx;
 
         // prevent unnecessary pkey overhead
-        // IMPORTANT: careful when change code below here
+        // IMPORTANT: careful when change code below this
         if (nb_rx == 0)
         {
             continue;
@@ -308,6 +226,17 @@ void MainLoop(void)
         }
     }
     printf("Keep calm and definitely full-force fighting for SOSP.\n");
+}
+
+// the following functions are executed in MOON env
+// i.e. on private stack with private heap
+void InitMoon()
+{
+    char *argv[0];
+    printf("[InitMoon] calling moonStart\n");
+    moonStart(0, argv);
+    printf("[InitMoon] nf exited before blocking on packets, intended?\n");
+    exit(0);
 }
 
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
@@ -332,8 +261,8 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             header.caplen = rte_pktmbuf_data_len(packetBurst[i]);
             memset(&header.ts, 0x0, sizeof(header.ts)); // todo
             uintptr_t *packet = rte_pktmbuf_mtod(packetBurst[i], uintptr_t *);
-            // *moonDataList[currentMoonId].extraLowPtr = (uintptr_t)packet;
-            // *moonDataList[currentMoonId].extraHighPtr = (uintptr_t)packet + header.caplen;
+            *moonDataList[currentMoonId].extraLowPtr = (uintptr_t)packet;
+            *moonDataList[currentMoonId].extraHighPtr = (uintptr_t)packet + header.caplen;
             callback(user, &header, (u_char *)packet);
         }
     }
