@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 
     // according to pkey(7), "The default key is assigned to any memory region
     // for which a pkey has not been explicitly assigned via pkey_mprotect(2)."
-    // However, pkey_set(0, ...) seems do not have any affect
+    // However, pkey_set(0, ...) seems do not have any effect
     // so use a non-default key to protect runtime for now
     runtimePkey = pkey_alloc(0, 0);
     printf("Allocate pkey %%%d for runtime\n", runtimePkey);
@@ -70,8 +70,18 @@ int main(int argc, char *argv[])
         rte_exit(EXIT_FAILURE, "pkey_mprotect: %d", ret);
     }
 
-    printf("*** START RUNTIME MAIN LOOP ***\n");
+    printf("assign rx/tx queues for workers\n");
+    int rx = 0, tx = 0;
     unsigned int workerId;
+    RTE_LCORE_FOREACH_WORKER(workerId)
+    {
+        workerDataList[workerId].rxQueue = rx;
+        workerDataList[workerId].txQueue = tx;
+        rx += 1;
+        tx += 1;
+    }
+
+    printf("*** START RUNTIME MAIN LOOP ***\n");
     RTE_LCORE_FOREACH_WORKER(workerId)
     {
         rte_eal_remote_launch(MainLoop, NULL, workerId);
@@ -89,7 +99,7 @@ void LoadMoon(char *moonPath, int moonId)
     moonDataList[moonId].id = moonId;
     moonDataList[moonId + 1].id = -1;
     moonDataList[moonId].pkey = pkey_alloc(0, 0);
-    printf("moon pkey: %d\n", moonDataList[moonId].pkey);
+    printf("moon pkey %%%d\n", moonDataList[moonId].pkey);
     moonDataList[moonId].switchTo = -1;
     if (moonId != 0)
     {
@@ -154,9 +164,12 @@ void LoadMoon(char *moonPath, int moonId)
 
 void MoonSwitch(unsigned int workerId)
 {
-    if (currentMoonId[workerId] != -1) // not switching back to runtime
+    if (workerDataList[workerId].current != -1) // not switching back to runtime
     {
-        int instanceId = moonDataList[currentMoonId[workerId]].workers[workerId].instanceId;
+        int instanceId =
+            moonDataList[workerDataList[workerId].current]
+                .workers[workerId]
+                .instanceId;
         HeapSwitch(instanceId);
         UpdatePkey(workerId);
         StackSwitch(instanceId);
@@ -174,7 +187,7 @@ void MoonSwitch(unsigned int workerId)
 int MainLoop(void *_arg)
 {
     int sent;
-    unsigned lcore_id;
+    unsigned lcore_id, workerId;
     uint64_t prev_tsc, diff_tsc, cur_tsc, timer_tsc;
     unsigned i, j, portid, nb_rx;
     const uint64_t drain_tsc =
@@ -183,7 +196,7 @@ int MainLoop(void *_arg)
 
     prev_tsc = 0;
     timer_tsc = 0;
-    lcore_id = rte_lcore_id();
+    workerId = lcore_id = rte_lcore_id();
 
     DisablePkey(1);
     RTE_LOG(INFO, L2FWD, "entering main loop on lcore $%u\n", lcore_id);
@@ -199,7 +212,7 @@ int MainLoop(void *_arg)
         {
             portid = dstPort;
             buffer = txBuffer;
-            sent = rte_eth_tx_buffer_flush(portid, 0, buffer);
+            sent = rte_eth_tx_buffer_flush(portid, workerDataList[workerId].txQueue, buffer);
             if (sent)
                 port_statistics.tx += sent;
 
@@ -223,7 +236,7 @@ int MainLoop(void *_arg)
 		 * Read packet from RX queues
 		 */
         portid = srcPort;
-        nb_rx = rte_eth_rx_burst(portid, 0, packetBurst, MAX_PKT_BURST);
+        nb_rx = rte_eth_rx_burst(portid, workerDataList[workerId].rxQueue, packetBurst, MAX_PKT_BURST);
         port_statistics.rx += nb_rx;
         burstSize = nb_rx;
 
@@ -234,14 +247,14 @@ int MainLoop(void *_arg)
             continue;
         }
 
-        currentMoonId[lcore_id] = 0;
-        MoonSwitch(lcore_id);
+        workerDataList[workerId].current = 0;
+        MoonSwitch(workerId);
         DisablePkey(0);
 
         for (i = 0; i < nb_rx; i++)
         {
             struct rte_mbuf *m = packetBurst[i];
-            sent = rte_eth_tx_buffer(dstPort, 0, txBuffer, m);
+            sent = rte_eth_tx_buffer(dstPort, workerDataList[workerId].txQueue, txBuffer, m);
             if (sent)
                 port_statistics.tx += sent;
         }
@@ -273,7 +286,7 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
         }
         else
         {
-            currentMoonId[workerId] = moonDataList[currentMoonId[workerId]].switchTo;
+            workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
             MoonSwitch(workerId);
         }
 
@@ -285,8 +298,8 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             header.caplen = rte_pktmbuf_data_len(packetBurst[i]);
             memset(&header.ts, 0x0, sizeof(header.ts)); // todo
             uintptr_t *packet = rte_pktmbuf_mtod(packetBurst[i], uintptr_t *);
-            *moonDataList[currentMoonId[workerId]].workers[workerId].extraLowPtr = (uintptr_t)packet;
-            *moonDataList[currentMoonId[workerId]].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
+            *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
+            *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
             callback(user, &header, (u_char *)packet);
         }
     }

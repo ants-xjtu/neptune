@@ -88,7 +88,8 @@ void check_all_ports_link_status(uint32_t port_mask)
     }
 }
 
-#define NB_MBUFS 64 * 1024 /* use 64k mbufs */
+// #define NB_MBUFS 64 * 1024 /* use 64k mbufs */
+#define NB_MBUFS 1024 * 1024
 #define MBUF_CACHE_SIZE 256
 #define PKT_BURST 32
 #define RX_RING_SIZE 1024
@@ -231,8 +232,8 @@ void SetupDpdk()
     }
     printf("ethernet rx port: %u, tx port: %u\n", srcPort, dstPort);
 
-    const unsigned int numberMbufs = 8192u, MEMPOOL_CACHE_SIZE = 256;
-    struct rte_mempool *pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", numberMbufs, MEMPOOL_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    // const unsigned int numberMbufs = 8192u, MEMPOOL_CACHE_SIZE = 256;
+    struct rte_mempool *pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     if (pktmbufPool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 

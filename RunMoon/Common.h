@@ -90,8 +90,13 @@ struct MoonData
 };
 struct MoonData moonDataList[16];
 int enablePku;
-int currentMoonId[MAX_WORKER_ID];
 int loading;
+struct WorkerData
+{
+    int current; // MOON id
+    int rxQueue, txQueue;
+};
+struct WorkerData workerDataList[MAX_WORKER_ID];
 
 // forward decalrations for runtime main
 void InitMoon();

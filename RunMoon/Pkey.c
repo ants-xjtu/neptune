@@ -48,7 +48,10 @@ void UpdatePkey(unsigned int workerId)
     {
         UpdatePkru(
             moonDataList[i].pkey,
-            moonDataList[i].id == currentMoonId[workerId] ? 0 : PKEY_DISABLE_WRITE, &pkru);
+            moonDataList[i].id == workerDataList[workerId].current
+                ? 0
+                : PKEY_DISABLE_WRITE,
+            &pkru);
     }
     pkey_write(pkru);
 }
