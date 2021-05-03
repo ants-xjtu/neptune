@@ -76,16 +76,21 @@ Interface *interface;
 struct rte_mbuf *packetBurst[MAX_PKT_BURST];
 unsigned int burstSize;
 int runtimePkey;
+#define MAX_WORKER_ID 96
 struct MoonData
 {
     int id; // -1 for end of MOONs
     int pkey;
-    uintptr_t *extraLowPtr, *extraHighPtr;
     int switchTo;
+    struct
+    {
+        int instanceId; // for stack/heap registration
+        uintptr_t *extraLowPtr, *extraHighPtr;
+    } workers[MAX_WORKER_ID];
 };
 struct MoonData moonDataList[16];
 int enablePku;
-int currentMoonId;
+int currentMoonId[MAX_WORKER_ID];
 int loading;
 
 // forward decalrations for runtime main
@@ -106,7 +111,7 @@ uint64_t numberTimerSecond;
 void PrintBench();
 
 // pkey
-void UpdatePkey();
-void DisablePkey();
+void UpdatePkey(unsigned int workerId);
+void DisablePkey(int force);
 
 #endif

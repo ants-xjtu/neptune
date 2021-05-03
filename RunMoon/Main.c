@@ -1,5 +1,7 @@
 #include "RunMoon/Common.h"
 
+static uint64_t timer_period = 1; /* default period is 10 seconds */
+
 int main(int argc, char *argv[])
 {
     int ret = rte_eal_init(argc, argv);
@@ -9,6 +11,8 @@ int main(int argc, char *argv[])
     argv += ret;
 
     SetupDpdk();
+    numberTimerSecond = timer_period;
+    timer_period *= rte_get_timer_hz();
 
     if (argc < 3)
     {
@@ -81,76 +85,91 @@ int main(int argc, char *argv[])
 
 void LoadMoon(char *moonPath, int moonId)
 {
-    printf("allocating memory for MOON %s\n", moonPath);
-    void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
-    printf("arena address %p size %#lx\n", arena, MOON_SIZE);
-
-    struct PrivateLibrary library;
-    library.file = moonPath;
-    LoadLibrary(&library);
-    printf("library requires space: %#lx\n", library.length);
-    void *stackStart = arena, *libraryStart = arena + STACK_SIZE;
-    void *heapStart = libraryStart + library.length;
-    size_t heapSize = MOON_SIZE - STACK_SIZE - library.length;
-
-    printf("*** MOON memory layout ***\n");
-    printf("Stack\t%p - %p\tsize: %#lx\n", stackStart, stackStart + STACK_SIZE, STACK_SIZE);
-    printf("Library\t%p - %p\tsize: %#lx\n", libraryStart, libraryStart + library.length, library.length);
-    printf("Heap\t%p - %p\tsize: %#lx\n", heapStart, heapStart + heapSize, heapSize);
-    printf("\n");
-
-    printf("initializing regions\n");
-    SetStack(moonId, stackStart, STACK_SIZE);
-    library.loadAddress = libraryStart;
-    DeployLibrary(&library);
-    SetHeap(heapStart, heapSize, moonId);
-    InitHeap();
-    printf("%s: initialized\n", DONE_STRING);
-
-    printf("setting protection region for MOON\n");
-    uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
-    *mainPrefix = (uintptr_t)arena;
-    printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
-
-    moonStart = LibraryFind(&library, "main");
-    printf("entering MOON for initial running, start = %p\n", moonStart);
-    StackStart(moonId, InitMoon);
-    printf("%s: MOON initialization\n", DONE_STRING);
-
-    printf("register MOON#%d\n", moonId);
+    printf("[LoadMoon] MOON#%d global registration\n", moonId);
     moonDataList[moonId].id = moonId;
     moonDataList[moonId + 1].id = -1;
-    moonDataList[moonId].extraLowPtr = LibraryFind(&library, "SwordHolder_ExtraLow");
-    moonDataList[moonId].extraHighPtr = LibraryFind(&library, "SwordHolder_ExtraHigh");
-    if (!moonDataList[moonId].extraLowPtr || !moonDataList[moonId].extraHighPtr)
-    {
-        rte_exit(EXIT_FAILURE, "cannot resolve extra region variables");
-    }
     moonDataList[moonId].pkey = pkey_alloc(0, 0);
+    printf("moon pkey: %d\n", moonDataList[moonId].pkey);
     moonDataList[moonId].switchTo = -1;
     if (moonId != 0)
     {
         moonDataList[moonId - 1].switchTo = moonId;
     }
-    // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
-    printf("%s: register MOON#%d\n", DONE_STRING, moonId);
+
+    unsigned int workerId;
+    RTE_LCORE_FOREACH_WORKER(workerId)
+    {
+        int instanceId = (workerId << 4) | (unsigned)moonId;
+        printf("[LoadMoon] MOON#%d @ worker$%d (inst!%03x)\n", moonId, workerId, instanceId);
+        printf("allocating memory for MOON %s\n", moonPath);
+        void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
+        printf("arena address %p size %#lx\n", arena, MOON_SIZE);
+
+        struct PrivateLibrary library;
+        library.file = moonPath;
+        LoadLibrary(&library);
+        printf("library requires space: %#lx\n", library.length);
+        void *stackStart = arena, *libraryStart = arena + STACK_SIZE;
+        void *heapStart = libraryStart + library.length;
+        size_t heapSize = MOON_SIZE - STACK_SIZE - library.length;
+
+        printf("*** MOON memory layout ***\n");
+        printf("Stack\t%p - %p\tsize: %#lx\n", stackStart, stackStart + STACK_SIZE, STACK_SIZE);
+        printf("Library\t%p - %p\tsize: %#lx\n", libraryStart, libraryStart + library.length, library.length);
+        printf("Heap\t%p - %p\tsize: %#lx\n", heapStart, heapStart + heapSize, heapSize);
+        // printf("\n");
+
+        printf("initializing regions\n");
+        SetStack(instanceId, stackStart, STACK_SIZE);
+        library.loadAddress = libraryStart;
+        DeployLibrary(&library);
+        SetHeap(heapStart, heapSize, instanceId);
+        InitHeap();
+        printf("%s: initialized\n", DONE_STRING);
+
+        printf("setting protection region for MOON\n");
+        uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
+        *mainPrefix = (uintptr_t)arena;
+        printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
+        pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
+
+        moonStart = LibraryFind(&library, "main");
+        printf("entering MOON for initial running, start = %p\n", moonStart);
+        StackStart(instanceId, InitMoon);
+        printf("%s: MOON initialization\n", DONE_STRING);
+
+        printf("register MOON#%d worker$%d data (inst!%03x)\n", moonId, workerId, instanceId);
+        moonDataList[moonId].workers[workerId].instanceId = instanceId;
+        uintptr_t *extraLow = LibraryFind(&library, "SwordHolder_ExtraLow"),
+                  *extraHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
+        if (!extraLow || !extraHigh)
+        {
+            rte_exit(EXIT_FAILURE, "cannot resolve extra region variables");
+        }
+        moonDataList[moonId].workers[workerId].extraLowPtr = extraLow;
+        moonDataList[moonId].workers[workerId].extraHighPtr = extraHigh;
+        printf("%s: register MOON#%d worker$%d\n", DONE_STRING, moonId, workerId);
+    }
 }
 
-void MoonSwitch()
+void MoonSwitch(unsigned int workerId)
 {
-    if (currentMoonId != -1) // not switching back to runtime
+    if (currentMoonId[workerId] != -1) // not switching back to runtime
     {
-        HeapSwitch(currentMoonId);
-        UpdatePkey();
+        int instanceId = moonDataList[currentMoonId[workerId]].workers[workerId].instanceId;
+        HeapSwitch(instanceId);
+        UpdatePkey(workerId);
+        StackSwitch(instanceId);
     }
-    StackSwitch(currentMoonId); // maybe -1
+    else
+    {
+        StackSwitch(-1);
+    }
 }
 
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 #define MEMPOOL_CACHE_SIZE 256
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
-
-static uint64_t timer_period = 1; /* default period is 10 seconds */
 
 int MainLoop(void *_arg)
 {
@@ -165,10 +184,9 @@ int MainLoop(void *_arg)
     prev_tsc = 0;
     timer_tsc = 0;
     lcore_id = rte_lcore_id();
-    numberTimerSecond = timer_period;
-    timer_period *= rte_get_timer_hz();
 
-    RTE_LOG(INFO, L2FWD, "entering main loop on lcore %u\n", lcore_id);
+    DisablePkey(1);
+    RTE_LOG(INFO, L2FWD, "entering main loop on lcore $%u\n", lcore_id);
 
     while (!force_quit)
     {
@@ -216,9 +234,9 @@ int MainLoop(void *_arg)
             continue;
         }
 
-        currentMoonId = 0;
-        MoonSwitch();
-        DisablePkey();
+        currentMoonId[lcore_id] = 0;
+        MoonSwitch(lcore_id);
+        DisablePkey(0);
 
         for (i = 0; i < nb_rx; i++)
         {
@@ -228,7 +246,7 @@ int MainLoop(void *_arg)
                 port_statistics.tx += sent;
         }
     }
-    printf("[RunMoon] worker on lcore#%d exit\n", lcore_id);
+    printf("[RunMoon] worker on lcore$%d exit\n", lcore_id);
     return 0;
 }
 
@@ -245,16 +263,18 @@ void InitMoon()
 
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
+    unsigned int workerId;
     for (;;)
     {
         if (loading)
         {
             StackSwitch(-1);
+            workerId = rte_lcore_id();
         }
         else
         {
-            currentMoonId = moonDataList[currentMoonId].switchTo;
-            MoonSwitch();
+            currentMoonId[workerId] = moonDataList[currentMoonId[workerId]].switchTo;
+            MoonSwitch(workerId);
         }
 
         for (int i = 0; i < burstSize; i += 1)
@@ -265,8 +285,8 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             header.caplen = rte_pktmbuf_data_len(packetBurst[i]);
             memset(&header.ts, 0x0, sizeof(header.ts)); // todo
             uintptr_t *packet = rte_pktmbuf_mtod(packetBurst[i], uintptr_t *);
-            *moonDataList[currentMoonId].extraLowPtr = (uintptr_t)packet;
-            *moonDataList[currentMoonId].extraHighPtr = (uintptr_t)packet + header.caplen;
+            *moonDataList[currentMoonId[workerId]].workers[workerId].extraLowPtr = (uintptr_t)packet;
+            *moonDataList[currentMoonId[workerId]].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
             callback(user, &header, (u_char *)packet);
         }
     }

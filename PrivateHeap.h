@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#define MAX_MOON_NUM 16
+#define MAX_MOON_NUM 4096
 void *HeapStart[MAX_MOON_NUM], *HeapEnd[MAX_MOON_NUM];
 
 void SetHeap(void *heap, size_t size, int moonId);

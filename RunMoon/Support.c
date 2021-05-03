@@ -7,10 +7,10 @@ void signal_handler(int signum)
         fflush(stdout);
         fflush(stderr);
         if (force_quit) {
-            printf("\nExit ungracefully now, should check for blocking/looping in code.\n");
+            printf("Exit ungracefully now, should check for blocking/looping in code.\n");
             abort();
         }
-        printf("\nSignal %d received, preparing to exit...\n",
+        printf("Signal %d received, preparing to exit...\n",
                signum);
         force_quit = true;
     }
@@ -252,7 +252,7 @@ void RedirectEthDevices(struct rte_eth_dev *devices)
     for (int i = 0; i < 2; i += 1)
     {
         struct rte_eth_dev *dev = &devices[i];
-        printf("setup device: %p\n", dev);
+        // printf("setup device: %p\n", dev);
         dev->rx_pkt_burst = RxBurst;
         dev->data = malloc(sizeof(struct rte_eth_dev_data));
         dev->data->rx_queues = malloc(sizeof(void *) * NumberQueue);

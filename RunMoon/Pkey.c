@@ -22,8 +22,7 @@ pkey_write(unsigned int value)
                      : "a"(value), "c"(0), "d"(0));
 }
 
-unsigned int pkru;
-int pkey_set(int key, unsigned int rights)
+int UpdatePkru(int key, unsigned int rights, unsigned int *pkru)
 {
     if (key < 0 || key > 15 || rights > 3)
     {
@@ -32,39 +31,39 @@ int pkey_set(int key, unsigned int rights)
     }
     unsigned int mask = 3 << (2 * key);
     // unsigned int pkru = pkey_read();
-    pkru = (pkru & ~mask) | (rights << (2 * key));
+    *pkru = (*pkru & ~mask) | (rights << (2 * key));
     // pkey_write(pkru);
     return 0;
 }
 
-void UpdatePkey()
+void UpdatePkey(unsigned int workerId)
 {
     if (!enablePku)
     {
         return;
     }
-    pkru = pkey_read();
-    pkey_set(runtimePkey, PKEY_DISABLE_WRITE);
+    unsigned int pkru = pkey_read();
+    UpdatePkru(runtimePkey, PKEY_DISABLE_WRITE, &pkru);
     for (int i = 0; moonDataList[i].id != -1; i += 1)
     {
-        pkey_set(
+        UpdatePkru(
             moonDataList[i].pkey,
-            moonDataList[i].id == currentMoonId ? 0 : PKEY_DISABLE_WRITE);
+            moonDataList[i].id == currentMoonId[workerId] ? 0 : PKEY_DISABLE_WRITE, &pkru);
     }
     pkey_write(pkru);
 }
 
-void DisablePkey()
+void DisablePkey(int force)
 {
-    if (!enablePku)
+    if (!enablePku && !force)
     {
         return;
     }
-    pkru = pkey_read();
-    pkey_set(runtimePkey, 0);
+    unsigned int pkru = pkey_read();
+    UpdatePkru(runtimePkey, 0, &pkru);
     for (int i = 0; moonDataList[i].id != -1; i += 1)
     {
-        pkey_set(moonDataList[i].pkey, 0);
+        UpdatePkru(moonDataList[i].pkey, 0, &pkru);
     }
     pkey_write(pkru);
 }
