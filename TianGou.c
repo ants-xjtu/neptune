@@ -167,14 +167,16 @@ int pcap_stats(pcap_t *p, struct pcap_stat *pt)
 // dpdk
 
 // two devices for src/dst ports
+// wrapper for rx/tx burst directly goes into runtime and reigster on this
+// array, because the functions are inlined in DPDK
 // this cannot go into interface, because I cannot "sync" it when assign to
 // fields in interface
 struct rte_eth_dev rte_eth_devices[2];
 
 int rte_eal_init(int argc, char **argv)
 {
-    MESSAGE("return 1(EAL already parsed)");
-    return 1;
+    MESSAGE("return 0");
+    return 0;
 }
 
 void rte_exit(int exit_code, const char *format, ...)
@@ -220,7 +222,7 @@ int rte_eth_rx_queue_setup(uint16_t port_id, uint16_t rx_queue_id,
                            uint16_t nb_rx_desc, unsigned int socket_id,
                            const struct rte_eth_rxconf *rx_conf, struct rte_mempool *mb_pool)
 {
-    MESSAGE("rx_queue is previously initialized");
+    MESSAGE("return 0");
     return 0;
 }
 
@@ -228,7 +230,7 @@ int rte_eth_tx_queue_setup(uint16_t port_id, uint16_t tx_queue_id,
                            uint16_t nb_tx_desc, unsigned int socket_id,
                            const struct rte_eth_txconf *tx_conf)
 {
-    MESSAGE("tx_queue is previously initialized");
+    MESSAGE("return 0");
     return 0;
 }
 
@@ -254,7 +256,7 @@ int rte_eth_tx_buffer_set_err_callback(struct rte_eth_dev_tx_buffer *buffer,
 
 int rte_eth_dev_start(uint16_t port_id)
 {
-    MESSAGE("return 0(device already up)");
+    MESSAGE("return 0");
     return 0;
 }
 

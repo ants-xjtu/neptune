@@ -78,7 +78,7 @@ unsigned int burstSize;
 int runtimePkey;
 struct MoonData
 {
-    int id;
+    int id; // -1 for end of MOONs
     int pkey;
     uintptr_t *extraLowPtr, *extraHighPtr;
     int switchTo;

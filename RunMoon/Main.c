@@ -1,6 +1,6 @@
 #include "RunMoon/Common.h"
 
-int main(int argc, char *argv[], char *envp[])
+int main(int argc, char *argv[])
 {
     int ret = rte_eal_init(argc, argv);
     if (ret < 0)
@@ -15,7 +15,7 @@ int main(int argc, char *argv[], char *envp[])
         printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon> [<moons>]\n", argv[0]);
         return 0;
     }
-    InitLoader(argc, argv, envp);
+    InitLoader(argc, argv, environ);
 
     const char *tiangouPath = argv[1];
     printf("loading tiangou library %s\n", tiangouPath);
@@ -32,7 +32,7 @@ int main(int argc, char *argv[], char *envp[])
     RedirectEthDevices(rteEthDevices);
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
-    printf("%s\n", DONE_STRING);
+    printf("%s: tiangou\n", DONE_STRING);
 
     int i = 2;
     enablePku = 0;
@@ -56,7 +56,7 @@ int main(int argc, char *argv[], char *envp[])
     // However, pkey_set(0, ...) seems do not have any affect
     // so use a non-default key to protect runtime for now
     runtimePkey = pkey_alloc(0, 0);
-    printf("Allocate pkey #%d for runtime\n", runtimePkey);
+    printf("Allocate pkey %%%d for runtime\n", runtimePkey);
     // dummy page for being protected
     long pagesize = sysconf(_SC_PAGESIZE);
     unsigned char *dummy = aligned_alloc(pagesize, pagesize);
@@ -98,7 +98,7 @@ void LoadMoon(char *moonPath, int moonId)
     DeployLibrary(&library);
     SetHeap(heapStart, heapSize, moonId);
     InitHeap();
-    printf("%s\n", DONE_STRING);
+    printf("%s: initialized\n", DONE_STRING);
 
     printf("setting protection region for MOON\n");
     uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
@@ -108,9 +108,9 @@ void LoadMoon(char *moonPath, int moonId)
     moonStart = LibraryFind(&library, "main");
     printf("entering MOON for initial running, start = %p\n", moonStart);
     StackStart(moonId, InitMoon);
-    printf("%s\n", DONE_STRING);
+    printf("%s: MOON initialization\n", DONE_STRING);
 
-    printf("finalize moon setup\n");
+    printf("register MOON#%d\n", moonId);
     moonDataList[moonId].id = moonId;
     moonDataList[moonId + 1].id = -1;
     moonDataList[moonId].extraLowPtr = LibraryFind(&library, "SwordHolder_ExtraLow");
@@ -126,7 +126,7 @@ void LoadMoon(char *moonPath, int moonId)
         moonDataList[moonId - 1].switchTo = moonId;
     }
     // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
-    printf("%s\n", DONE_STRING);
+    printf("%s: register MOON#%d\n", DONE_STRING, moonId);
 }
 
 void MoonSwitch()
@@ -166,7 +166,6 @@ void MainLoop(void)
     while (!force_quit)
     {
         cur_tsc = rte_rdtsc();
-
         /*
 		 * TX burst queue drain
 		 */
@@ -175,7 +174,6 @@ void MainLoop(void)
         {
             portid = dstPort;
             buffer = txBuffer;
-
             sent = rte_eth_tx_buffer_flush(portid, 0, buffer);
             if (sent)
                 port_statistics.tx += sent;
@@ -185,7 +183,6 @@ void MainLoop(void)
             {
                 /* advance the timer */
                 timer_tsc += diff_tsc;
-
                 /* if timer has reached its timeout */
                 if (unlikely(timer_tsc >= timer_period))
                 {
@@ -194,7 +191,6 @@ void MainLoop(void)
                     PrintBench();
                 }
             }
-
             prev_tsc = cur_tsc;
         }
 
