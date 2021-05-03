@@ -6,7 +6,8 @@ void signal_handler(int signum)
     {
         fflush(stdout);
         fflush(stderr);
-        if (force_quit) {
+        if (force_quit)
+        {
             printf("Exit ungracefully now, should check for blocking/looping in code.\n");
             abort();
         }
@@ -21,7 +22,7 @@ void check_all_ports_link_status(uint32_t port_mask)
 {
 #define CHECK_INTERVAL 100 /* 100ms */
 // #define MAX_CHECK_TIME 90  /* 9s (90 * 100ms) in total */
-#define MAX_CHECK_TIME 1
+#define MAX_CHECK_TIME 10
     uint16_t portid;
     uint8_t count, all_ports_up, print_flag = 0;
     struct rte_eth_link link;
@@ -87,6 +88,122 @@ void check_all_ports_link_status(uint32_t port_mask)
     }
 }
 
+#define NB_MBUFS 64 * 1024 /* use 64k mbufs */
+#define MBUF_CACHE_SIZE 256
+#define PKT_BURST 32
+#define RX_RING_SIZE 1024
+#define TX_RING_SIZE 1024
+
+static size_t NumberQueue;
+
+static inline int
+smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
+              uint16_t num_queues)
+{
+    NumberQueue = num_queues;
+
+    struct rte_eth_conf port_conf = {
+        .rxmode = {
+            .mq_mode = ETH_MQ_RX_RSS,
+            .split_hdr_size = 0,
+            .offloads = DEV_RX_OFFLOAD_CHECKSUM,
+        },
+        .rx_adv_conf = {
+            .rss_conf = {
+                .rss_key = NULL,
+                // .rss_hf = ETH_RSS_IP,
+                .rss_hf = ETH_RSS_TCP,
+            },
+        },
+        .txmode = {
+            .mq_mode = ETH_MQ_TX_NONE,
+        }};
+    const uint16_t rx_rings = num_queues, tx_rings = num_queues;
+    struct rte_eth_dev_info info;
+    struct rte_eth_rxconf rxq_conf;
+    struct rte_eth_txconf txq_conf;
+    int retval;
+    uint16_t q;
+    uint16_t nb_rxd = RX_RING_SIZE;
+    uint16_t nb_txd = TX_RING_SIZE;
+    uint64_t rss_hf_tmp;
+
+    if (rte_eal_process_type() == RTE_PROC_SECONDARY)
+        return 0;
+
+    if (!rte_eth_dev_is_valid_port(port))
+        return -1;
+
+    printf("# Initialising port %u... \n", port);
+    fflush(stdout);
+
+    retval = rte_eth_dev_info_get(port, &info);
+    if (retval != 0)
+    {
+        printf("Error during getting device (port %u) info: %s\n",
+               port, strerror(-retval));
+        return retval;
+    }
+
+    info.default_rxconf.rx_drop_en = 1;
+
+    if (info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
+        port_conf.txmode.offloads |=
+            DEV_TX_OFFLOAD_MBUF_FAST_FREE;
+
+    rss_hf_tmp = port_conf.rx_adv_conf.rss_conf.rss_hf;
+    port_conf.rx_adv_conf.rss_conf.rss_hf &= info.flow_type_rss_offloads;
+    if (port_conf.rx_adv_conf.rss_conf.rss_hf != rss_hf_tmp)
+    {
+        printf("Port %u modified RSS hash function based on hardware support,"
+               "requested:%#" PRIx64 " configured:%#" PRIx64 "\n",
+               port,
+               rss_hf_tmp,
+               port_conf.rx_adv_conf.rss_conf.rss_hf);
+    }
+
+    retval = rte_eth_dev_configure(port, rx_rings, tx_rings, &port_conf);
+    if (retval < 0)
+        return retval;
+
+    retval = rte_eth_dev_adjust_nb_rx_tx_desc(port, &nb_rxd, &nb_txd);
+    if (retval < 0)
+        return retval;
+
+    rxq_conf = info.default_rxconf;
+    rxq_conf.offloads = port_conf.rxmode.offloads;
+    for (q = 0; q < rx_rings; q++)
+    {
+        retval = rte_eth_rx_queue_setup(port, q, nb_rxd,
+                                        rte_eth_dev_socket_id(port),
+                                        &rxq_conf,
+                                        mbuf_pool);
+        if (retval < 0)
+            return retval;
+    }
+
+    txq_conf = info.default_txconf;
+    txq_conf.offloads = port_conf.txmode.offloads;
+    for (q = 0; q < tx_rings; q++)
+    {
+        retval = rte_eth_tx_queue_setup(port, q, nb_txd,
+                                        rte_eth_dev_socket_id(port),
+                                        &txq_conf);
+        if (retval < 0)
+            return retval;
+    }
+
+    retval = rte_eth_promiscuous_enable(port);
+    if (retval != 0)
+        return retval;
+
+    retval = rte_eth_dev_start(port);
+    if (retval < 0)
+        return retval;
+
+    return 0;
+}
+
 void SetupDpdk()
 {
     int ret;
@@ -119,132 +236,29 @@ void SetupDpdk()
     if (pktmbufPool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
-    static struct rte_eth_conf port_conf = {
-        .rxmode = {
-            .split_hdr_size = 0,
-        },
-        .txmode = {
-            .mq_mode = ETH_MQ_TX_NONE,
-        },
-    };
-
     RTE_ETH_FOREACH_DEV(portid)
     {
         if (portid != srcPort && portid != dstPort)
         {
             continue;
         }
-        struct rte_eth_rxconf rxq_conf;
-        struct rte_eth_txconf txq_conf;
-        struct rte_eth_conf local_port_conf = port_conf;
-        struct rte_eth_dev_info dev_info;
-        struct rte_ether_addr ethernetAddress;
-
-        printf("Initializing port %u...\n", portid);
-        ret = rte_eth_dev_info_get(portid, &dev_info);
-        if (ret != 0)
-            rte_exit(EXIT_FAILURE,
-                     "Error during getting device (port %u) info: %s\n",
-                     portid, strerror(-ret));
-
-        if (dev_info.tx_offload_capa & DEV_TX_OFFLOAD_MBUF_FAST_FREE)
-            local_port_conf.txmode.offloads |=
-                DEV_TX_OFFLOAD_MBUF_FAST_FREE;
-        ret = rte_eth_dev_configure(portid, 1, 1, &local_port_conf);
-        if (ret < 0)
-            rte_exit(EXIT_FAILURE, "Cannot configure device: err=%d, port=%u\n",
-                     ret, portid);
-
-        ret = rte_eth_dev_adjust_nb_rx_tx_desc(portid, &nb_rxd,
-                                               &nb_txd);
-        if (ret < 0)
-            rte_exit(EXIT_FAILURE,
-                     "Cannot adjust number of descriptors: err=%d, port=%u\n",
-                     ret, portid);
-
-        ret = rte_eth_macaddr_get(portid, &ethernetAddress);
-        if (ret < 0)
-            rte_exit(EXIT_FAILURE,
-                     "Cannot get MAC address: err=%d, port=%u\n",
-                     ret, portid);
-
-        /* init one RX queue */
-        fflush(stdout);
-        rxq_conf = dev_info.default_rxconf;
-        rxq_conf.offloads = local_port_conf.rxmode.offloads;
-        ret = rte_eth_rx_queue_setup(portid, 0, nb_rxd,
-                                     rte_eth_dev_socket_id(portid),
-                                     &rxq_conf,
-                                     pktmbufPool);
-        if (ret < 0)
-            rte_exit(EXIT_FAILURE, "rte_eth_rx_queue_setup:err=%d, port=%u\n",
-                     ret, portid);
-
-        /* init one TX queue on each port */
-        fflush(stdout);
-        txq_conf = dev_info.default_txconf;
-        txq_conf.offloads = local_port_conf.txmode.offloads;
-        ret = rte_eth_tx_queue_setup(portid, 0, nb_txd,
-                                     rte_eth_dev_socket_id(portid),
-                                     &txq_conf);
-        if (ret < 0)
-            rte_exit(EXIT_FAILURE, "rte_eth_tx_queue_setup:err=%d, port=%u\n",
-                     ret, portid);
-
-        txBuffer = rte_zmalloc_socket("tx_buffer",
-                                      RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST), 0,
-                                      rte_eth_dev_socket_id(portid));
-        if (txBuffer == NULL)
-            rte_exit(EXIT_FAILURE, "Cannot allocate buffer for tx on port %u\n",
-                     portid);
-
-        rte_eth_tx_buffer_init(txBuffer, MAX_PKT_BURST);
-
-        ret = rte_eth_tx_buffer_set_err_callback(txBuffer,
-                                                 rte_eth_tx_buffer_count_callback,
-                                                 &port_statistics.dropped);
-        if (ret < 0)
-            rte_exit(EXIT_FAILURE,
-                     "Cannot set error callback for tx buffer on port %u\n",
-                     portid);
-
-        // This is the function left out by sgdxbc. Is it intentional?
-        ret = rte_eth_dev_set_ptypes(portid, RTE_PTYPE_UNKNOWN, NULL,
-                                     0);
-        if (ret < 0)
-            printf("Port %u, Failed to disable Ptype parsing\n",
-                   portid);
-
-        ret = rte_eth_dev_start(portid);
-        if (ret < 0)
-            rte_exit(EXIT_FAILURE, "rte_eth_dev_start:err=%d, port=%u\n",
-                     ret, portid);
-
-        printf("%s\n", DONE_STRING);
-
-        ret = rte_eth_promiscuous_enable(portid);
-        if (ret != 0)
-            rte_exit(EXIT_FAILURE,
-                     "rte_eth_promiscuous_enable:err=%s, port=%u\n",
-                     rte_strerror(-ret), portid);
-
-        printf("Port %u, MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
-               portid,
-               ethernetAddress.addr_bytes[0],
-               ethernetAddress.addr_bytes[1],
-               ethernetAddress.addr_bytes[2],
-               ethernetAddress.addr_bytes[3],
-               ethernetAddress.addr_bytes[4],
-               ethernetAddress.addr_bytes[5]);
+        if (smp_port_init(portid, pktmbufPool, rte_lcore_count() - 1) < 0)
+            rte_exit(EXIT_FAILURE, "Error initialising ports\n");
     }
+
+    txBuffer = rte_zmalloc_socket(
+        "tx_buffer",
+        RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST), 0,
+        rte_eth_dev_socket_id(dstPort));
+    if (txBuffer == NULL)
+        rte_exit(EXIT_FAILURE, "Cannot allocate buffer for tx on port %u\n",
+                 dstPort);
 
     uint32_t portMask = 0;
     portMask |= (1 << srcPort);
     portMask |= (1 << dstPort);
     check_all_ports_link_status(portMask);
 }
-
-static const size_t NumberQueue = 16;
 
 void RedirectEthDevices(struct rte_eth_dev *devices)
 {
