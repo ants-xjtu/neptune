@@ -2460,7 +2460,7 @@ static struct malloc_state av_;  /* never directly referenced */
 // Add by sgdxbc
 #include "PrivateHeap.h"
 
-static void *heap_start, *heap_end;
+static __thread void *heap_start, *heap_end;
 static int morecore_finished;
 
 void SetHeap(void *heap, size_t size, int moonId) {

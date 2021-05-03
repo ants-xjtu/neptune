@@ -247,13 +247,13 @@ void SetupDpdk()
             rte_exit(EXIT_FAILURE, "Error initialising ports\n");
     }
 
-    txBuffer = rte_zmalloc_socket(
-        "tx_buffer",
-        RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST), 0,
-        rte_eth_dev_socket_id(dstPort));
-    if (txBuffer == NULL)
-        rte_exit(EXIT_FAILURE, "Cannot allocate buffer for tx on port %u\n",
-                 dstPort);
+    // txBuffer = rte_zmalloc_socket(
+    //     "tx_buffer",
+    //     RTE_ETH_TX_BUFFER_SIZE(MAX_PKT_BURST), 0,
+    //     rte_eth_dev_socket_id(dstPort));
+    // if (txBuffer == NULL)
+    //     rte_exit(EXIT_FAILURE, "Cannot allocate buffer for tx on port %u\n",
+    //              dstPort);
 
     uint32_t portMask = 0;
     portMask |= (1 << srcPort);

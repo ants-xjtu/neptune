@@ -1,52 +1,57 @@
 #include "Common.h"
 
-#define CYCLE_SIZE 40
-double cycle[CYCLE_SIZE], prevAvg = -1;
-int cycleIndex = 0;
-#define AVG_DELTA_CYCLE_SIZE 24
-int avgDeltaCycle[AVG_DELTA_CYCLE_SIZE];
-int avgDeltaCycleIndex = 0;
+struct BenchRecord
+{
+    double avgPps;
+    uint64_t tsc;
+};
+struct BenchRecord workerRecordList[MAX_WORKER_ID];
+
+void RecordBench(uint64_t currentTsc)
+{
+    unsigned int workerId = rte_lcore_id();
+    struct l2fwd_port_statistics *stat = &workerDataList[workerId].stat;
+    double pps = (double)stat->tx / numberTimerSecond / 1000;
+    stat->tx = 0;
+    // less equal to include slow start (pps == 0, prevAvg == 0) case
+    if (pps <= 0.8 * stat->prevAvg)
+    {
+        printf("[worker$%02u] ignore bad record\n", workerId);
+        return;
+    }
+    stat->cycle[stat->cycleIndex % CYCLE_SIZE] = pps;
+    stat->cycleIndex += 1;
+
+    double sum = 0.0;
+    int count = stat->cycleIndex >= CYCLE_SIZE ? CYCLE_SIZE : stat->cycleIndex;
+    for (int i = 0; i < count; i += 1)
+    {
+        sum += stat->cycle[i];
+    }
+    workerRecordList[workerId].avgPps = sum / count;
+    workerRecordList[workerId].tsc = currentTsc;
+    // printf("[worker$%02d] pps: %.3fK\n", workerId, sum / count);
+}
+
+static uint64_t prevPrintTsc;
 
 void PrintBench()
 {
-    double pps = (double)port_statistics.tx / numberTimerSecond / 1000;
-    printf("pps: %.3fK", pps);
-    memset(&port_statistics, 0, sizeof(port_statistics));
-
-    cycle[cycleIndex % CYCLE_SIZE] = pps;
-    if (pps != 0.0 && !(prevAvg >= 0.0 && pps < 0.8 * prevAvg))
+    uint64_t currentTsc = rte_rdtsc();
+    if (prevPrintTsc + timer_period > currentTsc)
     {
-        cycleIndex += 1;
-        printf("        ");
+        return;
     }
-    else
+    unsigned int workerId;
+    double pps = 0.0;
+    RTE_LCORE_FOREACH_WORKER(workerId)
     {
-        printf(" (ignored)");
-    }
-    printf("\t");
-    double sum = 0.0;
-    int count = cycleIndex >= CYCLE_SIZE ? CYCLE_SIZE : cycleIndex;
-    for (int i = 0; i < count; i += 1)
-    {
-        sum += cycle[i];
-    }
-    double avg = sum / count;
-    printf("avg(over past %2d): %fK\t", count, avg);
-
-    avgDeltaCycle[avgDeltaCycleIndex % AVG_DELTA_CYCLE_SIZE] = prevAvg < avg;
-    avgDeltaCycleIndex += 1;
-    int go[] = {0, 0};
-    for (int i = 0; i < avgDeltaCycleIndex; i += 1)
-    {
-        if (i >= AVG_DELTA_CYCLE_SIZE)
+        if (workerRecordList[workerId].tsc + timer_period < currentTsc)
         {
-            break;
+            return;
         }
-        go[avgDeltaCycle[i]] += 1;
+        pps += workerRecordList[workerId].avgPps;
     }
-    printf(
-        "%2d go up, %2d go down in last %2d avg\n",
-        go[0], go[1],
-        avgDeltaCycleIndex > AVG_DELTA_CYCLE_SIZE ? AVG_DELTA_CYCLE_SIZE : avgDeltaCycleIndex);
-    prevAvg = avg;
+    printf("pps: %fK\n", pps);
+    prevPrintTsc = currentTsc;
 }

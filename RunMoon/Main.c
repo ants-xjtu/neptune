@@ -1,6 +1,6 @@
 #include "RunMoon/Common.h"
 
-static uint64_t timer_period = 1; /* default period is 10 seconds */
+uint64_t timer_period = 1; /* default period is 10 seconds */
 
 int main(int argc, char *argv[])
 {
@@ -81,12 +81,22 @@ int main(int argc, char *argv[])
         tx += 1;
     }
 
-    printf("*** START RUNTIME MAIN LOOP ***\n");
+    printf("[RunMoon] launch workers\n");
     RTE_LCORE_FOREACH_WORKER(workerId)
     {
         rte_eal_remote_launch(MainLoop, NULL, workerId);
+    }
+
+    printf("*** START RUNTIME MAIN LOOP ***\n");
+    while (!force_quit)
+    {
+        PrintBench();
+        // TODO: supervisor tasks, update chain, redirect traffic, etc.
+    }
+
+    RTE_LCORE_FOREACH_WORKER(workerId)
+    {
         rte_eal_wait_lcore(workerId);
-        break;
     }
 
     printf("Keep calm and definitely full-force fighting for SOSP.\n");
@@ -141,7 +151,10 @@ void LoadMoon(char *moonPath, int moonId)
         uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
         *mainPrefix = (uintptr_t)arena;
         printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
-        pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
+        // protecting the stack will cause the calling `StackSwitch` or `UpdatePkey` itself to fail
+        // there must be a way to deal with it...
+        // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
+        pkey_mprotect(arena + STACK_SIZE, MOON_SIZE - STACK_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
 
         moonStart = LibraryFind(&library, "main");
         printf("entering MOON for initial running, start = %p\n", moonStart);
@@ -210,11 +223,11 @@ int MainLoop(void *_arg)
         diff_tsc = cur_tsc - prev_tsc;
         if (unlikely(diff_tsc > drain_tsc))
         {
-            portid = dstPort;
-            buffer = txBuffer;
-            sent = rte_eth_tx_buffer_flush(portid, workerDataList[workerId].txQueue, buffer);
-            if (sent)
-                port_statistics.tx += sent;
+            // portid = dstPort;
+            // buffer = txBuffer;
+            // sent = rte_eth_tx_buffer_flush(portid, workerDataList[workerId].txQueue, buffer);
+            // if (sent)
+            //     workerDataList[workerId].stat.tx += sent;
 
             /* if timer is enabled */
             if (timer_period > 0)
@@ -226,7 +239,7 @@ int MainLoop(void *_arg)
                 {
                     /* reset the timer */
                     timer_tsc = 0;
-                    PrintBench();
+                    RecordBench(cur_tsc);
                 }
             }
             prev_tsc = cur_tsc;
@@ -236,9 +249,10 @@ int MainLoop(void *_arg)
 		 * Read packet from RX queues
 		 */
         portid = srcPort;
-        nb_rx = rte_eth_rx_burst(portid, workerDataList[workerId].rxQueue, packetBurst, MAX_PKT_BURST);
-        port_statistics.rx += nb_rx;
-        burstSize = nb_rx;
+        nb_rx = rte_eth_rx_burst(
+            portid, workerDataList[workerId].rxQueue, workerDataList[workerId].packetBurst, MAX_PKT_BURST);
+        workerDataList[workerId].stat.rx += nb_rx;
+        workerDataList[workerId].burstSize = nb_rx;
 
         // prevent unnecessary pkey overhead
         // IMPORTANT: careful when change code below this
@@ -251,13 +265,18 @@ int MainLoop(void *_arg)
         MoonSwitch(workerId);
         DisablePkey(0);
 
-        for (i = 0; i < nb_rx; i++)
-        {
-            struct rte_mbuf *m = packetBurst[i];
-            sent = rte_eth_tx_buffer(dstPort, workerDataList[workerId].txQueue, txBuffer, m);
-            if (sent)
-                port_statistics.tx += sent;
-        }
+        // for (i = 0; i < nb_rx; i++)
+        // {
+        //     struct rte_mbuf *m = workerDataList[workerId].packetBurst[i];
+        //     sent = rte_eth_tx_buffer(dstPort, workerDataList[workerId].txQueue, txBuffer, m);
+        //     if (sent)
+        //         workerDataList[workerId].stat.tx += sent;
+        // }
+        sent = rte_eth_tx_burst(
+            dstPort, workerDataList[workerId].txQueue,
+            workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
+        if (sent)
+            workerDataList[workerId].stat.tx += sent;
     }
     printf("[RunMoon] worker on lcore$%d exit\n", lcore_id);
     return 0;
@@ -283,21 +302,23 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
         {
             StackSwitch(-1);
             workerId = rte_lcore_id();
+            // UpdatePkey(workerId);
         }
         else
         {
             workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
             MoonSwitch(workerId);
+            // UpdatePkey(workerId);
         }
 
-        for (int i = 0; i < burstSize; i += 1)
+        for (int i = 0; i < workerDataList[workerId].burstSize; i += 1)
         {
-            rte_prefetch0(rte_pktmbuf_mtod(packetBurst[i], void *));
+            rte_prefetch0(rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], void *));
             struct pcap_pkthdr header;
-            header.len = rte_pktmbuf_pkt_len(packetBurst[i]);
-            header.caplen = rte_pktmbuf_data_len(packetBurst[i]);
+            header.len = rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
+            header.caplen = rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i]);
             memset(&header.ts, 0x0, sizeof(header.ts)); // todo
-            uintptr_t *packet = rte_pktmbuf_mtod(packetBurst[i], uintptr_t *);
+            uintptr_t *packet = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], uintptr_t *);
             *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
             *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
             callback(user, &header, (u_char *)packet);

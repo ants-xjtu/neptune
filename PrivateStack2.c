@@ -18,7 +18,8 @@ static RegSet nfStack[MAX_STACK_NUM];
 // };
 
 // static struct StackHeader *globalStack;
-static int currStackId;
+static __thread int currStackId = -1;
+static __thread RegSet mainStack;
 
 void SetStack(int stackId, void *stack, size_t len)
 {
@@ -30,11 +31,14 @@ void SetStack(int stackId, void *stack, size_t len)
 
 void StackSwitch(int stackId)
 {
-    //I know this is ugly... I will fix it later
-    int realStack = (stackId < 0) ? (MAX_STACK_NUM - 1) : stackId;
-    int realCurrStack = (currStackId < 0) ? (MAX_STACK_NUM - 1) : currStackId;
+    // //I know this is ugly... I will fix it later
+    // int realStack = (stackId < 0) ? (MAX_STACK_NUM - 1) : stackId;
+    // int realCurrStack = (currStackId < 0) ? (MAX_STACK_NUM - 1) : currStackId;
+    RegSet *current = currStackId < 0 ? &mainStack : &nfStack[currStackId];
+    RegSet *next = stackId < 0 ? &mainStack : &nfStack[stackId];
     currStackId = stackId;
-    StackSwitchAsm(&nfStack[realCurrStack], &nfStack[realStack]);
+    // StackSwitchAsm(&nfStack[realCurrStack], &nfStack[realStack]);
+    StackSwitchAsm(current, next);
 }
 
 void StackStart(int stackId, PrivateStart start)
@@ -46,7 +50,8 @@ void StackStart(int stackId, PrivateStart start)
     //this is a bootstrap problem: we need to store status on main stack before first
     //`stackswitch` is called
     //so though this looks ugly and asymmetric, we need to embrace the inevitable
-    if (SaveState(&nfStack[MAX_STACK_NUM - 1]) == 0)
+    // if (SaveState(&nfStack[MAX_STACK_NUM - 1]) == 0)
+    if (!SaveState(&mainStack))
     {
         //rebase rsp only once, for later %rsp is saved in RegSet
         asm(
@@ -60,31 +65,3 @@ void StackStart(int stackId, PrivateStart start)
     //now that we've done initialize NF, we are now in main stack
     currStackId = -1;
 }
-
-// int StackRun(PrivateStart start) {
-// if (globalStack->started) {
-// /* the second time an NF is called */
-// if (SaveState(globalStack->TrampoStack) == 0) {
-// RestoreState(globalStack->MoonStack);
-// } else {
-// printf("return to runtime from private stack\n");
-// }
-// } else {
-// globalStack->started = 1;
-// if (SaveState(globalStack->TrampoStack) == 0) {
-// TODO: correctly set the stack location here
-// start();
-// return 0;
-// } else {
-// return 1;
-// }
-// }
-// }
-
-// void StackEscape() {
-// if (SaveState(globalStack->MoonStack) == 0) {
-// RestoreState(globalStack->TrampoStack);
-// } else {
-// printf("jumping into private stack from trampoline, now returning to vio\n");
-// }
-// }

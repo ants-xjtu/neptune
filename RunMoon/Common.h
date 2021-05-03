@@ -63,18 +63,9 @@ static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 // global variables of runtime main
 // most of them are passing information between runtime/parivate stacks
 int (*moonStart)(int argc, char *argv[]);
-struct l2fwd_port_statistics
-{
-    uint64_t tx;
-    uint64_t rx;
-    uint64_t dropped;
-} __rte_cache_aligned;
-struct l2fwd_port_statistics port_statistics;
-struct rte_eth_dev_tx_buffer *txBuffer;
+// struct rte_eth_dev_tx_buffer *txBuffer;
 Interface *interface;
 #define MAX_PKT_BURST 32
-struct rte_mbuf *packetBurst[MAX_PKT_BURST];
-unsigned int burstSize;
 int runtimePkey;
 #define MAX_WORKER_ID 96
 struct MoonData
@@ -91,10 +82,25 @@ struct MoonData
 struct MoonData moonDataList[16];
 int enablePku;
 int loading;
+#define CYCLE_SIZE 40
+struct l2fwd_port_statistics
+{
+    uint64_t tx;
+    uint64_t rx;
+    uint64_t dropped;
+    double cycle[CYCLE_SIZE];
+    int cycleIndex;
+    double prevAvg;
+} __rte_cache_aligned;
+// struct l2fwd_port_statistics port_statistics;
 struct WorkerData
 {
     int current; // MOON id
     int rxQueue, txQueue;
+    struct rte_mbuf *packetBurst[MAX_PKT_BURST];
+    unsigned int burstSize;
+
+    struct l2fwd_port_statistics stat;
 };
 struct WorkerData workerDataList[MAX_WORKER_ID];
 
@@ -113,6 +119,8 @@ void RedirectEthDevices(struct rte_eth_dev *devices);
 
 // bench
 uint64_t numberTimerSecond;
+extern uint64_t timer_period;
+void RecordBench(uint64_t);
 void PrintBench();
 
 // pkey
