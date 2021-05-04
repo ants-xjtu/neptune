@@ -197,7 +197,7 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
     {
         if (ph->p_type == PT_LOAD)
         {
-            if (mapstart < 0)
+            if (mapstart + 1 == 0)
                 mapstart = ALIGN_DOWN(ph->p_vaddr, 4096);
             mapend = ph->p_vaddr + ph->p_memsz;
         }
@@ -276,7 +276,7 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
             }
             if (!found)
             {
-                // printf("[Loader] %s\n", filename);
+                printf("[Loader] %s\n", filename);
                 int fd = open(filename, O_RDONLY);
                 /* XXX problems here
                  * open will successfully deal with file under the current directory

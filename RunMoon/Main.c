@@ -1,4 +1,4 @@
-#include "RunMoon/Common.h"
+#include "Common.h"
 
 uint64_t timer_period = 1; /* default period is 10 seconds */
 
@@ -25,15 +25,23 @@ int main(int argc, char *argv[])
     printf("loading tiangou library %s\n", tiangouPath);
     void *tiangou = dlopen(tiangouPath, RTLD_LAZY);
     interface = dlsym(tiangou, "interface");
-    printf("injecting interface functions at %p\n", interface);
+    printf("injecting TIANGOU interface at %p\n", interface);
     interface->malloc = HeapMalloc;
     interface->realloc = HeapRealloc;
     interface->calloc = HeapCalloc;
     interface->free = HeapFree;
     interface->signal = signal;
     interface->pcapLoop = PcapLoop;
+    struct rte_eth_dev_info srcInfo, dstInfo;
+    rte_eth_dev_info_get(srcPort, &srcInfo);
+    rte_eth_dev_info_get(dstPort, &dstInfo);
+    interface->srcInfo = &srcInfo;
+    interface->dstInfo = &dstInfo;
+    interface->tscHz = rte_get_tsc_hz();
+
     struct rte_eth_dev *rteEthDevices = dlsym(tiangou, "rte_eth_devices");
     RedirectEthDevices(rteEthDevices);
+
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
     printf("%s: tiangou\n", DONE_STRING);
@@ -156,11 +164,6 @@ void LoadMoon(char *moonPath, int moonId)
         // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
         pkey_mprotect(arena + STACK_SIZE, MOON_SIZE - STACK_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
 
-        moonStart = LibraryFind(&library, "main");
-        printf("entering MOON for initial running, start = %p\n", moonStart);
-        StackStart(instanceId, InitMoon);
-        printf("%s: MOON initialization\n", DONE_STRING);
-
         printf("register MOON#%d worker$%d data (inst!%03x)\n", moonId, workerId, instanceId);
         moonDataList[moonId].workers[workerId].instanceId = instanceId;
         uintptr_t *extraLow = LibraryFind(&library, "SwordHolder_ExtraLow"),
@@ -172,6 +175,11 @@ void LoadMoon(char *moonPath, int moonId)
         moonDataList[moonId].workers[workerId].extraLowPtr = extraLow;
         moonDataList[moonId].workers[workerId].extraHighPtr = extraHigh;
         printf("%s: register MOON#%d worker$%d\n", DONE_STRING, moonId, workerId);
+
+        moonStart = LibraryFind(&library, "main");
+        printf("entering MOON for initial running, start = %p\n", moonStart);
+        StackStart(instanceId, InitMoon);
+        printf("%s: MOON initialization\n", DONE_STRING);
     }
 }
 

@@ -17,6 +17,9 @@ typedef struct
     sighandler_t (*signal)(int signum, sighandler_t handler);
 
     int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
+
+    struct rte_eth_dev_info *srcInfo, *dstInfo;
+    uint64_t tscHz;
 } Interface;
 
 // the variable `interface` and `rte_eth_dev` is defined in TianGou.c

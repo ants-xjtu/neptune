@@ -50,7 +50,9 @@ add_executable(RunMoon
 )
 target_compile_definitions(RunMoon PRIVATE ALLOW_EXPERIMENTAL_API)
 target_include_directories(RunMoon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(RunMoon neptune PkgConfig::DPDK pcap)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+target_link_libraries(RunMoon PRIVATE neptune PkgConfig::DPDK pcap Threads::Threads)
 # patch to link drivers
 target_link_options(RunMoon PRIVATE -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)
 
@@ -67,6 +69,7 @@ target_link_directories(SwordHolderPass PRIVATE ${LLVM_LIBRARY_DIRS})
 
 # TianGou target - runtime interface bridger
 add_library(TianGou MODULE TianGou.c)
+target_link_libraries(TianGou PRIVATE Threads::Threads)
 
 # add_moon util
 function(add_moon)
@@ -125,9 +128,10 @@ function(add_moon)
     # additional options could be applied after target is created
     set_source_files_properties(${OPT_BITCODE_FILE} PROPERTIES LANGUAGE C)
     add_library(${MOON_NAME} MODULE ${OPT_BITCODE_FILE})
+    # add_executable(${MOON_NAME} ${OPT_BITCODE_FILE})
     target_compile_options(${MOON_NAME} PRIVATE -Wno-unused-command-line-argument)
     set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
-    target_link_libraries(${MOON_NAME} PkgConfig::DPDK pcap)
+    target_link_libraries(${MOON_NAME} PRIVATE PkgConfig::DPDK pcap Threads::Threads)
 endfunction(add_moon)
 
 # MOON targets
@@ -148,13 +152,13 @@ add_moon(TARGET Moon_Libnids${P} SOURCES
     Moon/LibnidsWtf.c
     Moon/libnids/src/NIDS-link_pic.bc
 )
-target_link_libraries(Moon_Libnids${P} gthread-2.0 nsl glib-2.0 net)
-target_link_options(Moon_Libnids${P} PRIVATE -pthread)
+target_link_libraries(Moon_Libnids${P} PRIVATE gthread-2.0 nsl glib-2.0 net)
+target_link_libraries(Moon_Libnids${P} PRIVATE Threads::Threads)
 
 add_moon(TARGET Moon_Prads${P} SOURCES
     Moon/prads/src/prads-link.bc
 )
-target_link_libraries(Moon_Prads${P} pcap pcre resolv)
+target_link_libraries(Moon_Prads${P} PRIVATE pcap pcre resolv)
 
 add_moon(TARGET Moon_L2Fwd${P} SOURCES
     Moon/L2Fwd.c

@@ -155,6 +155,7 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
 static void
 l2fwd_main_loop(void)
 {
+	printf("checkpoint #0\n");
 	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
 	struct rte_mbuf *m;
 	int sent;
@@ -164,10 +165,16 @@ l2fwd_main_loop(void)
 	struct lcore_queue_conf *qconf;
 	const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S *
 							   BURST_TX_DRAIN_US;
+	printf("checkpoint #1\n");
+	unsigned int *p = &per_lcore__lcore_id;
+	printf("checkpoint #2\n");
+	uintptr_t x = (uintptr_t)p;
+	printf("checkpoint #3");
+	printf("checkpoint #4: %lx\n", (uintptr_t)x);
+
 	struct rte_eth_dev_tx_buffer *buffer;
 
 	prev_tsc = 0;
-
 	lcore_id = rte_lcore_id();
 	qconf = &lcore_queue_conf[lcore_id];
 
@@ -189,7 +196,6 @@ l2fwd_main_loop(void)
 
 	while (!force_quit)
 	{
-
 		cur_tsc = rte_rdtsc();
 
 		/*
@@ -593,6 +599,10 @@ int main(int argc, char **argv)
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
+	// fake some arguments here to make it run
+	char *argv_[] = {"<program>", "-p", "0x3", "-q", "2"};
+	argc = 5;
+	argv = argv_;
 	/* parse application arguments (after the EAL ones) */
 	ret = l2fwd_parse_args(argc, argv);
 	if (ret < 0)
@@ -600,10 +610,11 @@ int main(int argc, char **argv)
 
 	printf("MAC updating %s\n", mac_updating ? "enabled" : "disabled");
 
-
 	nb_ports = rte_eth_dev_count_avail();
 	if (nb_ports == 0)
 		rte_exit(EXIT_FAILURE, "No Ethernet ports - bye\n");
+
+	// printf("checkpoint#0\n");
 
 	if (port_pair_params != NULL)
 	{
@@ -636,6 +647,7 @@ int main(int argc, char **argv)
 	}
 	else
 	{
+		// printf("checkpoint#1\n");
 		RTE_ETH_FOREACH_DEV(portid)
 		{
 			/* skip ports that are not enabled */
@@ -660,6 +672,7 @@ int main(int argc, char **argv)
 			l2fwd_dst_ports[last_port] = last_port;
 		}
 	}
+	// printf("checkpoint#2\n");
 
 	rx_lcore_id = 0;
 	qconf = NULL;
@@ -698,10 +711,13 @@ int main(int argc, char **argv)
 								   nb_lcores * MEMPOOL_CACHE_SIZE),
 					   8192U);
 
+	printf("checkpoint #3\n");
 	/* create the mbuf pool */
-	l2fwd_pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", nb_mbufs,
-												 MEMPOOL_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE,
-												 rte_socket_id());
+	l2fwd_pktmbuf_pool = rte_pktmbuf_pool_create(
+		"mbuf_pool", nb_mbufs,
+		MEMPOOL_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE,
+		rte_socket_id());
+	printf("checkpoint #4\n");
 	if (l2fwd_pktmbuf_pool == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
@@ -836,7 +852,7 @@ int main(int argc, char **argv)
 				 "All available ports are disabled. Please set portmask.\n");
 	}
 
-	check_all_ports_link_status(l2fwd_enabled_port_mask);
+	// check_all_ports_link_status(l2fwd_enabled_port_mask);
 
 	ret = 0;
 	/* launch per-lcore init on every lcore */
