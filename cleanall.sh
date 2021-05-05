@@ -2,6 +2,6 @@
 
 set -e
 
-make -C build clean
+bash -c 'cd build && make clean'
 make -C Vendor/libnids clean
 make -C Vendor/prads clean

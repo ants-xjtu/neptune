@@ -172,8 +172,6 @@ l2fwd_main_loop(void)
 
 	prev_tsc = 0;
 	lcore_id = rte_lcore_id();
-	printf("lcore_id: %p %u\n", &per_lcore__lcore_id, lcore_id);
-	// lcore_id = 0; // temp patch before bug-sym-und is solved
 	qconf = &lcore_queue_conf[lcore_id];
 
 	if (qconf->n_rx_port == 0)

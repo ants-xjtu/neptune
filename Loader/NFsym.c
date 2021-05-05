@@ -45,14 +45,14 @@ void *NFsym(void *ll, const char *s)
                     {
                         // return the real, rebased address
                         void **dest = (void **)(l->l_addr + it->r_offset);
-                        printf("name: %s, find real symbol address %p in GOT\n", s, *dest);
+                        // printf("name: %s, find real symbol address %p in GOT\n", s, *dest);
                         return *dest;
                     }
                     it++;
                 }
                 
             }
-            printf("name: %s, st_value: %#lx\n", s, curr_sym->st_value);
+            // printf("name: %s, st_value: %#lx\n", s, curr_sym->st_value);
             return (void *)(curr_sym->st_value + l->l_addr);
         }
         curr_sym++;
