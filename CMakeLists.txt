@@ -173,6 +173,20 @@ add_moon(TARGET Moon_RxBurstTest${P} SOURCES
     Moon/RxBurstTest.c
 )
 
+add_moon(TARGET Moon_MidStat${P} SOURCES
+    Vendor/mOS/core/lib/libmtcp.bc
+    Vendor/mOS/samples/midstat/midstat.c
+    Vendor/mOS/samples/common/applib.c
+)
+target_compile_definitions(Moon_MidStat${P}_SourceLibrary PRIVATE NDEBUG NETSTAT INFO DBGERR DBGCERR)
+target_include_directories(Moon_MidStat${P}_SourceLibrary PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/samples/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/util/include
+)
+target_link_libraries(Moon_MidStat${P} PRIVATE ssl crypto numa rt)
+
+
 endmacro()
 
 set(P "")
@@ -188,6 +202,10 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libnids/src/NIDS-li
 add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src/prads-link.bc
     COMMAND make prads-link.bc 2>/dev/null
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src
+)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/lib/libmtcp.bc
+    COMMAND make ../lib/libmtcp.bc
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/src
 )
 
 # Other test and bench targets

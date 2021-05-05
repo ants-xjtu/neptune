@@ -125,7 +125,7 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 int pcap_compile(pcap_t *p, struct bpf_program *fp,
                  const char *str, int optimize, bpf_u_int32 netmask)
 {
-    MESSAGE("return 0 by Qcloud");
+    MESSAGE("return 0");
     return 0;
 }
 
@@ -141,9 +141,9 @@ char *pcap_lookupdev(char *errbuf)
 pcap_t *pcap_open_live(const char *device, int snaplen,
                        int promisc, int to_ms, char *errbuf)
 {
-    MESSAGE("return NULL, errbuf filled");
+    MESSAGE("return 0x42");
     // strncpy(errbuf, "not supported", PCAP_ERRBUF_SIZE);
-    return (pcap_t *)1;
+    return (pcap_t *)0x42;
 }
 
 int pcap_datalink(pcap_t *p)
@@ -160,8 +160,32 @@ int pcap_dispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 
 int pcap_stats(pcap_t *p, struct pcap_stat *pt)
 {
-    MESSAGE("pcap check always pass");
+    MESSAGE("return 1");
     return 1;
+}
+
+pcap_t *pcap_create(const char *source, char *errbuf)
+{
+    MESSAGE("source = %s", source);
+    return (pcap_t *)0x42;
+}
+
+int pcap_activate(pcap_t *p)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int pcap_set_buffer_size(pcap_t *p, int buffer_size)
+{
+    MESSAGE("buffer_size = %d", buffer_size);
+    return 0;
+}
+
+int pcap_inject(pcap_t *p, const void *buf, size_t size)
+{
+    MESSAGE("not implemented");
+    abort();
 }
 
 // dpdk
