@@ -4,5 +4,6 @@
         "*.c": "c",
         "*.h": "c",
         "*.def": "cpp"
-    }
+    },
+    "cmake.configureOnEdit": false
 }

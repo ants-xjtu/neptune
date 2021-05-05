@@ -55,7 +55,7 @@ add_executable(RunMoon
 )
 target_compile_definitions(RunMoon PRIVATE ALLOW_EXPERIMENTAL_API)
 target_include_directories(RunMoon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(RunMoon PRIVATE neptune PkgConfig::DPDK pcap Threads::Threads)
+target_link_libraries(RunMoon PRIVATE neptune PkgConfig::DPDK pcap Threads::Threads ${CMAKE_DL_LIBS})
 # patch to link drivers
 target_link_options(RunMoon PRIVATE -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)
 
@@ -82,13 +82,14 @@ function(add_moon)
     set(MOON_NAME ${ADD_MOON_TARGET})
     set(SOURCES ${ADD_MOON_SOURCES})
     # message("[AddMoon] " ${MOON_NAME} ": ${SOURCES}")
-    set(BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-link.bc)
-    set(OPT_BITCODE_FILE ${CMAKE_BINARY_DIR}/${MOON_NAME}-opt.bc)
+    set(BITCODE_FILE ${CMAKE_CURRENT_BINARY_DIR}/MoonBitcode/${MOON_NAME}-link.bc)
+    set(OPT_BITCODE_FILE ${CMAKE_CURRENT_BINARY_DIR}/MoonBitcode/${MOON_NAME}-opt.bc)
 
     # step 1: *.c/*.bc + RuntimeLibrary.c -> *.bc
     set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE C)
     add_library(${MOON_NAME}_SourceLibrary OBJECT ${SOURCES} SwordHolder/RuntimeLibrary.c)
-    target_compile_options(${MOON_NAME}_SourceLibrary PRIVATE -emit-llvm -Xclang -disable-O0-optnone -Wno-unused-command-line-argument)
+    target_compile_options(${MOON_NAME}_SourceLibrary PRIVATE 
+        -emit-llvm -Xclang -disable-O0-optnone -Wno-unused-command-line-argument)
     set_target_properties(${MOON_NAME}_SourceLibrary PROPERTIES 
         POSITION_INDEPENDENT_CODE True
         LINKER_LANGUAGE C
@@ -97,6 +98,7 @@ function(add_moon)
     # step 2: *.bc -> link.bc
     add_custom_command(OUTPUT ${BITCODE_FILE}
         DEPENDS ${MOON_NAME}_SourceLibrary $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary> 
+        COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/MoonBitcode
         COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` > ${BITCODE_FILE}
         # COMMAND llvm-dis ${BITCODE_FILE}
     )
@@ -179,13 +181,13 @@ set(P "_NoSFI")
 create_moons()
 
 # 3rd party targets depend by MOONs
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/Vendor/libnids/src/NIDS-link_pic.bc
-    COMMAND make NIDS-link_pic.bc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Vendor/libnids/src
+add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libnids/src/NIDS-link_pic.bc
+    COMMAND make NIDS-link_pic.bc 2>/dev/null
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libnids/src
 )
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/Vendor/prads/src/prads-link.bc
-    COMMAND make prads-link.bc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Vendor/prads/src
+add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src/prads-link.bc
+    COMMAND make prads-link.bc 2>/dev/null
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src
 )
 
 # Other test and bench targets

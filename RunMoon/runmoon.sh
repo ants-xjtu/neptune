@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 PKU_FLAG=""
 # PKU_FLAG=" --pku"
 
