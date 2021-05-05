@@ -19,6 +19,7 @@ namespace
     const char *REASON_GEP_WITH_CONST_INDICES = "gep w/ const indices";
     const char *REASON_CONST_EXPR = "const expr";
     const char *REASON_CALL_MALLOC = "malloc";
+    const char *REASON_EXTERNAL = "extern global (could be false positive)";
 
     struct Stat
     {
@@ -42,10 +43,6 @@ namespace
             ignoredMap[reason] += 1;
         }
         void onBitcastOperand()
-        {
-            indirect += 1;
-        }
-        void onGEPOperand()
         {
             indirect += 1;
         }
@@ -122,7 +119,8 @@ namespace
         if (auto *call = dyn_cast<CallInst>(operand))
         {
             if (call->getCalledFunction()->getName() == "malloc" ||
-                call->getCalledFunction()->getName() == "calloc")
+                call->getCalledFunction()->getName() == "calloc" ||
+                call->getCalledFunction()->getName() == "realloc")
             {
                 stat.onIgnoredStoreInst(REASON_CALL_MALLOC);
                 return true;
@@ -144,6 +142,7 @@ namespace
             {
                 // outs() << "Skip external:\n  " << *global << "\nIn\n";
                 // outs() << *op << "\n";
+                stat.onIgnoredStoreInst(REASON_EXTERNAL);
                 return true;
             }
         }
