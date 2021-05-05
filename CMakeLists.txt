@@ -1,20 +1,28 @@
 cmake_minimum_required(VERSION 3.16)
 project(neptune)
 
+# config
+enable_language(ASM)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(DPDK REQUIRED IMPORTED_TARGET libdpdk)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+find_package(LLVM REQUIRED CONFIG)
+
 # neptune targets
 # neptune target - support library
-add_library(dlmalloc dlmalloc.c)
+add_library(dlmalloc Vendor/dlmalloc.c)
 target_compile_definitions(dlmalloc PRIVATE 
     USE_DL_PREFIX
     MORECORE_CANNOT_TRIM
     HAVE_MMAP=0
     MORECORE=PrivateMoreCore
 )
+target_include_directories(dlmalloc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(dlmalloc PROPERTIES POSITION_INDEPENDENT_CODE True)
 add_library(PrivateHeap INTERFACE)
 target_link_libraries(PrivateHeap INTERFACE dlmalloc)
 
-enable_language(ASM)
 add_library(PrivateStack PrivateStack2.c StackSwitch.S)
 
 add_library(PrivateLoad 
@@ -39,9 +47,6 @@ target_link_libraries(neptune INTERFACE
 )
 
 # RunMoon target - runtime executable
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(DPDK REQUIRED IMPORTED_TARGET libdpdk)
-
 add_executable(RunMoon 
     RunMoon/Main.c
     RunMoon/Support.c
@@ -50,14 +55,11 @@ add_executable(RunMoon
 )
 target_compile_definitions(RunMoon PRIVATE ALLOW_EXPERIMENTAL_API)
 target_include_directories(RunMoon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
 target_link_libraries(RunMoon PRIVATE neptune PkgConfig::DPDK pcap Threads::Threads)
 # patch to link drivers
 target_link_options(RunMoon PRIVATE -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)
 
 # SwordHolder targets - SFI pass
-find_package(LLVM REQUIRED CONFIG)
 add_library(SwordHolderPass MODULE
     SwordHolder/Pass.cxx
 )
@@ -150,13 +152,13 @@ set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
 add_moon(TARGET Moon_Libnids${P} SOURCES
     # Moon/LibnidsMain.c 
     Moon/LibnidsWtf.c
-    Moon/libnids/src/NIDS-link_pic.bc
+    Vendor/libnids/src/NIDS-link_pic.bc
 )
 target_link_libraries(Moon_Libnids${P} PRIVATE gthread-2.0 nsl glib-2.0 net)
 target_link_libraries(Moon_Libnids${P} PRIVATE Threads::Threads)
 
 add_moon(TARGET Moon_Prads${P} SOURCES
-    Moon/prads/src/prads-link.bc
+    Vendor/prads/src/prads-link.bc
 )
 target_link_libraries(Moon_Prads${P} PRIVATE pcap pcre resolv)
 
@@ -177,13 +179,13 @@ set(P "_NoSFI")
 create_moons()
 
 # 3rd party targets depend by MOONs
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/Moon/libnids/src/NIDS-link_pic.bc
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/Vendor/libnids/src/NIDS-link_pic.bc
     COMMAND make NIDS-link_pic.bc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Moon/libnids/src
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Vendor/libnids/src
 )
-add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/Moon/prads/src/prads-link.bc
+add_custom_command(OUTPUT ${CMAKE_SOURCE_DIR}/Vendor/prads/src/prads-link.bc
     COMMAND make prads-link.bc
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Moon/prads/src
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/Vendor/prads/src
 )
 
 # Other test and bench targets
