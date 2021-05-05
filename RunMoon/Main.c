@@ -165,7 +165,8 @@ void LoadMoon(char *moonPath, int moonId)
         pkey_mprotect(arena + STACK_SIZE, MOON_SIZE - STACK_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
 
         // need this to print corrent address so the value can be modified
-        LibraryFind(&library, "per_lcore__lcore_id");
+        unsigned *core_id = LibraryFind(&library, "per_lcore__lcore_id");
+        *core_id = 0;
 
         printf("register MOON#%d worker$%d data (inst!%03x)\n", moonId, workerId, instanceId);
         moonDataList[moonId].workers[workerId].instanceId = instanceId;
