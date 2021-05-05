@@ -8,7 +8,7 @@ int main(int argc, const char *argv[])
 {
     unsigned char *h = malloc(sizeof(unsigned char) * 64);
     unsigned char s;
-    // x = 42;
+    x = 42;
     printf("[Moon_Test] h = %p, &s = %p, &g = %p\n", h, &s, &g);
 
     unsigned char *choices[3] = {&s, h, &g};

@@ -155,7 +155,6 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
 static void
 l2fwd_main_loop(void)
 {
-	printf("checkpoint #0\n");
 	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
 	struct rte_mbuf *m;
 	int sent;
@@ -163,19 +162,14 @@ l2fwd_main_loop(void)
 	uint64_t prev_tsc, diff_tsc, cur_tsc;
 	unsigned i, j, portid, nb_rx;
 	struct lcore_queue_conf *qconf;
-	const uint64_t drain_tsc = (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S *
-							   BURST_TX_DRAIN_US;
-	printf("checkpoint #1\n");
-	unsigned int *p = &per_lcore__lcore_id;
-	printf("checkpoint #2\n");
-	uintptr_t x = (uintptr_t)p;
-	printf("checkpoint #3");
-	printf("checkpoint #4: %lx\n", (uintptr_t)x);
+	const uint64_t drain_tsc =
+		(rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S * BURST_TX_DRAIN_US;
 
 	struct rte_eth_dev_tx_buffer *buffer;
 
 	prev_tsc = 0;
 	lcore_id = rte_lcore_id();
+	printf("lcore_id: %p %u\n", &per_lcore__lcore_id, lcore_id);
 	qconf = &lcore_queue_conf[lcore_id];
 
 	if (qconf->n_rx_port == 0)
@@ -711,13 +705,11 @@ int main(int argc, char **argv)
 								   nb_lcores * MEMPOOL_CACHE_SIZE),
 					   8192U);
 
-	printf("checkpoint #3\n");
 	/* create the mbuf pool */
 	l2fwd_pktmbuf_pool = rte_pktmbuf_pool_create(
 		"mbuf_pool", nb_mbufs,
 		MEMPOOL_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE,
 		rte_socket_id());
-	printf("checkpoint #4\n");
 	if (l2fwd_pktmbuf_pool == NULL)
 		rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
 
@@ -741,8 +733,6 @@ int main(int argc, char **argv)
 		printf("Initializing port %u... ", portid);
 		fflush(stdout);
 
-		// Q: do we allow a MOON to get device infomation?
-		// Q: I didn't simply return 0 because dev_info is used afterwards...
 		ret = rte_eth_dev_info_get(portid, &dev_info);
 		if (ret != 0)
 			rte_exit(EXIT_FAILURE,
@@ -757,7 +747,6 @@ int main(int argc, char **argv)
 			rte_exit(EXIT_FAILURE, "Cannot configure device: err=%d, port=%u\n",
 					 ret, portid);
 
-		// Q: assume RunMoon setup the descriptors for it
 		ret = rte_eth_dev_adjust_nb_rx_tx_desc(portid, &nb_rxd,
 											   &nb_txd);
 		if (ret < 0)

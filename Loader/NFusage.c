@@ -276,7 +276,7 @@ uint64_t dissect_and_calculate(struct NF_list *nl)
             }
             if (!found)
             {
-                printf("[Loader] %s\n", filename);
+                // printf("[Loader] %s\n", filename);
                 int fd = open(filename, O_RDONLY);
                 /* XXX problems here
                  * open will successfully deal with file under the current directory
