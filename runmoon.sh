@@ -1,9 +1,10 @@
 #!/bin/bash
 
 PKU_FLAG=""
-PKU_FLAG=" --pku"
+# PKU_FLAG=" --pku"
 
-MOON_NAME="Libnids"
+MOON_NAME="L2Fwd"
+# MOON_NAME="Libnids"
 # MOON_NAME="Prads"
 
 SFI_FLAG=""

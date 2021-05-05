@@ -181,8 +181,15 @@ void LoadMoon(char *moonPath, int moonId)
 
         moonStart = LibraryFind(&library, "main");
         printf("entering MOON for initial running, start = %p\n", moonStart);
+        isDpdkMoon = 0;
         StackStart(instanceId, InitMoon);
-        printf("%s: MOON initialization\n", DONE_STRING);
+        printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, isDpdkMoon);
+        if (isDpdkMoon)
+        {
+            *extraLow = mbufLow;
+            *extraHigh = mbufHigh;
+            printf("one-time setting extra region for DPDK: %#lx - %#lx\n", *extraLow, *extraHigh);
+        }
     }
 }
 
@@ -313,13 +320,11 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
         {
             StackSwitch(-1);
             workerId = rte_lcore_id();
-            // UpdatePkey(workerId);
         }
         else
         {
             workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
             MoonSwitch(workerId);
-            // UpdatePkey(workerId);
         }
 
         for (int i = 0; i < workerDataList[workerId].burstSize; i += 1)
@@ -339,6 +344,45 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 {
-    printf("[RunMoon] RxBurst: sucess\n");
-    exit(0);
+    // printf("[RunMoon] RxBurst: sucess\n");
+    // exit(0);
+
+    unsigned int workerId = rte_lcore_id();
+    if (loading)
+    {
+        isDpdkMoon = 1;
+        StackSwitch(-1);
+    }
+    else
+    {
+        workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
+        // printf("switch to %d\n", workerDataList[workerId].current);
+        MoonSwitch(workerId);
+    }
+
+    if (nb_pkts < workerDataList[workerId].burstSize)
+    {
+        fprintf(stderr, "MOON rx burst size too small: %u\n", nb_pkts);
+        abort();
+    }
+    uint16_t size = workerDataList[workerId].burstSize;
+    memcpy(rx_pkts, workerDataList[workerId].packetBurst, size * sizeof(struct rte_mbuf *));
+    // clear burst
+    workerDataList[workerId].burstSize = 0;
+    return size;
+}
+
+uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+{
+    unsigned int workerId = rte_lcore_id();
+    if (workerDataList[workerId].burstSize + nb_pkts > MAX_PKT_BURST)
+    {
+        fprintf(stderr, "MOON tx burst size too large\n");
+        abort();
+    }
+    memcpy(
+        &workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize],
+        tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
+    workerDataList[workerId].burstSize += nb_pkts;
+    return nb_pkts;
 }

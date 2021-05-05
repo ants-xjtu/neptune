@@ -82,6 +82,7 @@ struct MoonData
 struct MoonData moonDataList[16];
 int enablePku;
 int loading;
+int isDpdkMoon;
 #define CYCLE_SIZE 40
 struct l2fwd_port_statistics
 {
@@ -110,10 +111,12 @@ int MainLoop(void *);
 void LoadMoon(char *, int);
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts);
+uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts);
 
 // support library APIs and global shared with main
 volatile bool force_quit;
 uint16_t srcPort, dstPort;
+uintptr_t mbufLow, mbufHigh;
 void SetupDpdk();
 void RedirectEthDevices(struct rte_eth_dev *devices);
 

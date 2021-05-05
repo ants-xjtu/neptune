@@ -139,6 +139,7 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
 	unsigned dst_port;
 	int sent;
 	struct rte_eth_dev_tx_buffer *buffer;
+	// printf("mbuf at %p, %p\n", m, rte_pktmbuf_mtod(m, struct rte_ether_hdr *));
 
 	dst_port = l2fwd_dst_ports[portid];
 
@@ -146,7 +147,9 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid)
 		l2fwd_mac_updating(m, dst_port);
 
 	buffer = tx_buffer[dst_port];
+	// printf("checkpoint #1\n");
 	sent = rte_eth_tx_buffer(dst_port, 0, buffer, m);
+	// printf("checkpoint #2\n");
 	if (sent)
 		port_statistics[dst_port].tx += sent;
 }
@@ -168,8 +171,9 @@ l2fwd_main_loop(void)
 	struct rte_eth_dev_tx_buffer *buffer;
 
 	prev_tsc = 0;
-	lcore_id = rte_lcore_id();
-	printf("lcore_id: %p %u\n", &per_lcore__lcore_id, lcore_id);
+	// lcore_id = rte_lcore_id();
+	// printf("lcore_id: %p %u\n", &per_lcore__lcore_id, lcore_id);
+	lcore_id = 0; // temp patch before bug-sym-und is solved
 	qconf = &lcore_queue_conf[lcore_id];
 
 	if (qconf->n_rx_port == 0)
@@ -196,6 +200,8 @@ l2fwd_main_loop(void)
 		 * TX burst queue drain
 		 */
 		diff_tsc = cur_tsc - prev_tsc;
+		// printf("checkpoint #4\n");
+
 		if (unlikely(diff_tsc > drain_tsc))
 		{
 
@@ -211,6 +217,7 @@ l2fwd_main_loop(void)
 			}
 			prev_tsc = cur_tsc;
 		}
+		// printf("checkpoint #5\n");
 
 		/*
 		 * Read packet from RX queues
@@ -219,8 +226,10 @@ l2fwd_main_loop(void)
 		{
 
 			portid = qconf->rx_port_list[i];
+			// printf("checkpoint #6\n");
 			nb_rx = rte_eth_rx_burst(portid, 0,
 									 pkts_burst, MAX_PKT_BURST);
+			// printf("checkpoint #0\n");
 
 			port_statistics[portid].rx += nb_rx;
 
@@ -228,8 +237,10 @@ l2fwd_main_loop(void)
 			{
 				m = pkts_burst[j];
 				rte_prefetch0(rte_pktmbuf_mtod(m, void *));
+				// printf("checkpoint #0.5\n");
 				l2fwd_simple_forward(m, portid);
 			}
+			// printf("checkpoint #3\n");
 		}
 	}
 }

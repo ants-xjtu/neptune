@@ -236,6 +236,10 @@ void SetupDpdk()
     struct rte_mempool *pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     if (pktmbufPool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
+    // it is hard to determine the corrent value for them...
+    // TODO
+    mbufLow = 0;
+    mbufHigh = ~mbufLow;
 
     RTE_ETH_FOREACH_DEV(portid)
     {
@@ -261,15 +265,28 @@ void SetupDpdk()
     check_all_ports_link_status(portMask);
 }
 
+uint16_t RxBurstNop(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
+{
+    return 0;
+}
+
+uint16_t TxBurstNop(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
+{
+    return nb_pkts;
+}
+
 void RedirectEthDevices(struct rte_eth_dev *devices)
 {
     printf("setup eth devices at: %p\n", devices);
     for (int i = 0; i < 2; i += 1)
     {
         struct rte_eth_dev *dev = &devices[i];
-        // printf("setup device: %p\n", dev);
-        dev->rx_pkt_burst = RxBurst;
         dev->data = malloc(sizeof(struct rte_eth_dev_data));
         dev->data->rx_queues = malloc(sizeof(void *) * NumberQueue);
+        dev->data->tx_queues = malloc(sizeof(void *) * NumberQueue);
     }
+    devices[0].rx_pkt_burst = RxBurst;
+    devices[0].tx_pkt_burst = TxBurstNop;
+    devices[1].rx_pkt_burst = RxBurstNop;
+    devices[1].tx_pkt_burst = TxBurst;
 }

@@ -367,7 +367,10 @@ int rte_eth_tx_queue_setup(uint16_t port_id, uint16_t tx_queue_id,
 
 int rte_eth_tx_buffer_init(struct rte_eth_dev_tx_buffer *buffer, uint16_t size)
 {
-    MESSAGE("return 0");
+    MESSAGE("create a one-sized buffer to prevent buffer");
+    buffer->size = 1;
+    buffer->length = 0;
+    buffer->error_callback = NULL;
     return 0;
 }
 
