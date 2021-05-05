@@ -405,8 +405,8 @@ int rte_eth_dev_close(uint16_t port_id)
     return 0;
 }
 
-void *__tls_get_addr(void *p)
+void *__tls_get_addr(void **p)
 {
-    MESSAGE("p = %p", p);
-    return p;
+    MESSAGE("p = %p, *p", p, *p);
+    return *p;
 }
