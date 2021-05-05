@@ -1,5 +1,3 @@
 build
-glibc-build
-gmem/**/obj
 *.bc
 *.o

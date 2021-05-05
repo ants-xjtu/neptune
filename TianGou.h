@@ -2,11 +2,10 @@
 #define NEPTUNE_TIANGOU_H
 
 #define _GNU_SOURCE
+#include <signal.h>
 #include <stddef.h>
 #include <pcap/pcap.h>
-#include <rte_mbuf.h>
-
-#define MAX_PKT_BURST 32
+#include <rte_ethdev.h>
 
 typedef struct
 {
@@ -15,14 +14,15 @@ typedef struct
     void *(*calloc)(size_t, size_t);
     void (*free)(void *);
 
-    void (*StackSwitch)(int);
+    sighandler_t (*signal)(int signum, sighandler_t handler);
 
-    struct rte_mbuf *packetBurst[MAX_PKT_BURST];
-    int burstSize;
+    int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
 
-    uintptr_t *packetRegionLow, *packetRegionHigh;
+    struct rte_eth_dev_info *srcInfo, *dstInfo;
+    uint64_t tscHz;
 } Interface;
 
-typedef void (*pcap_handler)(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes);
+// the variable `interface` and `rte_eth_dev` is defined in TianGou.c
+// because they must not be defined as extern
 
 #endif

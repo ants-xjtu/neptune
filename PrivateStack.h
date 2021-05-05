@@ -2,7 +2,7 @@
 #ifndef PRIVATE_STACK_H
 #define PRIVATE_STACK_H
 
-#define MAX_STACK_NUM 16
+#define MAX_STACK_NUM 4096
 
 typedef void (*PrivateStart)(void);
 
