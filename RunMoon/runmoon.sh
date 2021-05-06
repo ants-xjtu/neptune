@@ -5,8 +5,8 @@ set -e
 PKU_FLAG=""
 # PKU_FLAG=" --pku"
 
-MOON_NAME="L2Fwd"
-# MOON_NAME="MidStat"
+# MOON_NAME="L2Fwd"
+MOON_NAME="MidStat"
 # MOON_NAME="Libnids"
 # MOON_NAME="Prads"
 

@@ -18,8 +18,16 @@ typedef struct
 
     int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
 
+    // this two could be function pointer
+    // but they always return constant, so value is better
     struct rte_eth_dev_info *srcInfo, *dstInfo;
     uint64_t tscHz;
+
+    int (*pthreadCreate)(
+        pthread_t *restrict thread,
+        const pthread_attr_t *restrict attr,
+        void *(*start_routine)(void *),
+        void *restrict arg);
 } Interface;
 
 extern Interface interface;

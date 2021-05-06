@@ -272,7 +272,7 @@ l2fwd_main_loop(void)
 					/* do this only on main core */
 					if (lcore_id == rte_get_main_lcore())
 					{
-						print_stats();
+						// print_stats();
 						/* reset the timer */
 						timer_tsc = 0;
 					}
@@ -937,7 +937,7 @@ int main(int argc, char **argv)
 
 	pthread_t worker;
 	pthread_create(&worker, NULL, WorkerMain, NULL);
-	printf("main thread start waiting\n");
+	printf("main thread (#%lu) start waiting\n", pthread_self());
 	pthread_join(worker, NULL);
 
 	RTE_ETH_FOREACH_DEV(portid)
@@ -961,7 +961,7 @@ void *WorkerMain(void *_arg)
 {
 	int ret = 0;
 	unsigned lcore_id;
-	printf("[Worker] lcore_id: %u\n", rte_lcore_id());
+	printf("[Worker] lcore_id: %u pthread: %lu\n", rte_lcore_id(), pthread_self());
 	per_lcore__lcore_id = 0;
 	/* launch per-lcore init on every lcore */
 	rte_eal_mp_remote_launch(l2fwd_launch_one_lcore, NULL, CALL_MAIN);

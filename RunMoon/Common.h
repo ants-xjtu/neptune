@@ -51,23 +51,41 @@
 #include "TianGou.h"
 
 static const size_t STACK_SIZE = 32ul << 20; // 32MB
-static const size_t MOON_SIZE = 32ul << 30;  // 32GB
-// Heap size = MOON_SIZE - STACK_SIZE - library.length
+static const int NUMBER_STACK = 16;
+static const size_t MOON_SIZE = 32ul << 30; // 32GB
+// Heap size = MOON_SIZE - NUMBER_STACK * STACK_SIZE - library.length
 
 // static const char *DONE_STRING = "\xe2\x86\x91 done";
 #define RTE_TEST_RX_DESC_DEFAULT 1024
 #define RTE_TEST_TX_DESC_DEFAULT 1024
 static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
 static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
-
-// global variables of runtime main
-// most of them are passing information between runtime/parivate stacks
-int (*moonStart)(int argc, char *argv[]);
-// struct rte_eth_dev_tx_buffer *txBuffer;
-Interface *interfacePointer;
 #define MAX_PKT_BURST 32
-int runtimePkey;
 #define MAX_WORKER_ID 96
+#define CYCLE_SIZE 40
+
+// global variables of runtime supervisor & workers
+// constant that will only be set once during runtime init
+int runtimePkey;
+int enablePku;
+// loading time variable
+// when these variables are set/accessed, only one MOON is initializing
+// on runtime supervisor's thread, so do not need to think about thread
+// safety
+struct Loading
+{
+    int inProgress;
+    int instanceId;
+    int (*moonStart)(int argc, char *argv[]);
+    int isDpdkMoon;
+    void *heapStart;
+    size_t heapSize;
+};
+struct Loading loading;
+// moonDataList[] is only set during loading/reconfiguration(WIP), and
+// workers will only read them
+// instance data inside moonDataList[].workers[] is allocated per MOON per worker
+// so each worker only access its own index
 struct MoonData
 {
     int id; // -1 for end of MOONs
@@ -80,10 +98,7 @@ struct MoonData
     } workers[MAX_WORKER_ID];
 };
 struct MoonData moonDataList[16];
-int enablePku;
-int loading;
-int isDpdkMoon;
-#define CYCLE_SIZE 40
+// worker data is accessed by each worker on its own index
 struct l2fwd_port_statistics
 {
     uint64_t tx;
@@ -112,6 +127,11 @@ void LoadMoon(char *, int);
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts);
 uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts);
+int PthreadCreate(
+    pthread_t *restrict thread,
+    const pthread_attr_t *restrict attr,
+    void *(*start_routine)(void *),
+    void *restrict arg);
 
 // support library APIs and global shared with main
 volatile bool force_quit;

@@ -13,6 +13,9 @@ int main(int argc, char *argv[])
     SetupDpdk();
     numberTimerSecond = timer_period;
     timer_period *= rte_get_timer_hz();
+    struct rte_eth_dev_info srcInfo, dstInfo;
+    rte_eth_dev_info_get(srcPort, &srcInfo);
+    rte_eth_dev_info_get(dstPort, &dstInfo);
 
     if (argc < 3)
     {
@@ -24,7 +27,7 @@ int main(int argc, char *argv[])
     const char *tiangouPath = argv[1];
     printf("loading tiangou library %s\n", tiangouPath);
     void *tiangou = dlopen(tiangouPath, RTLD_LAZY);
-    interfacePointer = dlsym(tiangou, "interface");
+    Interface *interfacePointer = dlsym(tiangou, "interface");
     printf("injecting TIANGOU interface at %p\n", interfacePointer);
     interfacePointer->malloc = HeapMalloc;
     interfacePointer->realloc = HeapRealloc;
@@ -32,16 +35,10 @@ int main(int argc, char *argv[])
     interfacePointer->free = HeapFree;
     interfacePointer->signal = signal;
     interfacePointer->pcapLoop = PcapLoop;
-    struct rte_eth_dev_info srcInfo, dstInfo;
-    rte_eth_dev_info_get(srcPort, &srcInfo);
-    rte_eth_dev_info_get(dstPort, &dstInfo);
     interfacePointer->srcInfo = &srcInfo;
     interfacePointer->dstInfo = &dstInfo;
     interfacePointer->tscHz = rte_get_tsc_hz();
-
-    // struct rte_eth_dev *rteEthDevices = dlsym(tiangou, "rte_eth_devices");
-    // RedirectEthDevices(rteEthDevices);
-
+    interfacePointer->pthreadCreate = PthreadCreate;
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
     printf("%s: tiangou\n", DONE_STRING);
@@ -54,14 +51,14 @@ int main(int argc, char *argv[])
         enablePku = 1;
     }
 
-    loading = 1;
+    loading.inProgress = 1;
     for (int moonId = 0; i < argc; moonId += 1, i += 1)
     {
         char *moonPath = argv[i];
         printf("[RunMoon] moon#%d START LOADING\n", moonId);
         LoadMoon(argv[i], moonId);
     }
-    loading = 0;
+    loading.inProgress = 0;
 
     // according to pkey(7), "The default key is assigned to any memory region
     // for which a pkey has not been explicitly assigned via pkey_mprotect(2)."
@@ -137,12 +134,12 @@ void LoadMoon(char *moonPath, int moonId)
         library.file = moonPath;
         LoadLibrary(&library);
         printf("library requires space: %#lx\n", library.length);
-        void *stackStart = arena, *libraryStart = arena + STACK_SIZE;
+        void *stackStart = arena, *libraryStart = arena + NUMBER_STACK * STACK_SIZE;
         void *heapStart = libraryStart + library.length;
-        size_t heapSize = MOON_SIZE - STACK_SIZE - library.length;
+        size_t heapSize = MOON_SIZE - NUMBER_STACK * STACK_SIZE - library.length;
 
         printf("*** MOON memory layout ***\n");
-        printf("Stack\t%p - %p\tsize: %#lx\n", stackStart, stackStart + STACK_SIZE, STACK_SIZE);
+        printf("Stack#0\t%p - %p\tsize: %#lx\n", stackStart, stackStart + STACK_SIZE, STACK_SIZE);
         printf("Library\t%p - %p\tsize: %#lx\n", libraryStart, libraryStart + library.length, library.length);
         printf("Heap\t%p - %p\tsize: %#lx\n", heapStart, heapStart + heapSize, heapSize);
         // printf("\n");
@@ -191,12 +188,12 @@ void LoadMoon(char *moonPath, int moonId)
         moonDataList[moonId].workers[workerId].extraHighPtr = extraHigh;
         printf("%s: register MOON#%d worker$%d\n", DONE_STRING, moonId, workerId);
 
-        moonStart = LibraryFind(&library, "main");
-        printf("entering MOON for initial running, start = %p\n", moonStart);
-        isDpdkMoon = 0;
+        loading.moonStart = LibraryFind(&library, "main");
+        printf("entering MOON for initial running, start = %p\n", loading.moonStart);
+        loading.isDpdkMoon = 0;
         StackStart(instanceId, InitMoon);
-        printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, isDpdkMoon);
-        if (isDpdkMoon)
+        printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, loading.isDpdkMoon);
+        if (loading.isDpdkMoon)
         {
             *extraLow = mbufLow;
             *extraHigh = mbufHigh;
@@ -236,14 +233,12 @@ int MainLoop(void *_arg)
     const uint64_t drain_tsc =
         (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S * BURST_TX_DRAIN_US;
     struct rte_eth_dev_tx_buffer *buffer;
-
     prev_tsc = 0;
     timer_tsc = 0;
     workerId = lcore_id = rte_lcore_id();
 
     DisablePkey(1);
     RTE_LOG(INFO, L2FWD, "entering main loop on lcore $%u\n", lcore_id);
-
     while (!force_quit)
     {
         cur_tsc = rte_rdtsc();
@@ -253,12 +248,6 @@ int MainLoop(void *_arg)
         diff_tsc = cur_tsc - prev_tsc;
         if (unlikely(diff_tsc > drain_tsc))
         {
-            // portid = dstPort;
-            // buffer = txBuffer;
-            // sent = rte_eth_tx_buffer_flush(portid, workerDataList[workerId].txQueue, buffer);
-            // if (sent)
-            //     workerDataList[workerId].stat.tx += sent;
-
             /* if timer is enabled */
             if (timer_period > 0)
             {
@@ -291,17 +280,13 @@ int MainLoop(void *_arg)
             continue;
         }
 
+        // switch into the first MOON in the chain
+        // that MOON will switch into the next one instead of return here
         workerDataList[workerId].current = 0;
         MoonSwitch(workerId);
         DisablePkey(0);
+        // now we are back from the last MOON, the packet burst is done!
 
-        // for (i = 0; i < nb_rx; i++)
-        // {
-        //     struct rte_mbuf *m = workerDataList[workerId].packetBurst[i];
-        //     sent = rte_eth_tx_buffer(dstPort, workerDataList[workerId].txQueue, txBuffer, m);
-        //     if (sent)
-        //         workerDataList[workerId].stat.tx += sent;
-        // }
         sent = rte_eth_tx_burst(
             dstPort, workerDataList[workerId].txQueue,
             workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
@@ -318,17 +303,29 @@ void InitMoon()
 {
     char *argv[0];
     printf("[InitMoon] calling moonStart\n");
-    moonStart(0, argv);
+    loading.moonStart(0, argv);
     printf("[InitMoon] nf exited before blocking on packets, intended?\n");
     exit(0);
 }
 
+int PthreadCreate(
+    pthread_t *restrict thread,
+    const pthread_attr_t *restrict attr,
+    void *(*start_routine)(void *),
+    void *restrict arg)
+{
+    printf("will implement\n");
+    abort();
+    return 0;
+}
+
+// core part of packet IO
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     unsigned int workerId;
     for (;;)
     {
-        if (loading)
+        if (loading.inProgress)
         {
             StackSwitch(-1);
             workerId = rte_lcore_id();
@@ -356,13 +353,10 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 {
-    // printf("[RunMoon] RxBurst: sucess\n");
-    // exit(0);
-
     unsigned int workerId = rte_lcore_id();
-    if (loading)
+    if (loading.inProgress)
     {
-        isDpdkMoon = 1;
+        loading.isDpdkMoon = 1;
         StackSwitch(-1);
     }
     else
