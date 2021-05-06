@@ -130,7 +130,8 @@ ThreadLogMain(void* arg)
 						ctx->cpu, cnt);
 				break;
 			}
-			len = fwrite(w_buff->buff, 1, w_buff->buff_len, w_buff->fid);
+			// len = fwrite(w_buff->buff, 1, w_buff->buff_len, w_buff->fid);
+			len = w_buff->buff_len;
 			if (len != w_buff->buff_len) {
 				TRACE_ERROR("CPU %d: Tried to write %d, but only write %ld\n", 
 						ctx->cpu, w_buff->buff_len, len);

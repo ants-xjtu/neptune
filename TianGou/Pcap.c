@@ -6,12 +6,6 @@ int pcap_setfilter(pcap_t *p, struct bpf_program *fp)
     return 0;
 }
 
-const u_char *pcap_next(pcap_t *p, struct pcap_pkthdr *h)
-{
-    MESSAGE("return NULL");
-    return NULL;
-}
-
 int pcap_get_selectable_fd(pcap_t *p)
 {
     MESSAGE("return -1");
@@ -39,6 +33,12 @@ int pcap_loop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
     MESSAGE("callback = %p", callback);
     return (interface.pcapLoop)(p, cnt, callback, user);
+}
+
+const u_char *pcap_next(pcap_t *p, struct pcap_pkthdr *h)
+{
+    // this will be called a lot, so no MESSAGE for it
+    return (interface.pcapNext)(p, h);
 }
 
 int pcap_compile(pcap_t *p, struct bpf_program *fp,

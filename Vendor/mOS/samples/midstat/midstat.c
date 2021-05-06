@@ -270,7 +270,8 @@ main(int argc, char **argv)
 	struct mtcp_conf mcfg;          /* mOS configuration */
 
 	/* get the total # of cpu cores */
-	g_max_cores = GetNumCPUs();       
+	g_max_cores = GetNumCPUs();    
+	g_max_cores = 2;   
 
 	/* Parse command line arguments */
 	while ((opt = getopt(argc, argv, "c:f:")) != -1) {

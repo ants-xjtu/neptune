@@ -880,6 +880,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 #endif
 
 	ts = ts_prev = 0;
+	printf("checkpoint #0\n");
 	while ((!ctx->done || mtcp->flow_cnt) && !ctx->exit) {
 		
 		STAT_COUNT(mtcp->runstat.rounds);
@@ -894,20 +895,25 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 		ts = TIMEVAL_TO_TS(&cur_ts);
 		mtcp->cur_ts = ts;
 
+	printf("checkpoint #1\n");
 		for (rx_inf = 0; rx_inf < g_config.mos->netdev_table->num; rx_inf++) {
-
+	printf("checkpoint #1.1\n");
 			recv_cnt = mtcp->iom->recv_pkts(ctx, rx_inf);
+	printf("checkpoint #1.2\n");
 			STAT_COUNT(mtcp->runstat.rounds_rx_try);
 
 			for (i = 0; i < recv_cnt; i++) {
 				uint16_t len;
 				uint8_t *pktbuf;
+	printf("checkpoint #2\n");
 				pktbuf = mtcp->iom->get_rptr(mtcp->ctx, rx_inf, i, &len);
+	printf("checkpoint #3\n");
 				ProcessPacket(mtcp, rx_inf, i, ts, pktbuf, len);
 			}
 
 		}
 		STAT_COUNT(mtcp->runstat.rounds_rx);
+	printf("checkpoint #4\n");
 
 #if TIME_STAT
 		gettimeofday(&processing_ts, NULL);
@@ -926,6 +932,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			walk->cb(&mctx, walk->id, 0, 0 /* FIXME */, NULL);
 			DelTimer(mtcp, walk);
 		}
+	printf("checkpoint #5\n");
 
 		/* interaction with application */
 		if (mtcp->flow_cnt > 0) {
@@ -954,6 +961,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			if (g_config.mos->tcp_timeout > 0 && ts != ts_prev) {
 				CheckConnectionTimeout(mtcp, ts, thresh);
 			}
+	printf("checkpoint #6\n");
 
 #if TIME_STAT
 		}
@@ -965,6 +973,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 #endif /* TIME_STAT */
 
 		}
+	printf("checkpoint #7\n");
 
 		/* 
 		 * before flushing epoll events, call monitor events for
@@ -973,6 +982,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 		if (mtcp->num_msp > 0)
 			/* call this when only a standalone monitor is running */
 			FlushMonitorReadEvents(mtcp);
+	printf("checkpoint #8\n");
 			
 		/* if epoll is in use, flush all the queued events */
 		if (mtcp->ep) {
@@ -984,11 +994,13 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 		UpdateStatCounter(&mtcp->rtstat.epoll, 
 				TimeDiffUs(&epoll_ts, &tcheck_ts));
 #endif /* TIME_STAT */
+	printf("checkpoint #9\n");
 
 		if (end_app_exists && mtcp->flow_cnt > 0) {
 			/* handle stream queues  */
 			HandleApplicationCalls(mtcp, ts);
 		}
+	printf("checkpoint #10\n");
 
 #if TIME_STAT
 		gettimeofday(&handle_ts, NULL);
@@ -997,6 +1009,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 #endif /* TIME_STAT */
 
 		WritePacketsToChunks(mtcp, ts);
+	printf("checkpoint #11\n");
 
 		/* send packets from write buffer */
 		/* Send until tx is available */
@@ -1005,6 +1018,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			for (tx_inf = 0; tx_inf < num_dev; tx_inf++) {
 				mtcp->iom->send_pkts(ctx, tx_inf);
 			}
+	printf("checkpoint #12\n");
 		
 #if TIME_STAT
 		gettimeofday(&xmit_ts, NULL);
@@ -1025,6 +1039,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			}
 #endif /* NETSTAT */
 		}
+	printf("checkpoint #13\n");
 
 		if (mtcp->iom->select)
 			mtcp->iom->select(ctx);
@@ -1208,12 +1223,13 @@ InitializeMTCPManager(struct mtcp_thread_context* ctx)
 
 	snprintf(log_name, MAX_FILE_NAME, "%s/"LOG_FILE_NAME"_%d", 
 			g_config.mos->mos_log, ctx->cpu);
-	mtcp->log_fp = fopen(log_name, "w+");
-	if (!mtcp->log_fp) {
-		perror("fopen");
-		CTRACE_ERROR("Failed to create file for logging. (%s)\n", log_name);
-		return NULL;
-	}
+	// mtcp->log_fp = fopen(log_name, "w+");
+	// if (!mtcp->log_fp) {
+	// 	perror("fopen");
+	// 	CTRACE_ERROR("Failed to create file for logging. (%s)\n", log_name);
+	// 	return NULL;
+	// }
+	mtcp->log_fp = NULL;
 	mtcp->sp_fd = g_logctx[ctx->cpu]->pair_sp_fd;
 	mtcp->logger = g_logctx[ctx->cpu];
 	
@@ -1286,6 +1302,7 @@ MTCPRunThread(void *arg)
 	int working;
 	struct mtcp_manager *mtcp;
 	struct mtcp_thread_context *ctx;
+	// printf("checkpoint #0\n");
 
 	/* affinitize the thread to this core first */
 	mtcp_core_affinitize(cpu);
@@ -1300,11 +1317,13 @@ MTCPRunThread(void *arg)
 	}
 	ctx->thread = pthread_self();
 	ctx->cpu = cpu;
+	// printf("checkpoint #1\n");
 	mtcp = ctx->mtcp_manager = InitializeMTCPManager(ctx);
 	if (!mtcp) {
 		TRACE_ERROR("Failed to initialize mtcp manager.\n");
 		exit(-1);
 	}
+	// printf("checkpoint #2\n");
 
 	/* assign mtcp context's underlying I/O module */
 	mtcp->iom = current_iomodule_func;
@@ -1312,11 +1331,13 @@ MTCPRunThread(void *arg)
 	/* I/O initializing */
 	if (mtcp->iom->init_handle)
 		mtcp->iom->init_handle(ctx);
+	// printf("checkpoint #3\n");
 
 	if (pthread_mutex_init(&ctx->flow_pool_lock, NULL)) {
 		perror("pthread_mutex_init of ctx->flow_pool_lock\n");
 		exit(-1);
 	}
+	// printf("checkpoint #4\n");
 	
 	if (pthread_mutex_init(&ctx->socket_pool_lock, NULL)) {
 		perror("pthread_mutex_init of ctx->socket_pool_lock\n");
@@ -1329,6 +1350,7 @@ MTCPRunThread(void *arg)
 	SQ_LOCK_INIT(&ctx->sendq_lock, "ctx->sendq_lock", exit(-1));
 	SQ_LOCK_INIT(&ctx->ackq_lock, "ctx->ackq_lock", exit(-1));
 	SQ_LOCK_INIT(&ctx->destroyq_lock, "ctx->destroyq_lock", exit(-1));
+	// printf("checkpoint #5\n");
 
 	/* remember this context pointer for signal processing */
 	g_pctx[cpu] = ctx;
@@ -1368,6 +1390,7 @@ static int MTCPDPDKRunThread(void *arg)
 mctx_t 
 mtcp_create_context(int cpu)
 {
+	printf("[mtcp_create_context] cpu = %d\n", cpu);
 	mctx_t mctx;
 	int ret;
 

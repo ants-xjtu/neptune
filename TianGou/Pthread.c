@@ -6,20 +6,6 @@ void *__tls_get_addr(void **p)
     return *p;
 }
 
-struct ThreadClosure
-{
-    void *(*start)(void *);
-    void *restrict arg;
-    void (*init)();
-};
-
-static void *ThreadMain(void *data)
-{
-    struct ThreadClosure *closure = data;
-    closure->init();
-    return closure->start(closure->arg);
-}
-
 int pthread_create(
     pthread_t *restrict thread,
     const pthread_attr_t *restrict _attr,
@@ -33,12 +19,11 @@ int pthread_create(
         abort();
     }
     return (interface.pthreadCreate)(thread, NULL, start_routine, arg);
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    // TODO
-    struct ThreadClosure *closure = (interface.malloc)(sizeof(struct ThreadClosure));
-    closure->init = NULL; // TODO
-    closure->start = start_routine;
-    closure->arg = arg;
-    return (interface.pthreadCreate)(thread, &attr, ThreadMain, closure);
+}
+
+int sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask)
+{
+    MESSAGE("pid = %d, cpusetsize = %lu, mask at %p", pid, cpusetsize, mask);
+    MESSAGE("return 0");
+    return 0;
 }

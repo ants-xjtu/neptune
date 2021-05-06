@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "PrivateStack.h"
 
@@ -20,6 +21,19 @@ static RegSet nfStack[MAX_STACK_NUM];
 // static struct StackHeader *globalStack;
 static __thread int currStackId = -1;
 static __thread RegSet mainStack;
+
+static int savedCurrStackId;
+static RegSet savedMainStack;
+void CrossThreadSaveStack()
+{
+    savedCurrStackId = currStackId;
+    memcpy(savedMainStack, mainStack, sizeof(RegSet));
+}
+void CrossThreadRestoreStack()
+{
+    currStackId = savedCurrStackId;
+    memcpy(mainStack, savedMainStack, sizeof(RegSet));
+}
 
 void SetStack(int stackId, void *stack, size_t len)
 {

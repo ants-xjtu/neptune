@@ -80,6 +80,8 @@ struct Loading
     int isDpdkMoon;
     void *heapStart;
     size_t heapSize;
+    void *stackStart;
+    int threadStackIndex;
 };
 struct Loading loading;
 // moonDataList[] is only set during loading/reconfiguration(WIP), and
@@ -115,6 +117,7 @@ struct WorkerData
     int rxQueue, txQueue;
     struct rte_mbuf *packetBurst[MAX_PKT_BURST];
     unsigned int burstSize;
+    int pcapNextIndex;
 
     struct l2fwd_port_statistics stat;
 };
@@ -125,6 +128,7 @@ void InitMoon();
 int MainLoop(void *);
 void LoadMoon(char *, int);
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
+const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h);
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts);
 uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts);
 int PthreadCreate(

@@ -17,6 +17,7 @@ typedef struct
     sighandler_t (*signal)(int signum, sighandler_t handler);
 
     int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
+    const u_char *(*pcapNext)(pcap_t *p, struct pcap_pkthdr *h);
 
     // this two could be function pointer
     // but they always return constant, so value is better

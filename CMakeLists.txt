@@ -196,8 +196,8 @@ target_link_libraries(Moon_MidStat${P} PRIVATE ssl crypto numa rt)
 
 endmacro()
 
-set(P "")
-create_moons()
+# set(P "")
+# create_moons()
 set(P "_NoSFI")
 create_moons()
 

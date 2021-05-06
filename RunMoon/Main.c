@@ -35,6 +35,7 @@ int main(int argc, char *argv[])
     interfacePointer->free = HeapFree;
     interfacePointer->signal = signal;
     interfacePointer->pcapLoop = PcapLoop;
+    interfacePointer->pcapNext = PcapNext;
     interfacePointer->srcInfo = &srcInfo;
     interfacePointer->dstInfo = &dstInfo;
     interfacePointer->tscHz = rte_get_tsc_hz();
@@ -191,6 +192,11 @@ void LoadMoon(char *moonPath, int moonId)
         loading.moonStart = LibraryFind(&library, "main");
         printf("entering MOON for initial running, start = %p\n", loading.moonStart);
         loading.isDpdkMoon = 0;
+        loading.instanceId = instanceId;
+        loading.heapStart = heapStart;
+        loading.heapSize = heapSize;
+        loading.threadStackIndex = 0;
+        loading.stackStart = stackStart;
         StackStart(instanceId, InitMoon);
         printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, loading.isDpdkMoon);
         if (loading.isDpdkMoon)
@@ -308,15 +314,49 @@ void InitMoon()
     exit(0);
 }
 
+struct ThreadClosure
+{
+    void *(*start)(void *);
+    void *restrict arg;
+};
+
+static void *ThreadMain(void *data)
+{
+    per_lcore__lcore_id = 0;
+    SetHeap(loading.heapStart, loading.heapSize, loading.instanceId);
+    CrossThreadRestoreStack();
+    struct ThreadClosure *closure = data;
+    printf("finished recover TLS for pthread of function %p\n", closure->start);
+    return closure->start(closure->arg);
+}
+
 int PthreadCreate(
     pthread_t *restrict thread,
-    const pthread_attr_t *restrict attr,
+    const pthread_attr_t *restrict _attr,
     void *(*start_routine)(void *),
     void *restrict arg)
 {
-    printf("will implement\n");
-    abort();
-    return 0;
+    if (!loading.inProgress)
+    {
+        fprintf(stderr, "[PthreadCreate] not allowed after loading\n");
+        abort();
+    }
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    loading.threadStackIndex += 1;
+    if (loading.threadStackIndex == NUMBER_STACK)
+    {
+        fprintf(stderr, "too many thread in one MOON\n");
+        abort();
+    }
+    void *threadStackStart = loading.stackStart + STACK_SIZE * loading.threadStackIndex;
+    printf("set thread stack to %p size %#lx\n", threadStackStart, STACK_SIZE);
+    pthread_attr_setstack(&attr, threadStackStart, STACK_SIZE);
+    struct ThreadClosure *closure = malloc(sizeof(struct ThreadClosure));
+    closure->start = start_routine;
+    closure->arg = arg;
+    CrossThreadSaveStack();
+    return pthread_create(thread, &attr, ThreadMain, closure);
 }
 
 // core part of packet IO
@@ -349,6 +389,35 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             callback(user, &header, (u_char *)packet);
         }
     }
+}
+
+const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
+{
+    unsigned int workerId = rte_lcore_id();
+    if (loading.inProgress)
+    {
+        printf("[PcapNext] initialization finish\n");
+        StackSwitch(-1);
+        printf("[PcapNext] start first burst\n");
+    }
+    if (workerDataList[workerId].pcapNextIndex >= workerDataList[workerId].burstSize)
+    {
+        workerDataList[workerId].pcapNextIndex = 0;
+        workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
+        MoonSwitch(workerId);
+    }
+    int i = workerDataList[workerId].pcapNextIndex;
+    workerDataList[workerId].pcapNextIndex += 1;
+    rte_prefetch0(rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], void *));
+    struct pcap_pkthdr header;
+    header.len = rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
+    header.caplen = rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i]);
+    memset(&header.ts, 0x0, sizeof(header.ts)); // todo
+    uintptr_t *packet = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], uintptr_t *);
+    *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
+    *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
+    *h = header;
+    return (u_char *)packet;
 }
 
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
