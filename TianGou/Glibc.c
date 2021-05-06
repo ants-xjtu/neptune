@@ -60,3 +60,9 @@ char *strdup(const char *str)
     *cx = '\0';
     return x;
 }
+
+ int usleep(useconds_t usec)
+ {
+     MESSAGE("usec = %u, return immediately\n", usec);
+     return 0;
+ }

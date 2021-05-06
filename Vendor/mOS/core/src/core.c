@@ -895,25 +895,25 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 		ts = TIMEVAL_TO_TS(&cur_ts);
 		mtcp->cur_ts = ts;
 
-	printf("checkpoint #1\n");
+	// printf("checkpoint #1\n");
 		for (rx_inf = 0; rx_inf < g_config.mos->netdev_table->num; rx_inf++) {
-	printf("checkpoint #1.1\n");
+	// printf("checkpoint #1.1\n");
 			recv_cnt = mtcp->iom->recv_pkts(ctx, rx_inf);
-	printf("checkpoint #1.2\n");
+	// printf("checkpoint #1.2\n");
 			STAT_COUNT(mtcp->runstat.rounds_rx_try);
 
 			for (i = 0; i < recv_cnt; i++) {
 				uint16_t len;
 				uint8_t *pktbuf;
-	printf("checkpoint #2\n");
+	// printf("checkpoint #2\n");
 				pktbuf = mtcp->iom->get_rptr(mtcp->ctx, rx_inf, i, &len);
-	printf("checkpoint #3\n");
+	// printf("checkpoint #3\n");
 				ProcessPacket(mtcp, rx_inf, i, ts, pktbuf, len);
 			}
 
 		}
 		STAT_COUNT(mtcp->runstat.rounds_rx);
-	printf("checkpoint #4\n");
+	// printf("checkpoint #4\n");
 
 #if TIME_STAT
 		gettimeofday(&processing_ts, NULL);
@@ -932,7 +932,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			walk->cb(&mctx, walk->id, 0, 0 /* FIXME */, NULL);
 			DelTimer(mtcp, walk);
 		}
-	printf("checkpoint #5\n");
+	// printf("checkpoint #5\n");
 
 		/* interaction with application */
 		if (mtcp->flow_cnt > 0) {
@@ -961,7 +961,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			if (g_config.mos->tcp_timeout > 0 && ts != ts_prev) {
 				CheckConnectionTimeout(mtcp, ts, thresh);
 			}
-	printf("checkpoint #6\n");
+	// printf("checkpoint #6\n");
 
 #if TIME_STAT
 		}
@@ -973,7 +973,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 #endif /* TIME_STAT */
 
 		}
-	printf("checkpoint #7\n");
+	// printf("checkpoint #7\n");
 
 		/* 
 		 * before flushing epoll events, call monitor events for
@@ -982,7 +982,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 		if (mtcp->num_msp > 0)
 			/* call this when only a standalone monitor is running */
 			FlushMonitorReadEvents(mtcp);
-	printf("checkpoint #8\n");
+	// printf("checkpoint #8\n");
 			
 		/* if epoll is in use, flush all the queued events */
 		if (mtcp->ep) {
@@ -994,13 +994,13 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 		UpdateStatCounter(&mtcp->rtstat.epoll, 
 				TimeDiffUs(&epoll_ts, &tcheck_ts));
 #endif /* TIME_STAT */
-	printf("checkpoint #9\n");
+	// printf("checkpoint #9\n");
 
 		if (end_app_exists && mtcp->flow_cnt > 0) {
 			/* handle stream queues  */
 			HandleApplicationCalls(mtcp, ts);
 		}
-	printf("checkpoint #10\n");
+	// printf("checkpoint #10\n");
 
 #if TIME_STAT
 		gettimeofday(&handle_ts, NULL);
@@ -1009,7 +1009,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 #endif /* TIME_STAT */
 
 		WritePacketsToChunks(mtcp, ts);
-	printf("checkpoint #11\n");
+	// printf("checkpoint #11\n");
 
 		/* send packets from write buffer */
 		/* Send until tx is available */
@@ -1018,7 +1018,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			for (tx_inf = 0; tx_inf < num_dev; tx_inf++) {
 				mtcp->iom->send_pkts(ctx, tx_inf);
 			}
-	printf("checkpoint #12\n");
+	// printf("checkpoint #12\n");
 		
 #if TIME_STAT
 		gettimeofday(&xmit_ts, NULL);
@@ -1039,7 +1039,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 			}
 #endif /* NETSTAT */
 		}
-	printf("checkpoint #13\n");
+	// printf("checkpoint #13\n");
 
 		if (mtcp->iom->select)
 			mtcp->iom->select(ctx);

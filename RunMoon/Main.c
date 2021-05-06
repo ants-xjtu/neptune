@@ -40,6 +40,8 @@ int main(int argc, char *argv[])
     interfacePointer->dstInfo = &dstInfo;
     interfacePointer->tscHz = rte_get_tsc_hz();
     interfacePointer->pthreadCreate = PthreadCreate;
+    interfacePointer->pthreadCondTimedwait = PthreadCondTimedwait;
+    interfacePointer->pthreadCondWait = PthreadCondWait;
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
     printf("%s: tiangou\n", DONE_STRING);
@@ -393,13 +395,14 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 
 const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
 {
-    unsigned int workerId = rte_lcore_id();
+    unsigned int workerId;
     if (loading.inProgress)
     {
         printf("[PcapNext] initialization finish\n");
         StackSwitch(-1);
         printf("[PcapNext] start first burst\n");
     }
+    workerId = rte_lcore_id();
     if (workerDataList[workerId].pcapNextIndex >= workerDataList[workerId].burstSize)
     {
         workerDataList[workerId].pcapNextIndex = 0;
@@ -422,14 +425,16 @@ const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
 
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 {
-    unsigned int workerId = rte_lcore_id();
+    unsigned int workerId;
     if (loading.inProgress)
     {
         loading.isDpdkMoon = 1;
         StackSwitch(-1);
+        workerId = rte_lcore_id();
     }
     else
     {
+        workerId = rte_lcore_id();
         workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
         // printf("switch to %d\n", workerDataList[workerId].current);
         MoonSwitch(workerId);
@@ -460,4 +465,29 @@ uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
         tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
     workerDataList[workerId].burstSize += nb_pkts;
     return nb_pkts;
+}
+
+int PthreadCondTimedwait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex,
+    const struct timespec *restrict abstime)
+{
+    if (rte_lcore_id() != 0)
+    {
+        fprintf(stderr, "not allowed to wait on worker thread\n");
+        abort();
+    }
+    return pthread_cond_timedwait(cond, mutex, abstime);
+}
+
+int PthreadCondWait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex)
+{
+    if (rte_lcore_id() != 0)
+    {
+        fprintf(stderr, "not allowed to wait on worker thread\n");
+        abort();
+    }
+    return pthread_cond_wait(cond, mutex);
 }

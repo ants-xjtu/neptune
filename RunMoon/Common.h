@@ -136,6 +136,13 @@ int PthreadCreate(
     const pthread_attr_t *restrict attr,
     void *(*start_routine)(void *),
     void *restrict arg);
+int PthreadCondTimedwait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex,
+    const struct timespec *restrict abstime);
+int PthreadCondWait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex);
 
 // support library APIs and global shared with main
 volatile bool force_quit;

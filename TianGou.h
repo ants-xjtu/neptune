@@ -29,6 +29,13 @@ typedef struct
         const pthread_attr_t *restrict attr,
         void *(*start_routine)(void *),
         void *restrict arg);
+    int (*pthreadCondTimedwait)(
+        pthread_cond_t *restrict cond,
+        pthread_mutex_t *restrict mutex,
+        const struct timespec *restrict abstime);
+    int (*pthreadCondWait)(
+        pthread_cond_t *restrict cond,
+        pthread_mutex_t *restrict mutex);
 } Interface;
 
 extern Interface interface;
