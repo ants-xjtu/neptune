@@ -70,7 +70,14 @@ target_include_directories(SwordHolderPass PRIVATE ${LLVM_INCLUDE_DIRS})
 target_link_directories(SwordHolderPass PRIVATE ${LLVM_LIBRARY_DIRS})
 
 # TianGou target - runtime interface bridger
-add_library(TianGou MODULE TianGou.c)
+add_library(TianGou MODULE 
+    TianGou/Glibc.c
+    TianGou/Pcap.c
+    TianGou/Dpdk.c
+    TianGou/Pthread.c
+    TianGou/Interface.c
+)
+target_include_directories(TianGou PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(TianGou PRIVATE Threads::Threads)
 
 # add_moon util
@@ -173,10 +180,24 @@ add_moon(TARGET Moon_RxBurstTest${P} SOURCES
     Moon/RxBurstTest.c
 )
 
+add_moon(TARGET Moon_MidStat${P} SOURCES
+    Vendor/mOS/core/lib/libmtcp.bc
+    Vendor/mOS/samples/midstat/midstat.c
+    Vendor/mOS/samples/common/applib.c
+)
+target_compile_definitions(Moon_MidStat${P}_SourceLibrary PRIVATE NDEBUG NETSTAT INFO DBGERR DBGCERR)
+target_include_directories(Moon_MidStat${P}_SourceLibrary PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/samples/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/util/include
+)
+target_link_libraries(Moon_MidStat${P} PRIVATE ssl crypto numa rt)
+
+
 endmacro()
 
-set(P "")
-create_moons()
+# set(P "")
+# create_moons()
 set(P "_NoSFI")
 create_moons()
 
@@ -188,6 +209,10 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libnids/src/NIDS-li
 add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src/prads-link.bc
     COMMAND make prads-link.bc 2>/dev/null
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src
+)
+add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/lib/libmtcp.bc
+    COMMAND make DISABLE_NUMA=1 ../lib/libmtcp.bc 2>/dev/null
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/src
 )
 
 # Other test and bench targets
@@ -203,3 +228,7 @@ target_link_libraries(StackSwitchBench neptune)
 add_executable(LoaderTest LoaderTest.c)
 target_link_libraries(LoaderTest neptune)
 
+add_executable(ExpPthread ExpPthread.c)
+target_compile_definitions(ExpPthread PRIVATE ALLOW_EXPERIMENTAL_API)
+target_link_libraries(ExpPthread PRIVATE PkgConfig::DPDK Threads::Threads)
+target_link_options(ExpPthread PRIVATE -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)

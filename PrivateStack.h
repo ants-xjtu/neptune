@@ -28,4 +28,11 @@ void StackSwitch(int stackId);
 // (nf@stack#1) StackSwitch(2)
 // (nf@stack#2) StackSwitch(-1)
 
+// when we are jumping between pthreads, the TLS that record
+// current stack ID will be lost
+// call this to save/recover it, so the following StackSwitch calling
+// will work even with stacks of different threads
+void CrossThreadSaveStack();
+void CrossThreadRestoreStack();
+
 #endif

@@ -118,6 +118,11 @@ namespace
         }
         if (auto *call = dyn_cast<CallInst>(operand))
         {
+            // outs() << *call << "\n";
+            if (!call->getCalledFunction())
+            {
+                return false;
+            }
             if (call->getCalledFunction()->getName() == "malloc" ||
                 call->getCalledFunction()->getName() == "calloc" ||
                 call->getCalledFunction()->getName() == "realloc")
