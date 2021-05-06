@@ -126,7 +126,7 @@ calcCPUs:
 -include $(DEPS)
 
 clean: clean-library
-	rm -f *.o *~ core
+	rm -f *.o *.bc *~ core
 	rm -rf .*.d tags .bpf
 
 clean-library:

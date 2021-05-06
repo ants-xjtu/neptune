@@ -24,23 +24,23 @@ int main(int argc, char *argv[])
     const char *tiangouPath = argv[1];
     printf("loading tiangou library %s\n", tiangouPath);
     void *tiangou = dlopen(tiangouPath, RTLD_LAZY);
-    interface = dlsym(tiangou, "interface");
-    printf("injecting TIANGOU interface at %p\n", interface);
-    interface->malloc = HeapMalloc;
-    interface->realloc = HeapRealloc;
-    interface->calloc = HeapCalloc;
-    interface->free = HeapFree;
-    interface->signal = signal;
-    interface->pcapLoop = PcapLoop;
+    interfacePointer = dlsym(tiangou, "interface");
+    printf("injecting TIANGOU interface at %p\n", interfacePointer);
+    interfacePointer->malloc = HeapMalloc;
+    interfacePointer->realloc = HeapRealloc;
+    interfacePointer->calloc = HeapCalloc;
+    interfacePointer->free = HeapFree;
+    interfacePointer->signal = signal;
+    interfacePointer->pcapLoop = PcapLoop;
     struct rte_eth_dev_info srcInfo, dstInfo;
     rte_eth_dev_info_get(srcPort, &srcInfo);
     rte_eth_dev_info_get(dstPort, &dstInfo);
-    interface->srcInfo = &srcInfo;
-    interface->dstInfo = &dstInfo;
-    interface->tscHz = rte_get_tsc_hz();
+    interfacePointer->srcInfo = &srcInfo;
+    interfacePointer->dstInfo = &dstInfo;
+    interfacePointer->tscHz = rte_get_tsc_hz();
 
-    struct rte_eth_dev *rteEthDevices = dlsym(tiangou, "rte_eth_devices");
-    RedirectEthDevices(rteEthDevices);
+    // struct rte_eth_dev *rteEthDevices = dlsym(tiangou, "rte_eth_devices");
+    // RedirectEthDevices(rteEthDevices);
 
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
@@ -164,11 +164,20 @@ void LoadMoon(char *moonPath, int moonId)
         // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
         pkey_mprotect(arena + STACK_SIZE, MOON_SIZE - STACK_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
 
+        // wierd thing here: `*core_id = 0` must after `pkey_mprotect`, or SEGFAULT
+        // totally cannot understand
+        printf("inject global variable for MOON library\n");
         unsigned *core_id = LibraryFind(&library, "per_lcore__lcore_id");
         if (core_id)
         {
             *core_id = 0;
         }
+        struct rte_eth_dev *rteEthDevices = LibraryFind(&library, "rte_eth_devices");
+        if (rteEthDevices)
+        {
+            RedirectEthDevices(rteEthDevices);
+        }
+        printf("%s\n", DONE_STRING);
 
         printf("register MOON#%d worker$%d data (inst!%03x)\n", moonId, workerId, instanceId);
         moonDataList[moonId].workers[workerId].instanceId = instanceId;

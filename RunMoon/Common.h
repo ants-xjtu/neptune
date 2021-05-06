@@ -54,7 +54,7 @@ static const size_t STACK_SIZE = 32ul << 20; // 32MB
 static const size_t MOON_SIZE = 32ul << 30;  // 32GB
 // Heap size = MOON_SIZE - STACK_SIZE - library.length
 
-static const char *DONE_STRING = "\xe2\x86\x91 done";
+// static const char *DONE_STRING = "\xe2\x86\x91 done";
 #define RTE_TEST_RX_DESC_DEFAULT 1024
 #define RTE_TEST_TX_DESC_DEFAULT 1024
 static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
@@ -64,7 +64,7 @@ static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 // most of them are passing information between runtime/parivate stacks
 int (*moonStart)(int argc, char *argv[]);
 // struct rte_eth_dev_tx_buffer *txBuffer;
-Interface *interface;
+Interface *interfacePointer;
 #define MAX_PKT_BURST 32
 int runtimePkey;
 #define MAX_WORKER_ID 96

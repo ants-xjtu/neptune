@@ -3427,6 +3427,7 @@ Void_t* mALLOc(size_t bytes)
 #endif
 {
   mstate av = get_malloc_state();
+  // printf("heap_start: %p, &heap_start: %p\n", heap_start, &heap_start);
 
   INTERNAL_SIZE_T nb;               /* normalized request size */
   unsigned int    idx;              /* associated bin index */
