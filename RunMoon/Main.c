@@ -130,7 +130,8 @@ void LoadMoon(char *moonPath, int moonId)
         int instanceId = (workerId << 4) | (unsigned)moonId;
         printf("[LoadMoon] MOON#%d @ worker$%d (inst!%03x)\n", moonId, workerId, instanceId);
         printf("allocating memory for MOON %s\n", moonPath);
-        void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
+        // void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
+        void *arena = aligned_alloc(sysconf(_SC_PAGESIZE), MOON_SIZE);
         printf("arena address %p size %#lx\n", arena, MOON_SIZE);
 
         struct PrivateLibrary library;

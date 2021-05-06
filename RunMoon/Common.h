@@ -52,7 +52,7 @@
 
 static const size_t STACK_SIZE = 32ul << 20; // 32MB
 static const int NUMBER_STACK = 16;
-static const size_t MOON_SIZE = 32ul << 30; // 32GB
+static const size_t MOON_SIZE = 4ul << 30; // 32GB
 // Heap size = MOON_SIZE - NUMBER_STACK * STACK_SIZE - library.length
 
 // static const char *DONE_STRING = "\xe2\x86\x91 done";

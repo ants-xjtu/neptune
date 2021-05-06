@@ -71,6 +71,7 @@ find_connection(int cpu, int sock)
 static void
 cb_creation(mctx_t mctx, int sock, int side, uint64_t events, filter_arg_t *arg)
 {
+	printf("cb_creation\n");
 	socklen_t addrslen = sizeof(struct sockaddr) * 2;
 	struct connection *c;
 
@@ -162,6 +163,7 @@ cb_printstat(mctx_t mctx, int sock, int side,
 		.tv_sec = 1,
 		.tv_usec = 0
 	};
+	return;
 
 	printf("Proto CPU "
 		   "Client Address        Client State "
@@ -271,7 +273,7 @@ main(int argc, char **argv)
 
 	/* get the total # of cpu cores */
 	g_max_cores = GetNumCPUs();    
-	g_max_cores = 2;   
+	g_max_cores = 1;   
 
 	/* Parse command line arguments */
 	while ((opt = getopt(argc, argv, "c:f:")) != -1) {

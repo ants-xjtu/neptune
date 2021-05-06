@@ -625,6 +625,7 @@ mtcp_socket(mctx_t mctx, int domain, int type, int protocol)
 	mtcp_manager_t mtcp;
 	socket_map_t socket;
 
+	// printf("checkpoint #0\n");
 	mtcp = GetMTCPManager(mctx);
 	if (!mtcp) {
 		errno = EACCES;
@@ -647,7 +648,9 @@ mtcp_socket(mctx_t mctx, int domain, int type, int protocol)
 		return -1;
 	}
 
+	// printf("checkpoint #1\n");
 	socket = AllocateSocket(mctx, type);
+	// printf("checkpoint #2\n");
 	if (!socket) {
 		errno = ENFILE;
 		return -1;
