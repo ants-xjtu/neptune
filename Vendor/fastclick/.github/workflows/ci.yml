@@ -1,0 +1,72 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ '*' ]
+  pull_request:
+    branches: [ master ]
+env:
+    CXXFLAGS: -std=gnu++11
+    FLAGS: --enable-all-elements --disable-verbose-batch --enable-simtime
+
+    #Until we find a solution for the world-writable /home/runner in GitHub Actions...
+    NODPDKTEST: 1
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+        matrix:
+            COMPILER: [gcc, clang]
+            FRAMEWORK: [vanilla, dpdk, dpdk-light]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+    - name: Install pip
+      run: |
+          python -m pip install --upgrade pip
+    - name: framework
+      run: |
+          if [ "${{matrix.FRAMEWORK}}" = "dpdk" -o "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
+            echo "Compiling DPDK..." ;
+            export STABLE=
+            export VERSION=20.11
+            export FRAMEWORK_FLAGS="--enable-dpdk";
+            export PKG_CONFIG_PATH=$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/pkgconfig/ ;
+            export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(pwd)/dpdk-$STABLE$VERSION/install/lib/x86_64-linux-gnu/ ;
+            if [ ! -e "dpdk-$STABLE$VERSION" ] || ! pkg-config --exists libdpdk ; then
+                wget http://fast.dpdk.org/rel/dpdk-$VERSION.tar.gz &&
+                tar -zxf dpdk-$VERSION.tar.gz &&
+                cd dpdk-$STABLE$VERSION &&
+                pip3 install meson ninja &&
+                meson -Dprefix=$(pwd)/install/ build &&
+                cd build &&
+                ninja &&
+                ninja install &&
+                cd .. &&
+                cd .. ;
+            fi
+            if [ "${{matrix.FRAMEWORK}}" = "dpdk-light" ] ; then
+                echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS --enable-dpdk-packet --disable-clone --disable-task-stats --disable-cpu-load --disable-dpdk-softqueue" >> $GITHUB_ENV
+            else
+                echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
+            fi
+            echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+            echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          fi
+    - name: configure
+      run: |
+          if [ "${{matrix.COMPILER}}" = "clang" ] ; then export CC=clang; export CXX=clang++; fi
+          ./configure $FLAGS $FRAMEWORK_FLAGS
+    - name: make
+      run: make
+    - name: simple_launch
+      run: chmod 700 /home/runner ; ./userlevel/click -j 2 -e 'DriverManager(stop);'
+    - name: make check
+      run: make check
