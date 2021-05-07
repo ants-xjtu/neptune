@@ -1,4 +1,5 @@
 #include "TianGou.h"
+#include <poll.h>
 
 // malloc
 void *malloc(size_t size)
@@ -66,8 +67,18 @@ char *strdup(const char *str)
     return x;
 }
 
- int usleep(useconds_t usec)
- {
-     MESSAGE("usec = %u, return immediately\n", usec);
-     return 0;
- }
+int usleep(useconds_t usec)
+{
+    MESSAGE("usec = %u, return immediately\n", usec);
+    return 0;
+}
+
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+    // MESSAGE("nfds = %lu, timeout = %d", nfds, timeout);
+    for (int i = 0; i < nfds; i += 1)
+    {
+        fds[i].revents = POLLIN;
+    }
+    return nfds;
+}

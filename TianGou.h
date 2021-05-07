@@ -19,6 +19,7 @@ typedef struct
 
     int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
     const u_char *(*pcapNext)(pcap_t *p, struct pcap_pkthdr *h);
+    int (*pcapDispatch)(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 
     // this two could be function pointer
     // but they always return constant, so value is better

@@ -38,6 +38,7 @@ int main(int argc, char *argv[])
     interfacePointer->signal = signal;
     interfacePointer->pcapLoop = PcapLoop;
     interfacePointer->pcapNext = PcapNext;
+    interfacePointer->pcapDispatch = PcapDispatch;
     interfacePointer->srcInfo = &srcInfo;
     interfacePointer->dstInfo = &dstInfo;
     interfacePointer->tscHz = rte_get_tsc_hz();
@@ -200,7 +201,7 @@ void LoadMoon(char *moonPath, int moonId)
         {
             // hard code for fast click now
             struct NF_link_map *l = library.loadAddress;
-            loading.moonStart = (void *)(l->l_addr + 0x19ce40);
+            loading.moonStart = (void *)(l->l_addr + 0x16db70);
         }
         printf("entering MOON for initial running, start = %p\n", loading.moonStart);
         loading.isDpdkMoon = 0;
@@ -319,11 +320,11 @@ int MainLoop(void *_arg)
 // i.e. on private stack with private heap
 void InitMoon()
 {
-    // char *argv[] = {"<program>", "--dpdk", "-c", "0x1", "-n", "1", "--", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"};
-    char *argv[0];
+    char *argv[] = {"<program>", "-f", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"};
+    // char *argv[0];
     printf("[InitMoon] calling moonStart\n");
-    // loading.moonStart(8, argv);
-    loading.moonStart(0, argv);
+    loading.moonStart(3, argv);
+    // loading.moonStart(0, argv);
     printf("[InitMoon] nf exited before blocking on packets, intended?\n");
     exit(0);
 }
@@ -376,6 +377,11 @@ int PthreadCreate(
 // core part of packet IO
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
+    if (cnt > 0)
+    {
+        fprintf(stderr, "PcapLoop not support cnt > 0\n");
+        abort();
+    }
     unsigned int workerId;
     for (;;)
     {
@@ -403,6 +409,39 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             callback(user, &header, (u_char *)packet);
         }
     }
+}
+
+int PcapDispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
+{
+    if (cnt != 1)
+    {
+        fprintf(stderr, "PcapDispatch not cnt != 1\n");
+        abort();
+    }
+    unsigned int workerId;
+    if (loading.inProgress)
+    {
+        StackSwitch(-1);
+        workerId = rte_lcore_id();
+        workerDataList[workerId].pcapNextIndex = 0;
+    }
+    workerId = rte_lcore_id();
+    if (workerDataList[workerId].pcapNextIndex >= workerDataList[workerId].burstSize)
+    {
+        workerDataList[workerId].pcapNextIndex = 0;
+        workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
+        MoonSwitch(workerId);
+    }
+    int i = workerDataList[workerId].pcapNextIndex;
+    workerDataList[workerId].pcapNextIndex += 1;
+    rte_prefetch0(rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], void *));
+    struct pcap_pkthdr header;
+    header.len = rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
+    header.caplen = rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i]);
+    memset(&header.ts, 0x0, sizeof(header.ts)); // todo
+    uintptr_t *packet = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], uintptr_t *);
+    callback(user, &header, (u_char *)packet);
+    return 1;
 }
 
 const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
