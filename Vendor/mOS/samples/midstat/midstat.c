@@ -71,7 +71,7 @@ find_connection(int cpu, int sock)
 static void
 cb_creation(mctx_t mctx, int sock, int side, uint64_t events, filter_arg_t *arg)
 {
-	printf("cb_creation\n");
+	// printf("cb_creation\n");
 	socklen_t addrslen = sizeof(struct sockaddr) * 2;
 	struct connection *c;
 

@@ -1,4 +1,5 @@
 #include "Common.h"
+#include "../Loader/NFlink.h"
 
 uint64_t timer_period = 1; /* default period is 10 seconds */
 
@@ -32,6 +33,7 @@ int main(int argc, char *argv[])
     interfacePointer->malloc = HeapMalloc;
     interfacePointer->realloc = HeapRealloc;
     interfacePointer->calloc = HeapCalloc;
+    interfacePointer->alignedAlloc = HeapAlignedAlloc;
     interfacePointer->free = HeapFree;
     interfacePointer->signal = signal;
     interfacePointer->pcapLoop = PcapLoop;
@@ -157,9 +159,9 @@ void LoadMoon(char *moonPath, int moonId)
         printf("%s: initialized\n", DONE_STRING);
 
         printf("setting protection region for MOON\n");
-        uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
-        *mainPrefix = (uintptr_t)arena;
-        printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
+        // uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
+        // *mainPrefix = (uintptr_t)arena;
+        // printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
         // protecting the stack will cause the calling `StackSwitch` or `UpdatePkey` itself to fail
         // there must be a way to deal with it...
         // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
@@ -169,6 +171,7 @@ void LoadMoon(char *moonPath, int moonId)
         // totally cannot understand
         printf("inject global variable for MOON library\n");
         unsigned *core_id = LibraryFind(&library, "per_lcore__lcore_id");
+        printf("core_id at %p\n", core_id);
         if (core_id)
         {
             *core_id = 0;
@@ -182,17 +185,23 @@ void LoadMoon(char *moonPath, int moonId)
 
         printf("register MOON#%d worker$%d data (inst!%03x)\n", moonId, workerId, instanceId);
         moonDataList[moonId].workers[workerId].instanceId = instanceId;
-        uintptr_t *extraLow = LibraryFind(&library, "SwordHolder_ExtraLow"),
-                  *extraHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
-        if (!extraLow || !extraHigh)
-        {
-            rte_exit(EXIT_FAILURE, "cannot resolve extra region variables");
-        }
-        moonDataList[moonId].workers[workerId].extraLowPtr = extraLow;
-        moonDataList[moonId].workers[workerId].extraHighPtr = extraHigh;
+        // uintptr_t *extraLow = LibraryFind(&library, "SwordHolder_ExtraLow"),
+        //           *extraHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
+        // if (!extraLow || !extraHigh)
+        // {
+        //     rte_exit(EXIT_FAILURE, "cannot resolve extra region variables");
+        // }
+        // moonDataList[moonId].workers[workerId].extraLowPtr = extraLow;
+        // moonDataList[moonId].workers[workerId].extraHighPtr = extraHigh;
         printf("%s: register MOON#%d worker$%d\n", DONE_STRING, moonId, workerId);
 
         loading.moonStart = LibraryFind(&library, "main");
+        if (loading.moonStart == NULL)
+        {
+            // hard code for fast click now
+            struct NF_link_map *l = library.loadAddress;
+            loading.moonStart = (void *)(l->l_addr + 0x19ce40);
+        }
         printf("entering MOON for initial running, start = %p\n", loading.moonStart);
         loading.isDpdkMoon = 0;
         loading.instanceId = instanceId;
@@ -202,12 +211,12 @@ void LoadMoon(char *moonPath, int moonId)
         loading.stackStart = stackStart;
         StackStart(instanceId, InitMoon);
         printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, loading.isDpdkMoon);
-        if (loading.isDpdkMoon)
-        {
-            *extraLow = mbufLow;
-            *extraHigh = mbufHigh;
-            printf("one-time setting extra region for DPDK: %#lx - %#lx\n", *extraLow, *extraHigh);
-        }
+        // if (loading.isDpdkMoon)
+        // {
+        //     *extraLow = mbufLow;
+        //     *extraHigh = mbufHigh;
+        //     printf("one-time setting extra region for DPDK: %#lx - %#lx\n", *extraLow, *extraHigh);
+        // }
     }
 }
 
@@ -310,8 +319,10 @@ int MainLoop(void *_arg)
 // i.e. on private stack with private heap
 void InitMoon()
 {
+    // char *argv[] = {"<program>", "--dpdk", "-c", "0x1", "-n", "1", "--", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"};
     char *argv[0];
     printf("[InitMoon] calling moonStart\n");
+    // loading.moonStart(8, argv);
     loading.moonStart(0, argv);
     printf("[InitMoon] nf exited before blocking on packets, intended?\n");
     exit(0);
@@ -387,8 +398,8 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             header.caplen = rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i]);
             memset(&header.ts, 0x0, sizeof(header.ts)); // todo
             uintptr_t *packet = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], uintptr_t *);
-            *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
-            *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
+            // *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
+            // *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
             callback(user, &header, (u_char *)packet);
         }
     }
@@ -402,6 +413,8 @@ const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
         printf("[PcapNext] initialization finish\n");
         StackSwitch(-1);
         printf("[PcapNext] start first burst\n");
+        workerId = rte_lcore_id();
+        workerDataList[workerId].pcapNextIndex = 0;
     }
     workerId = rte_lcore_id();
     if (workerDataList[workerId].pcapNextIndex >= workerDataList[workerId].burstSize)
@@ -418,8 +431,8 @@ const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
     header.caplen = rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i]);
     memset(&header.ts, 0x0, sizeof(header.ts)); // todo
     uintptr_t *packet = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], uintptr_t *);
-    *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
-    *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
+    // *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
+    // *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
     *h = header;
     return (u_char *)packet;
 }

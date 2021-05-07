@@ -869,10 +869,10 @@ mtcp_getpeername(mctx_t mctx, int sockfd, struct sockaddr *saddr,
 	}
 
 	/* check if the calling thread is in MOS context */
-	if (mtcp->ctx->thread != pthread_self()) {
-		errno = EPERM;
-		return -1;
-	}
+	// if (mtcp->ctx->thread != pthread_self()) {
+	// 	errno = EPERM;
+	// 	return -1;
+	// }
 
 	socket = &mtcp->msmap[sockfd];
 	sin = (struct sockaddr_in *)saddr;

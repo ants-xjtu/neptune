@@ -212,10 +212,10 @@ mtcp_getsockopt(mctx_t mctx, int sockid, int level,
 		break;
 	case SOL_MONSOCKET:
 		/* check if the calling thread is in MOS context */
-		if (mtcp->ctx->thread != pthread_self()) {
-			errno = EPERM;
-			return -1;
-		}
+		// if (mtcp->ctx->thread != pthread_self()) {
+		// 	errno = EPERM;
+		// 	return -1;
+		// }
 		/*
 		 * All options will only work for active 
 		 * monitor stream sockets

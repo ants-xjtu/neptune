@@ -13,6 +13,7 @@ typedef struct
     void *(*realloc)(void *, size_t);
     void *(*calloc)(size_t, size_t);
     void (*free)(void *);
+    void *(*alignedAlloc)(size_t, size_t);
 
     sighandler_t (*signal)(int signum, sighandler_t handler);
 

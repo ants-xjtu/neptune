@@ -1034,7 +1034,7 @@ RunMainLoop(struct mtcp_thread_context *ctx)
 				ARPTimer(mtcp, ts);
 #endif
 #ifdef NETSTAT
-				PrintNetworkStats(mtcp, ts);
+				// PrintNetworkStats(mtcp, ts);
 #endif
 			}
 #endif /* NETSTAT */

@@ -21,6 +21,11 @@ void *calloc(size_t size, size_t count)
     return (interface.calloc)(size, count);
 }
 
+void *aligned_alloc(size_t align, size_t size)
+{
+    return (interface.alignedAlloc)(align, size);
+}
+
 // crucial part of glibc
 void exit(int stat)
 {
