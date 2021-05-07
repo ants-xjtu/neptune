@@ -51,8 +51,8 @@
 #include "TianGou.h"
 
 static const size_t STACK_SIZE = 32ul << 20; // 32MB
-static const int NUMBER_STACK = 16;
-static const size_t MOON_SIZE = 4ul << 30; // 32GB
+static const int NUMBER_STACK = 4;
+static const size_t MOON_SIZE = 2ul << 30; // 32GB
 // Heap size = MOON_SIZE - NUMBER_STACK * STACK_SIZE - library.length
 
 // static const char *DONE_STRING = "\xe2\x86\x91 done";
@@ -77,6 +77,7 @@ struct Loading
     int inProgress;
     int instanceId;
     int (*moonStart)(int argc, char *argv[]);
+    int configIndex;
     int isDpdkMoon;
     void *heapStart;
     size_t heapSize;
@@ -126,7 +127,7 @@ struct WorkerData workerDataList[MAX_WORKER_ID];
 // forward decalrations for runtime main
 void InitMoon();
 int MainLoop(void *);
-void LoadMoon(char *, int);
+void LoadMoon(char *, int, int);
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h);
 int PcapDispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user);

@@ -3,6 +3,25 @@
 
 uint64_t timer_period = 1; /* default period is 10 seconds */
 
+struct MoonConfig
+{
+    char *path;
+    char *argv[10];
+    int argc;
+};
+static struct MoonConfig CONFIG[] = {
+    {.path = "./build/libMoon_Libnids_NoSFI.so", .argv = {}, .argc = 0},
+    {.path = "./build/libMoon_MidStat_NoSFI.so", .argv = {}, .argc = 0},
+    {.path = "./build/libMoon_L2Fwd_NoSFI.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
+    {.path = "./Vendor/fastclick/userlevel/click", .argv = {"-f", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"}, .argc = 2},
+};
+
+// static const char *CONFIG[][2] = {
+//     { ""},
+//     {"./build/libMoon_MidStat_NoSFI.so", ""},
+//     {"./build/libMoon_MidStat_NoSFI.so", ""},
+// };
+
 int main(int argc, char *argv[])
 {
     int ret = rte_eal_init(argc, argv);
@@ -20,7 +39,7 @@ int main(int argc, char *argv[])
 
     if (argc < 3)
     {
-        printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon> [<moons>]\n", argv[0]);
+        printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon_idx> [<moon_idxs>]\n", argv[0]);
         return 0;
     }
     InitLoader(argc, argv, environ);
@@ -57,12 +76,18 @@ int main(int argc, char *argv[])
         enablePku = 1;
     }
 
-    loading.inProgress = 1;
+    int configIndex[16];
     for (int moonId = 0; i < argc; moonId += 1, i += 1)
     {
-        char *moonPath = argv[i];
-        printf("[RunMoon] moon#%d START LOADING\n", moonId);
-        LoadMoon(argv[i], moonId);
+        configIndex[moonId] = atoi(argv[i]);
+        configIndex[moonId + 1] = -1;
+    }
+    loading.inProgress = 1;
+    for (int moonId = 0; configIndex[moonId] != -1; moonId += 1)
+    {
+        char *moonPath = CONFIG[configIndex[moonId]].path;
+        printf("START LOADING moon#%d\n", moonId);
+        LoadMoon(moonPath, moonId, configIndex[moonId]);
     }
     loading.inProgress = 0;
 
@@ -114,7 +139,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void LoadMoon(char *moonPath, int moonId)
+void LoadMoon(char *moonPath, int moonId, int configIndex)
 {
     printf("[LoadMoon] MOON#%d global registration\n", moonId);
     moonDataList[moonId].id = moonId;
@@ -210,6 +235,7 @@ void LoadMoon(char *moonPath, int moonId)
         loading.heapSize = heapSize;
         loading.threadStackIndex = 0;
         loading.stackStart = stackStart;
+        loading.configIndex = configIndex;
         StackStart(instanceId, InitMoon);
         printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, loading.isDpdkMoon);
         // if (loading.isDpdkMoon)
@@ -320,10 +346,10 @@ int MainLoop(void *_arg)
 // i.e. on private stack with private heap
 void InitMoon()
 {
-    char *argv[] = {"<program>", "-f", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"};
+    char **argv = CONFIG[loading.configIndex].argv;
     // char *argv[0];
     printf("[InitMoon] calling moonStart\n");
-    loading.moonStart(3, argv);
+    loading.moonStart(CONFIG[loading.configIndex].argc, argv);
     // loading.moonStart(0, argv);
     printf("[InitMoon] nf exited before blocking on packets, intended?\n");
     exit(0);
