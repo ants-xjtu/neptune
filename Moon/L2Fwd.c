@@ -597,6 +597,10 @@ int main(int argc, char **argv)
 		rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
 	argc -= ret;
 	argv += ret;
+	for (int i = 0; i < argc; i += 1)
+	{
+		printf("%d: %s\n", i, argv[i]);
+	}
 
 	force_quit = false;
 	signal(SIGINT, signal_handler);

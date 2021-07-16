@@ -27,3 +27,20 @@ int sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask)
     MESSAGE("return 0");
     return 0;
 }
+
+int pthread_cond_timedwait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex,
+    const struct timespec *restrict abstime)
+{
+    MESSAGE("cond = %p, mutex = %p, abstime = .tv_sec = %ld, .tv_nsec = %ld", cond, mutex, abstime->tv_sec, abstime->tv_nsec);
+    return (interface.pthreadCondTimedwait)(cond, mutex, abstime);
+}
+
+int pthread_cond_wait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex)
+{
+    MESSAGE("cond = %p, mutex = %p", cond, mutex);
+    return (interface.pthreadCondWait)(cond, mutex);
+}

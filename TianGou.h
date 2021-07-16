@@ -13,11 +13,13 @@ typedef struct
     void *(*realloc)(void *, size_t);
     void *(*calloc)(size_t, size_t);
     void (*free)(void *);
+    void *(*alignedAlloc)(size_t, size_t);
 
     sighandler_t (*signal)(int signum, sighandler_t handler);
 
     int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
     const u_char *(*pcapNext)(pcap_t *p, struct pcap_pkthdr *h);
+    int (*pcapDispatch)(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 
     // this two could be function pointer
     // but they always return constant, so value is better
@@ -29,6 +31,13 @@ typedef struct
         const pthread_attr_t *restrict attr,
         void *(*start_routine)(void *),
         void *restrict arg);
+    int (*pthreadCondTimedwait)(
+        pthread_cond_t *restrict cond,
+        pthread_mutex_t *restrict mutex,
+        const struct timespec *restrict abstime);
+    int (*pthreadCondWait)(
+        pthread_cond_t *restrict cond,
+        pthread_mutex_t *restrict mutex);
 } Interface;
 
 extern Interface interface;

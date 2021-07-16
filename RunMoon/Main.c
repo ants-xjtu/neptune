@@ -1,6 +1,26 @@
 #include "Common.h"
+#include "../Loader/NFlink.h"
 
 uint64_t timer_period = 1; /* default period is 10 seconds */
+
+struct MoonConfig
+{
+    char *path;
+    char *argv[10];
+    int argc;
+};
+static struct MoonConfig CONFIG[] = {
+    {.path = "./build/libMoon_Libnids_NoSFI.so", .argv = {}, .argc = 0},
+    {.path = "./build/libMoon_MidStat_NoSFI.so", .argv = {}, .argc = 0},
+    {.path = "./build/libMoon_L2Fwd_NoSFI.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
+    {.path = "./Vendor/fastclick/userlevel/click", .argv = {"-f", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"}, .argc = 2},
+};
+
+// static const char *CONFIG[][2] = {
+//     { ""},
+//     {"./build/libMoon_MidStat_NoSFI.so", ""},
+//     {"./build/libMoon_MidStat_NoSFI.so", ""},
+// };
 
 int main(int argc, char *argv[])
 {
@@ -19,7 +39,7 @@ int main(int argc, char *argv[])
 
     if (argc < 3)
     {
-        printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon> [<moons>]\n", argv[0]);
+        printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon_idx> [<moon_idxs>]\n", argv[0]);
         return 0;
     }
     InitLoader(argc, argv, environ);
@@ -32,14 +52,18 @@ int main(int argc, char *argv[])
     interfacePointer->malloc = HeapMalloc;
     interfacePointer->realloc = HeapRealloc;
     interfacePointer->calloc = HeapCalloc;
+    interfacePointer->alignedAlloc = HeapAlignedAlloc;
     interfacePointer->free = HeapFree;
     interfacePointer->signal = signal;
     interfacePointer->pcapLoop = PcapLoop;
     interfacePointer->pcapNext = PcapNext;
+    interfacePointer->pcapDispatch = PcapDispatch;
     interfacePointer->srcInfo = &srcInfo;
     interfacePointer->dstInfo = &dstInfo;
     interfacePointer->tscHz = rte_get_tsc_hz();
     interfacePointer->pthreadCreate = PthreadCreate;
+    interfacePointer->pthreadCondTimedwait = PthreadCondTimedwait;
+    interfacePointer->pthreadCondWait = PthreadCondWait;
     printf("configure preloading for tiangou\n");
     PreloadLibrary(tiangou);
     printf("%s: tiangou\n", DONE_STRING);
@@ -52,12 +76,18 @@ int main(int argc, char *argv[])
         enablePku = 1;
     }
 
-    loading.inProgress = 1;
+    int configIndex[16];
     for (int moonId = 0; i < argc; moonId += 1, i += 1)
     {
-        char *moonPath = argv[i];
-        printf("[RunMoon] moon#%d START LOADING\n", moonId);
-        LoadMoon(argv[i], moonId);
+        configIndex[moonId] = atoi(argv[i]);
+        configIndex[moonId + 1] = -1;
+    }
+    loading.inProgress = 1;
+    for (int moonId = 0; configIndex[moonId] != -1; moonId += 1)
+    {
+        char *moonPath = CONFIG[configIndex[moonId]].path;
+        printf("START LOADING moon#%d\n", moonId);
+        LoadMoon(moonPath, moonId, configIndex[moonId]);
     }
     loading.inProgress = 0;
 
@@ -109,7 +139,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void LoadMoon(char *moonPath, int moonId)
+void LoadMoon(char *moonPath, int moonId, int configIndex)
 {
     printf("[LoadMoon] MOON#%d global registration\n", moonId);
     moonDataList[moonId].id = moonId;
@@ -128,7 +158,8 @@ void LoadMoon(char *moonPath, int moonId)
         int instanceId = (workerId << 4) | (unsigned)moonId;
         printf("[LoadMoon] MOON#%d @ worker$%d (inst!%03x)\n", moonId, workerId, instanceId);
         printf("allocating memory for MOON %s\n", moonPath);
-        void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
+        // void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
+        void *arena = aligned_alloc(sysconf(_SC_PAGESIZE), MOON_SIZE);
         printf("arena address %p size %#lx\n", arena, MOON_SIZE);
 
         struct PrivateLibrary library;
@@ -154,9 +185,9 @@ void LoadMoon(char *moonPath, int moonId)
         printf("%s: initialized\n", DONE_STRING);
 
         printf("setting protection region for MOON\n");
-        uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
-        *mainPrefix = (uintptr_t)arena;
-        printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
+        // uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
+        // *mainPrefix = (uintptr_t)arena;
+        // printf("main region prefix:\t%#lx (align 32GB)\n", *mainPrefix);
         // protecting the stack will cause the calling `StackSwitch` or `UpdatePkey` itself to fail
         // there must be a way to deal with it...
         // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
@@ -166,6 +197,7 @@ void LoadMoon(char *moonPath, int moonId)
         // totally cannot understand
         printf("inject global variable for MOON library\n");
         unsigned *core_id = LibraryFind(&library, "per_lcore__lcore_id");
+        printf("core_id at %p\n", core_id);
         if (core_id)
         {
             *core_id = 0;
@@ -179,17 +211,23 @@ void LoadMoon(char *moonPath, int moonId)
 
         printf("register MOON#%d worker$%d data (inst!%03x)\n", moonId, workerId, instanceId);
         moonDataList[moonId].workers[workerId].instanceId = instanceId;
-        uintptr_t *extraLow = LibraryFind(&library, "SwordHolder_ExtraLow"),
-                  *extraHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
-        if (!extraLow || !extraHigh)
-        {
-            rte_exit(EXIT_FAILURE, "cannot resolve extra region variables");
-        }
-        moonDataList[moonId].workers[workerId].extraLowPtr = extraLow;
-        moonDataList[moonId].workers[workerId].extraHighPtr = extraHigh;
+        // uintptr_t *extraLow = LibraryFind(&library, "SwordHolder_ExtraLow"),
+        //           *extraHigh = LibraryFind(&library, "SwordHolder_ExtraHigh");
+        // if (!extraLow || !extraHigh)
+        // {
+        //     rte_exit(EXIT_FAILURE, "cannot resolve extra region variables");
+        // }
+        // moonDataList[moonId].workers[workerId].extraLowPtr = extraLow;
+        // moonDataList[moonId].workers[workerId].extraHighPtr = extraHigh;
         printf("%s: register MOON#%d worker$%d\n", DONE_STRING, moonId, workerId);
 
         loading.moonStart = LibraryFind(&library, "main");
+        if (loading.moonStart == NULL)
+        {
+            // hard code for fast click now
+            struct NF_link_map *l = library.loadAddress;
+            loading.moonStart = (void *)(l->l_addr + 0x16db70);
+        }
         printf("entering MOON for initial running, start = %p\n", loading.moonStart);
         loading.isDpdkMoon = 0;
         loading.instanceId = instanceId;
@@ -197,14 +235,15 @@ void LoadMoon(char *moonPath, int moonId)
         loading.heapSize = heapSize;
         loading.threadStackIndex = 0;
         loading.stackStart = stackStart;
+        loading.configIndex = configIndex;
         StackStart(instanceId, InitMoon);
         printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, loading.isDpdkMoon);
-        if (loading.isDpdkMoon)
-        {
-            *extraLow = mbufLow;
-            *extraHigh = mbufHigh;
-            printf("one-time setting extra region for DPDK: %#lx - %#lx\n", *extraLow, *extraHigh);
-        }
+        // if (loading.isDpdkMoon)
+        // {
+        //     *extraLow = mbufLow;
+        //     *extraHigh = mbufHigh;
+        //     printf("one-time setting extra region for DPDK: %#lx - %#lx\n", *extraLow, *extraHigh);
+        // }
     }
 }
 
@@ -307,9 +346,11 @@ int MainLoop(void *_arg)
 // i.e. on private stack with private heap
 void InitMoon()
 {
-    char *argv[0];
+    char **argv = CONFIG[loading.configIndex].argv;
+    // char *argv[0];
     printf("[InitMoon] calling moonStart\n");
-    loading.moonStart(0, argv);
+    loading.moonStart(CONFIG[loading.configIndex].argc, argv);
+    // loading.moonStart(0, argv);
     printf("[InitMoon] nf exited before blocking on packets, intended?\n");
     exit(0);
 }
@@ -362,6 +403,11 @@ int PthreadCreate(
 // core part of packet IO
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
+    if (cnt > 0)
+    {
+        fprintf(stderr, "PcapLoop not support cnt > 0\n");
+        abort();
+    }
     unsigned int workerId;
     for (;;)
     {
@@ -384,22 +430,28 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
             header.caplen = rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i]);
             memset(&header.ts, 0x0, sizeof(header.ts)); // todo
             uintptr_t *packet = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], uintptr_t *);
-            *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
-            *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
+            // *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
+            // *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
             callback(user, &header, (u_char *)packet);
         }
     }
 }
 
-const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
+int PcapDispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
-    unsigned int workerId = rte_lcore_id();
+    if (cnt != 1)
+    {
+        fprintf(stderr, "PcapDispatch not cnt != 1\n");
+        abort();
+    }
+    unsigned int workerId;
     if (loading.inProgress)
     {
-        printf("[PcapNext] initialization finish\n");
         StackSwitch(-1);
-        printf("[PcapNext] start first burst\n");
+        workerId = rte_lcore_id();
+        workerDataList[workerId].pcapNextIndex = 0;
     }
+    workerId = rte_lcore_id();
     if (workerDataList[workerId].pcapNextIndex >= workerDataList[workerId].burstSize)
     {
         workerDataList[workerId].pcapNextIndex = 0;
@@ -414,22 +466,54 @@ const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
     header.caplen = rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i]);
     memset(&header.ts, 0x0, sizeof(header.ts)); // todo
     uintptr_t *packet = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], uintptr_t *);
-    *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
-    *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
+    callback(user, &header, (u_char *)packet);
+    return 1;
+}
+
+const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
+{
+    unsigned int workerId;
+    if (loading.inProgress)
+    {
+        printf("[PcapNext] initialization finish\n");
+        StackSwitch(-1);
+        printf("[PcapNext] start first burst\n");
+        workerId = rte_lcore_id();
+        workerDataList[workerId].pcapNextIndex = 0;
+    }
+    workerId = rte_lcore_id();
+    if (workerDataList[workerId].pcapNextIndex >= workerDataList[workerId].burstSize)
+    {
+        workerDataList[workerId].pcapNextIndex = 0;
+        workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
+        MoonSwitch(workerId);
+    }
+    int i = workerDataList[workerId].pcapNextIndex;
+    workerDataList[workerId].pcapNextIndex += 1;
+    rte_prefetch0(rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], void *));
+    struct pcap_pkthdr header;
+    header.len = rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
+    header.caplen = rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i]);
+    memset(&header.ts, 0x0, sizeof(header.ts)); // todo
+    uintptr_t *packet = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], uintptr_t *);
+    // *moonDataList[workerDataList[workerId].current].workers[workerId].extraLowPtr = (uintptr_t)packet;
+    // *moonDataList[workerDataList[workerId].current].workers[workerId].extraHighPtr = (uintptr_t)packet + header.caplen;
     *h = header;
     return (u_char *)packet;
 }
 
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 {
-    unsigned int workerId = rte_lcore_id();
+    unsigned int workerId;
     if (loading.inProgress)
     {
         loading.isDpdkMoon = 1;
         StackSwitch(-1);
+        workerId = rte_lcore_id();
     }
     else
     {
+        workerId = rte_lcore_id();
         workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
         // printf("switch to %d\n", workerDataList[workerId].current);
         MoonSwitch(workerId);
@@ -460,4 +544,29 @@ uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
         tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
     workerDataList[workerId].burstSize += nb_pkts;
     return nb_pkts;
+}
+
+int PthreadCondTimedwait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex,
+    const struct timespec *restrict abstime)
+{
+    if (rte_lcore_id() != 0)
+    {
+        fprintf(stderr, "not allowed to wait on worker thread\n");
+        abort();
+    }
+    return pthread_cond_timedwait(cond, mutex, abstime);
+}
+
+int PthreadCondWait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex)
+{
+    if (rte_lcore_id() != 0)
+    {
+        fprintf(stderr, "not allowed to wait on worker thread\n");
+        abort();
+    }
+    return pthread_cond_wait(cond, mutex);
 }

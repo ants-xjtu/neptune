@@ -2517,6 +2517,10 @@ void *HeapCalloc(size_t count, size_t size) {
   return dlcalloc(count, size);
 }
 
+void *HeapAlignedAlloc(size_t align, size_t size) {
+  return dlmemalign(align, size);
+}
+
 // Add by sgdxbc end
 
 /*

@@ -1,4 +1,5 @@
 #include "TianGou.h"
+#include <unistd.h>
 
 int rte_eal_init(int argc, char **argv)
 {
@@ -71,6 +72,7 @@ int rte_eth_dev_socket_id(uint16_t port_id)
 
 int rte_eth_macaddr_get(uint16_t port_id, struct rte_ether_addr *mac_addr)
 {
+    MESSAGE("port_id = %u", port_id);
     for (int i = 0; i < 5; i += 1)
     {
         mac_addr->addr_bytes[i] = 0xff;
@@ -121,31 +123,6 @@ int rte_eal_wait_lcore(unsigned worker_id)
     return 0;
 }
 
-// const struct rte_memzone *rte_memzone_reserve(
-//     const char *name, size_t len, int socket_id, unsigned flags)
-// {
-//     MESSAGE("name = %s, len = %lu, socket_id = %d, flags = %u", name, len, socket_id, flags);
-//     struct rte_memzone *mz = (interface.malloc)(sizeof(struct rte_memzone));
-//     if (!mz)
-//     {
-//         return NULL;
-//     }
-//     void *mzAddr = (interface.malloc)(len);
-//     if (!mzAddr)
-//     {
-//         (interface.free)(mz);
-//         return NULL;
-//     }
-//     mz->addr = mzAddr;
-//     mz->iova = (uint64_t)mzAddr;
-//     mz->len = len;
-//     mz->hugepage_sz = sysconf(_SC_PAGESIZE);
-//     mz->socket_id = 0;
-//     mz->flags = 0;
-//     MESSAGE("return memzone = %p, mz->addr = %p", mz, mz->addr);
-//     return mz;
-// }
-
 uint64_t rte_get_tsc_hz(void)
 {
     return interface.tscHz;
@@ -159,6 +136,36 @@ int rte_log(uint32_t level, uint32_t logtype, const char *format, ...)
     vprintf(format, ap);
     va_end(ap);
     return 0;
+}
+
+const struct rte_memzone *
+rte_memzone_reserve_aligned(
+    const char *name, size_t len, int socket_id,
+    unsigned flags, unsigned align)
+{
+    MESSAGE("name = %s, len = %lu, socket_id = %d, flags = %u, align = %u", name, len, socket_id, flags, align);
+    struct rte_memzone *mz = (interface.malloc)(sizeof(struct rte_memzone));
+    strncpy(mz->name, name, RTE_MEMZONE_NAMESIZE);
+    // mz->iova = RTE_BAD_IOVA;
+    mz->addr = (interface.alignedAlloc)(align, len);
+    mz->iova = (rte_iova_t)mz->addr;
+    if (!mz->addr)
+    {
+        abort();
+    }
+    mz->len = len;
+    mz->hugepage_sz = sysconf(_SC_PAGESIZE);
+    mz->socket_id = 0;
+    mz->flags = 0;
+    return mz;
+}
+
+const struct rte_memzone *
+rte_memzone_reserve(
+    const char *name, size_t len, int socket_id,
+    unsigned flags)
+{
+    return rte_memzone_reserve_aligned(name, len, socket_id, flags, 0);
 }
 
 // nop below here
