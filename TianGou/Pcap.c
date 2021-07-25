@@ -167,3 +167,10 @@ int pcap_lookupnet(
     MESSAGE("device = %s", device);
     return 0;
 }
+
+void
+pcap_freecode(struct bpf_program *program)
+{
+    MESSAGE("return");
+    return;
+}

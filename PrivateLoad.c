@@ -27,13 +27,12 @@ void LoadLibrary(struct PrivateLibrary *library)
 
 int DeployLibrary(struct PrivateLibrary *library)
 {
-    const ProxyRecord records[] = {{.pointer = NULL, .name = NULL}};
-    library->loadAddress = NFopen(
-        library->file, RTLD_LAZY, library->loadAddress, records, loaderArgc, loaderArgv, loaderEnvp);
+    // TODO: find every library on the dependency tree, and mprotect it
+    library->loadAddress = dlopen(library->file, RTLD_DEEPBIND | RTLD_NOW);
     return library->loadAddress == NULL;
 }
 
 void *LibraryFind(struct PrivateLibrary const *library, const char *name)
 {
-    return NFsym(library->loadAddress, name);
+    return dlsym(library->loadAddress, name);
 }

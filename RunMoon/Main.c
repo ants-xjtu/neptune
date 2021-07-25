@@ -10,10 +10,13 @@ struct MoonConfig
     int argc;
 };
 static struct MoonConfig CONFIG[] = {
-    {.path = "./build/libMoon_Libnids_NoSFI.so", .argv = {}, .argc = 0},
-    {.path = "./build/libMoon_MidStat_NoSFI.so", .argv = {}, .argc = 0},
-    {.path = "./build/libMoon_L2Fwd_NoSFI.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
-    {.path = "./Vendor/fastclick/userlevel/click", .argv = {"-f", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"}, .argc = 2},
+    // {.path = "./build/libMoon_Libnids_NoSFI.so", .argv = {}, .argc = 0},
+    // {.path = "./build/libMoon_MidStat_NoSFI.so", .argv = {}, .argc = 0},
+    // {.path = "./build/libMoon_L2Fwd_NoSFI.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
+    // {.path = "./Vendor/fastclick/userlevel/click", .argv = {"-f", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"}, .argc = 2},
+    {.path = "./libs/libMoon_Libnids.so", .argv = {}, .argc = 0},
+    {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
+    {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
 };
 
 // static const char *CONFIG[][2] = {
@@ -42,7 +45,7 @@ int main(int argc, char *argv[])
         printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon_idx> [<moon_idxs>]\n", argv[0]);
         return 0;
     }
-    InitLoader(argc, argv, environ);
+    // InitLoader(argc, argv, environ);
 
     const char *tiangouPath = argv[1];
     printf("loading tiangou library %s\n", tiangouPath);
@@ -65,7 +68,8 @@ int main(int argc, char *argv[])
     interfacePointer->pthreadCondTimedwait = PthreadCondTimedwait;
     interfacePointer->pthreadCondWait = PthreadCondWait;
     printf("configure preloading for tiangou\n");
-    PreloadLibrary(tiangou);
+    // no need for we are hard-coding tiangou in binaries
+    // PreloadLibrary(tiangou);
     printf("%s: tiangou\n", DONE_STRING);
 
     int i = 2;
@@ -164,22 +168,40 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 
         struct PrivateLibrary library;
         library.file = moonPath;
-        LoadLibrary(&library);
-        printf("library requires space: %#lx\n", library.length);
-        void *stackStart = arena, *libraryStart = arena + NUMBER_STACK * STACK_SIZE;
-        void *heapStart = libraryStart + library.length;
-        size_t heapSize = MOON_SIZE - NUMBER_STACK * STACK_SIZE - library.length;
+        // we don't need to know the size of a library beforehand now
+        // LoadLibrary(&library);
+        // printf("library requires space: %#lx\n", library.length);
+        void *stackStart = arena;
+        void *heapStart = arena + NUMBER_STACK * STACK_SIZE;
+        size_t heapSize = MOON_SIZE - NUMBER_STACK * STACK_SIZE;
 
         printf("*** MOON memory layout ***\n");
         printf("Stack#0\t%p - %p\tsize: %#lx\n", stackStart, stackStart + STACK_SIZE, STACK_SIZE);
-        printf("Library\t%p - %p\tsize: %#lx\n", libraryStart, libraryStart + library.length, library.length);
         printf("Heap\t%p - %p\tsize: %#lx\n", heapStart, heapStart + heapSize, heapSize);
         // printf("\n");
 
         printf("initializing regions\n");
         SetStack(instanceId, stackStart, STACK_SIZE);
-        library.loadAddress = libraryStart;
-        DeployLibrary(&library);
+
+        // Q: the problem here is somewhat clear: ld.so need to run the constructor of SOs, which explain 
+        // why `ld.so` is calling `glib-2.0` or `rte_eal`.
+        // During the initialization of these libraries, their call to malloc cause unpredictable problems
+        // which I currently cannot figure it out.
+        // necessary to correctly run Libnids!
+        // dlopen("/usr/local/lib/ccoffxfrz.0.so.0", RTLD_NOW);
+        // an attempt in vain to bypass segfault in L2Fwd
+        // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmvjdr.so.1", RTLD_NOW);
+        // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivppia.so.21", RTLD_NOW);
+        // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivpxmbgfzt.so.21", RTLD_NOW);
+        // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivpcqcx.so.21", RTLD_NOW);
+        
+        
+        // I want dlopen to warn me if it is complaining
+        if (DeployLibrary(&library))
+        {
+            fprintf(stderr, "loading %s as MOON failed, reason: %s\n", library.file, dlerror());
+            exit(-1);
+        }
         SetHeap(heapStart, heapSize, instanceId);
         InitHeap();
         printf("%s: initialized\n", DONE_STRING);
@@ -191,11 +213,17 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
         // protecting the stack will cause the calling `StackSwitch` or `UpdatePkey` itself to fail
         // there must be a way to deal with it...
         // pkey_mprotect(arena, MOON_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
+
+        // TODO: find a way to correctly protect the shared object's region
         pkey_mprotect(arena + STACK_SIZE, MOON_SIZE - STACK_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
 
         // wierd thing here: `*core_id = 0` must after `pkey_mprotect`, or SEGFAULT
         // totally cannot understand
         printf("inject global variable for MOON library\n");
+        // the semantics is a little different, but I believe the results will be the same
+        // Originally NFsym only tells if the NF itself needs `lcore_id', but now even the NF does not need it
+        // if the library NF depends define `lcore_id', it would be returned by dlsym.
+        // But it's OK. The NF does not use it anyway
         unsigned *core_id = LibraryFind(&library, "per_lcore__lcore_id");
         printf("core_id at %p\n", core_id);
         if (core_id)
@@ -225,6 +253,8 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
         if (loading.moonStart == NULL)
         {
             // hard code for fast click now
+            // this may cause problems, so print it verbosely
+            printf("main function found in %s! Is it intentional?\n", library.file);
             struct NF_link_map *l = library.loadAddress;
             loading.moonStart = (void *)(l->l_addr + 0x16db70);
         }

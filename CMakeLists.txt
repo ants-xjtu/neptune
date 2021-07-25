@@ -7,7 +7,9 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(DPDK REQUIRED IMPORTED_TARGET libdpdk)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-find_package(LLVM REQUIRED CONFIG)
+
+# get rid of LLVM for we don't need to deal with SFI
+# find_package(LLVM REQUIRED CONFIG)
 
 # neptune targets
 # neptune target - support library
@@ -59,16 +61,6 @@ target_link_libraries(RunMoon PRIVATE neptune PkgConfig::DPDK pcap Threads::Thre
 # patch to link drivers
 target_link_options(RunMoon PRIVATE -Wl,--no-as-needed -L/usr/local/lib64 -lrte_net_ixgbe -lrte_mempool_ring)
 
-# SwordHolder targets - SFI pass
-add_library(SwordHolderPass MODULE
-    SwordHolder/Pass.cxx
-)
-target_compile_features(SwordHolderPass PRIVATE cxx_range_for cxx_auto_type)
-set_target_properties(SwordHolderPass PROPERTIES COMPILE_FLAGS "-fno-rtti")
-target_compile_definitions(SwordHolderPass PRIVATE ${LLVM_DEFINITIONS})
-target_include_directories(SwordHolderPass PRIVATE ${LLVM_INCLUDE_DIRS})
-target_link_directories(SwordHolderPass PRIVATE ${LLVM_LIBRARY_DIRS})
-
 # TianGou target - runtime interface bridger
 add_library(TianGou MODULE 
     TianGou/Glibc.c
@@ -80,140 +72,73 @@ add_library(TianGou MODULE
 target_include_directories(TianGou PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(TianGou PRIVATE Threads::Threads)
 
-# add_moon util
-function(add_moon)
-    set(options)
-    set(oneValueArgs TARGET)
-    set(multiValueArgs SOURCES)
-    cmake_parse_arguments(ADD_MOON "${option}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-    set(MOON_NAME ${ADD_MOON_TARGET})
-    set(SOURCES ${ADD_MOON_SOURCES})
-    # message("[AddMoon] " ${MOON_NAME} ": ${SOURCES}")
-    set(BITCODE_FILE ${CMAKE_CURRENT_BINARY_DIR}/MoonBitcode/${MOON_NAME}-link.bc)
-    set(OPT_BITCODE_FILE ${CMAKE_CURRENT_BINARY_DIR}/MoonBitcode/${MOON_NAME}-opt.bc)
-
-    # step 1: *.c/*.bc + RuntimeLibrary.c -> *.bc
-    set_source_files_properties(${SOURCES} PROPERTIES LANGUAGE C)
-    add_library(${MOON_NAME}_SourceLibrary OBJECT ${SOURCES} SwordHolder/RuntimeLibrary.c)
-    target_compile_options(${MOON_NAME}_SourceLibrary PRIVATE 
-        -emit-llvm -Xclang -disable-O0-optnone -Wno-unused-command-line-argument)
-    set_target_properties(${MOON_NAME}_SourceLibrary PROPERTIES 
-        POSITION_INDEPENDENT_CODE True
-        LINKER_LANGUAGE C
-    )
-
-    # step 2: *.bc -> link.bc
-    add_custom_command(OUTPUT ${BITCODE_FILE}
-        DEPENDS ${MOON_NAME}_SourceLibrary $<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary> 
-        COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/MoonBitcode
-        COMMAND llvm-link-10 `echo \"$<TARGET_OBJECTS:${MOON_NAME}_SourceLibrary>\" | sed 's/$<SEMICOLON>/ /g'` > ${BITCODE_FILE}
-        # COMMAND llvm-dis ${BITCODE_FILE}
-    )
-
-    # step 3: link.bc -> opt.bc
-    # 1: BITCODE_FILE, 2: OPT_BITCODE_FILE
-    set(OPT12_COMMAND opt-10 -O3 -o ${OPT_BITCODE_FILE} ${BITCODE_FILE})
-    set(OPT22_COMMAND opt-10 -O3 -o ${OPT_BITCODE_FILE} ${OPT_BITCODE_FILE})
-    set(OPT11_COMMAND opt-10 -O3 -o ${BITCODE_FILE} ${BITCODE_FILE})
-    set(SFI12_COMMAND opt-10
-        -load $<TARGET_FILE:SwordHolderPass> -SwordHolder
-        -o ${OPT_BITCODE_FILE} ${BITCODE_FILE}
-    )
-    if (MOON_NAME MATCHES "_NoSFI$")
-        add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
-            DEPENDS ${BITCODE_FILE}
-            COMMAND ${OPT12_COMMAND}
-            # COMMAND llvm-dis ${OPT_BITCODE_FILE}
-        )
-    else()
-        add_custom_command(OUTPUT ${OPT_BITCODE_FILE}
-            DEPENDS ${BITCODE_FILE} SwordHolderPass
-            COMMAND ${OPT11_COMMAND}
-            COMMAND ${SFI12_COMMAND}
-            COMMAND ${OPT22_COMMAND}
-            # COMMAND llvm-dis ${OPT_BITCODE_FILE}
-        )
-    endif()
-
-    # step 4: opt.bc -> MOON.so
-    # additional options could be applied after target is created
-    set_source_files_properties(${OPT_BITCODE_FILE} PROPERTIES LANGUAGE C)
-    add_library(${MOON_NAME} MODULE ${OPT_BITCODE_FILE})
-    # add_executable(${MOON_NAME} ${OPT_BITCODE_FILE})
-    target_compile_options(${MOON_NAME} PRIVATE -Wno-unused-command-line-argument)
-    set_target_properties(${MOON_NAME} PROPERTIES LINKER_LANGUAGE C)
-    target_link_libraries(${MOON_NAME} PRIVATE PkgConfig::DPDK pcap Threads::Threads)
-endfunction(add_moon)
 
 # MOON targets
 # moons name: Moon_CamelCase
-macro(create_moons)
 
-add_moon(TARGET Moon_Test${P} SOURCES 
-    Moon/Test.c
+add_library(Moon_Test MODULE
+    Moon/Test.c   
 )
 
-add_moon(TARGET Moon_TestPlusPlus${P} SOURCES
+add_library(Moon_TestPlusPlus MODULE
     Moon/Test++.cxx
 )
-set_target_properties(Moon_TestPlusPlus${P} PROPERTIES LINKER_LANGUAGE CXX)
+set_target_properties(Moon_TestPlusPlus PROPERTIES LINKER_LANGUAGE CXX)
 
-add_moon(TARGET Moon_Libnids${P} SOURCES
+add_library(Moon_Libnids MODULE
     # Moon/LibnidsMain.c 
     Moon/LibnidsWtf.c
-    Vendor/libnids/src/NIDS-link_pic.bc
+    # originally statically linked with libnids
+    # Vendor/libnids/src/NIDS-link_pic.bc
 )
-target_link_libraries(Moon_Libnids${P} PRIVATE gthread-2.0 nsl glib-2.0 net)
-target_link_libraries(Moon_Libnids${P} PRIVATE Threads::Threads)
+# target_link_libraries(Moon_Libnids PRIVATE gthread-2.0 nsl glib-2.0 net)
+target_link_libraries(Moon_Libnids PRIVATE nids)
+target_link_libraries(Moon_Libnids PRIVATE Threads::Threads)
 
-add_moon(TARGET Moon_Prads${P} SOURCES
-    Vendor/prads/src/prads-link.bc
-)
-target_link_libraries(Moon_Prads${P} PRIVATE pcap pcre resolv)
+# No, Prads is already a shared object
+# add_moon(TARGET Moon_Prads SOURCES
+#     Vendor/prads/src/prads-link.bc
+# )
+# target_link_libraries(Moon_Prads PRIVATE pcap pcre resolv)
 
-add_moon(TARGET Moon_L2Fwd${P} SOURCES
+add_library(Moon_L2Fwd MODULE
     Moon/L2Fwd.c
 )
-target_compile_definitions(Moon_L2Fwd${P}_SourceLibrary PRIVATE ALLOW_EXPERIMENTAL_API)
+target_compile_definitions(Moon_L2Fwd PRIVATE ALLOW_EXPERIMENTAL_API)
+target_compile_options(Moon_L2Fwd PRIVATE -Wno-unused-command-line-argument)
+target_link_libraries(Moon_L2Fwd PRIVATE PkgConfig::DPDK pcap Threads::Threads)
 
-add_moon(TARGET Moon_RxBurstTest${P} SOURCES
+add_library(Moon_RxBurstTest MODULE
     Moon/RxBurstTest.c
 )
 
-add_moon(TARGET Moon_MidStat${P} SOURCES
-    Vendor/mOS/core/lib/libmtcp.bc
-    Vendor/mOS/samples/midstat/midstat.c
-    Vendor/mOS/samples/common/applib.c
-)
-target_compile_definitions(Moon_MidStat${P}_SourceLibrary PRIVATE NDEBUG NETSTAT INFO DBGERR DBGCERR)
-target_include_directories(Moon_MidStat${P}_SourceLibrary PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/samples/common
-    ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/util/include
-)
-target_link_libraries(Moon_MidStat${P} PRIVATE ssl crypto numa rt)
-
-
-endmacro()
-
-# set(P "")
-# create_moons()
-set(P "_NoSFI")
-create_moons()
+# midstat currently unsupported
+# add_moon(TARGET Moon_MidStat SOURCES
+#     Vendor/mOS/core/lib/libmtcp.bc
+#     Vendor/mOS/samples/midstat/midstat.c
+#     Vendor/mOS/samples/common/applib.c
+# )
+# target_compile_definitions(Moon_MidStat_SourceLibrary PRIVATE NDEBUG NETSTAT INFO DBGERR DBGCERR)
+# target_include_directories(Moon_MidStat_SourceLibrary PRIVATE 
+#     ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/include
+#     ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/samples/common
+#     ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/util/include
+# )
+# target_link_libraries(Moon_MidStat PRIVATE ssl crypto numa rt)
 
 # 3rd party targets depend by MOONs
-add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libnids/src/NIDS-link_pic.bc
-    COMMAND make NIDS-link_pic.bc 2>/dev/null
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libnids/src
-)
-add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src/prads-link.bc
-    COMMAND make prads-link.bc 2>/dev/null
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src
-)
-add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/lib/libmtcp.bc
-    COMMAND make DISABLE_NUMA=1 ../lib/libmtcp.bc 2>/dev/null
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/src
-)
+# add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libnids/src/NIDS-link_pic.bc
+#     COMMAND make NIDS-link_pic.bc 2>/dev/null
+#     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/libnids/src
+# )
+# add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src/prads-link.bc
+#     COMMAND make prads-link.bc 2>/dev/null
+#     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/prads/src
+# )
+# add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/lib/libmtcp.bc
+#     COMMAND make DISABLE_NUMA=1 ../lib/libmtcp.bc 2>/dev/null
+#     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Vendor/mOS/core/src
+# )
 
 # Other test and bench targets
 add_executable(MallocTest MallocTest.c)
