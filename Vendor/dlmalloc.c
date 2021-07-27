@@ -2506,6 +2506,9 @@ void *HeapMalloc(size_t size) {
 }
 
 void HeapFree(void *object) {
+  // TODO: redo this if you believe all glibc functions are correctly handled
+  if (object > heap_end || object < heap_start)
+    return;
   dlfree(object);
 }
 

@@ -194,7 +194,9 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
         // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivppia.so.21", RTLD_NOW);
         // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivpxmbgfzt.so.21", RTLD_NOW);
         // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivpcqcx.so.21", RTLD_NOW);
-        
+        SetHeap(heapStart, heapSize, instanceId);
+        InitHeap();
+        printf("%s: initialized\n", DONE_STRING);
         
         // I want dlopen to warn me if it is complaining
         if (DeployLibrary(&library))
@@ -202,9 +204,7 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
             fprintf(stderr, "loading %s as MOON failed, reason: %s\n", library.file, dlerror());
             exit(-1);
         }
-        SetHeap(heapStart, heapSize, instanceId);
-        InitHeap();
-        printf("%s: initialized\n", DONE_STRING);
+        
 
         printf("setting protection region for MOON\n");
         // uintptr_t *mainPrefix = LibraryFind(&library, "SwordHolder_MainPrefix");
@@ -254,7 +254,7 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
         {
             // hard code for fast click now
             // this may cause problems, so print it verbosely
-            printf("main function found in %s! Is it intentional?\n", library.file);
+            printf("main function not found in %s! Is it intentional?\n", library.file);
             struct NF_link_map *l = library.loadAddress;
             loading.moonStart = (void *)(l->l_addr + 0x16db70);
         }

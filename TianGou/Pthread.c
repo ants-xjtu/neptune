@@ -1,10 +1,10 @@
 #include "TianGou.h"
 
-void *__tls_get_addr(void **p)
-{
-    MESSAGE("p = %p, *p = %p", p, *p);
-    return *p;
-}
+// void *__tls_get_addr(void **p)
+// {
+//     MESSAGE("p = %p, *p = %p", p, *p);
+//     return *p;
+// }
 
 int pthread_create(
     pthread_t *restrict thread,
