@@ -107,7 +107,9 @@ struct l2fwd_port_statistics
     uint64_t tx;
     uint64_t rx;
     uint64_t dropped;
+    uint64_t bytes;
     double cycle[CYCLE_SIZE];
+    double Mcycle[CYCLE_SIZE];
     int cycleIndex;
     double prevAvg;
 } __rte_cache_aligned;

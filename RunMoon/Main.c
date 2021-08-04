@@ -367,6 +367,8 @@ int MainLoop(void *_arg)
             workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
         if (sent)
             workerDataList[workerId].stat.tx += sent;
+        for (int i = 0;i < sent; i++)
+            workerDataList[workerId].stat.bytes += rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
     }
     printf("[RunMoon] worker on lcore$%d exit\n", lcore_id);
     return 0;
