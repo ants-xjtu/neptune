@@ -18,7 +18,10 @@ sysPath = ['/home/hypermoon/Qcloud/glib/_build/glib/', \
 # specify those libraries that are shared, i.e., not hashed as a dependency
 unchanged = ['libc.so.6', \
         'ld-linux-x86-64.so.2', \
-        'libpthread.so.0']
+        'libpthread.so.0', \
+        'libm.so.6', \
+        'libgcc_s.so.1', \
+        'libstdc++.so.6']
 
 
 def hash(key, filename):
@@ -137,6 +140,9 @@ def worker():
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
+        # NB: the alias should be the same as the directory name under libs/, otherwise
+        # there is nowhere to export it.
+        # TODO: reduce the alias and use the directory containing the so to export
         print("usage: python hash-dep.py absolute-filename alias(i.e. hash key)")
         exit(1)
     
