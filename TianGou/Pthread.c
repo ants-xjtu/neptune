@@ -28,6 +28,14 @@ int sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask)
     return 0;
 }
 
+int pthread_setaffinity_np(pthread_t thread, size_t cpusetsize,
+                                  const cpu_set_t *cpuset)
+{
+    MESSAGE("thread = %lu, cpusetsize = %lu, mask at %p", thread, cpusetsize, cpuset);
+    MESSAGE("return 0");
+    return 0;
+}
+
 int pthread_cond_timedwait(
     pthread_cond_t *restrict cond,
     pthread_mutex_t *restrict mutex,

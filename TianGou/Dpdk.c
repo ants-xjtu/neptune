@@ -238,3 +238,9 @@ int rte_eth_dev_close(uint16_t port_id)
     MESSAGE("return 0");
     return 0;
 }
+
+unsigned int rte_lcore_count()
+{
+    MESSAGE("return 1");
+    return 1;
+}
