@@ -244,3 +244,27 @@ unsigned int rte_lcore_count()
     MESSAGE("return 1");
     return 1;
 }
+
+int rte_mbuf_dyn_rx_timestamp_register(int *field_offset, uint64_t *rx_flag)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_dev_set_vlan_offload(uint16_t port_id, int offload_mask)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_dev_is_valid_port(uint16_t port_id)
+{
+    MESSAGE("always valid");
+    return 1;
+}
+
+int rte_flow_isolate(uint16_t port_id, int set, struct rte_flow_error *error)
+{
+    MESSAGE("return 0");
+    return 0;
+}

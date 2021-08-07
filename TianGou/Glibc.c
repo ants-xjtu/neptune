@@ -44,6 +44,19 @@ sighandler_t signal(int signum, sighandler_t handler)
     return NULL;
 }
 
+int sigaction(int signum, const struct sigaction *restrict act,
+                     struct sigaction *restrict oldact)
+{
+    MESSAGE("nf try to change behavior of signal %d", signum);
+    if (signum != SIGINT && signum != SIGTERM)
+    {
+        (interface.sigaction)(signum, act, oldact);
+        return 0;
+    }
+    return 0;
+}
+
+
 char *strdup(const char *str)
 {
     // toy version of strlen, and duplicate string on private heap

@@ -286,7 +286,8 @@ void RedirectEthDevices(struct rte_eth_dev *devices)
         dev->data->tx_queues = malloc(sizeof(void *) * NumberQueue);
     }
     devices[0].rx_pkt_burst = RxBurst;
-    devices[0].tx_pkt_burst = TxBurstNop;
+    // devices[0].tx_pkt_burst = TxBurstNop;
+    devices[0].tx_pkt_burst = TxBurst;
     devices[1].rx_pkt_burst = RxBurstNop;
     devices[1].tx_pkt_burst = TxBurst;
 }

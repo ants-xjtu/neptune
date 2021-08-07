@@ -16,6 +16,8 @@ typedef struct
     void *(*alignedAlloc)(size_t, size_t);
 
     sighandler_t (*signal)(int signum, sighandler_t handler);
+    int (*sigaction)(int signum, const struct sigaction *restrict act,
+                     struct sigaction *restrict oldact);
 
     int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
     const u_char *(*pcapNext)(pcap_t *p, struct pcap_pkthdr *h);

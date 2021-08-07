@@ -17,7 +17,7 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./libs/libMoon_Libnids.so", .argv = {}, .argc = 0},
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
     {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
-    {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/bounce.click"}, .argc = 6},
+    {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
 };
 
 // static const char *CONFIG[][2] = {
@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
     interfacePointer->alignedAlloc = HeapAlignedAlloc;
     interfacePointer->free = HeapFree;
     interfacePointer->signal = signal;
+    interfacePointer->sigaction = sigaction;
     interfacePointer->pcapLoop = PcapLoop;
     interfacePointer->pcapNext = PcapNext;
     interfacePointer->pcapDispatch = PcapDispatch;
@@ -364,7 +365,8 @@ int MainLoop(void *_arg)
         // now we are back from the last MOON, the packet burst is done!
 
         sent = rte_eth_tx_burst(
-            dstPort, workerDataList[workerId].txQueue,
+            // dstPort, workerDataList[workerId].txQueue,
+            srcPort, workerDataList[workerId].txQueue,
             workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
         if (sent)
             workerDataList[workerId].stat.tx += sent;
