@@ -141,7 +141,7 @@ int main(int argc, char *argv[])
         rte_eal_wait_lcore(workerId);
     }
 
-    printf("Keep calm and definitely full-force fighting for SOSP.\n");
+    printf("Keep calm and definitely full-force fighting for NSDI.\n");
     return 0;
 }
 
