@@ -49,7 +49,7 @@ uint16_t rte_eth_dev_count_avail()
 
 uint64_t rte_eth_find_next_owned_by(uint16_t port_id, const uint64_t owner_id)
 {
-    MESSAGE("port_id = %u", port_id);
+    // MESSAGE("port_id = %u", port_id);
     return port_id > 1 ? RTE_MAX_ETHPORTS : port_id;
 }
 
@@ -264,6 +264,31 @@ int rte_eth_dev_is_valid_port(uint16_t port_id)
 }
 
 int rte_flow_isolate(uint16_t port_id, int set, struct rte_flow_error *error)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_dev_set_ptypes(uint16_t port_id, uint32_t ptype_mask,
+			   uint32_t *set_ptypes, unsigned int num)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_link_get_nowait (uint16_t port_id, struct rte_eth_link *link)
+{
+    // MESSAGE("return 0");
+    return 0;
+}
+
+// WARNING: this is for debugging only
+// void rte_mempool_free(struct rte_mempool *mp)
+// {
+//     MESSAGE("nor freeing when debugging");
+//     return;
+// }
+int rte_dev_probe(const char *devargs)
 {
     MESSAGE("return 0");
     return 0;

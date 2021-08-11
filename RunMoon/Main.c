@@ -18,6 +18,12 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
     {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
+    {.path = "./libs/Libnids/forward.so", .argv = {}, .argc = 0},
+    {.path = "./libs/ndpi/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
+    // {.path = "./libs/Libnids-old/libMoon_Libnids.so", .argv = {}, .argc = 0},
+    // #6: this config might not be used to directly call main
+    {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
+    {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
 };
 
 // static const char *CONFIG[][2] = {
