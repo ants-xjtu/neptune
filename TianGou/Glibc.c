@@ -2,30 +2,30 @@
 #include <poll.h>
 
 // malloc
-void *malloc(size_t size)
-{
-    return (interface.malloc)(size);
-}
+// void *malloc(size_t size)
+// {
+//     return (interface.malloc)(size);
+// }
 
-void free(void *object)
-{
-    (interface.free)(object);
-}
+// void free(void *object)
+// {
+//     (interface.free)(object);
+// }
 
-void *realloc(void *object, size_t size)
-{
-    return (interface.realloc)(object, size);
-}
+// void *realloc(void *object, size_t size)
+// {
+//     return (interface.realloc)(object, size);
+// }
 
-void *calloc(size_t size, size_t count)
-{
-    return (interface.calloc)(size, count);
-}
+// void *calloc(size_t size, size_t count)
+// {
+//     return (interface.calloc)(size, count);
+// }
 
-void *aligned_alloc(size_t align, size_t size)
-{
-    return (interface.alignedAlloc)(align, size);
-}
+// void *aligned_alloc(size_t align, size_t size)
+// {
+//     return (interface.alignedAlloc)(align, size);
+// }
 
 // crucial part of glibc
 void exit(int stat)
@@ -57,28 +57,28 @@ int sigaction(int signum, const struct sigaction *restrict act,
 }
 
 
-char *strdup(const char *str)
-{
-    // toy version of strlen, and duplicate string on private heap
-    const char *curr = str;
-    size_t cnt = 0;
-    while (*curr != '\0')
-    {
-        cnt++;
-        curr++;
-    }
-    char *x = (char *)(interface.malloc)(cnt + 1);
-    curr = str;
-    char *cx = x;
-    while (*curr != '\0')
-    {
-        *cx = *curr;
-        cx++;
-        curr++;
-    }
-    *cx = '\0';
-    return x;
-}
+// char *strdup(const char *str)
+// {
+//     // toy version of strlen, and duplicate string on private heap
+//     const char *curr = str;
+//     size_t cnt = 0;
+//     while (*curr != '\0')
+//     {
+//         cnt++;
+//         curr++;
+//     }
+//     char *x = (char *)(interface.malloc)(cnt + 1);
+//     curr = str;
+//     char *cx = x;
+//     while (*curr != '\0')
+//     {
+//         *cx = *curr;
+//         cx++;
+//         curr++;
+//     }
+//     *cx = '\0';
+//     return x;
+// }
 
 int usleep(useconds_t usec)
 {
@@ -95,3 +95,13 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     }
     return nfds;
 }
+
+// toy version of strlen, for debugging netbricks
+// for performance, make sure to comment it out later
+// size_t strlen(const char *s)
+// {
+//     size_t cnt = 0;
+//     while(*s++ != '\0')
+//         cnt++;
+//     return cnt;
+// }

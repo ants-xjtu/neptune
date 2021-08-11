@@ -96,6 +96,8 @@ void check_all_ports_link_status(uint32_t port_mask)
 #define TX_RING_SIZE 1024
 
 static size_t NumberQueue;
+struct rte_mempool *pktmbufPool = NULL;
+struct rte_mempool *nbMbufPool = NULL;
 
 static inline int
 smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
@@ -233,7 +235,9 @@ void SetupDpdk()
     printf("ethernet rx port: %u, tx port: %u\n", srcPort, dstPort);
 
     // const unsigned int numberMbufs = 8192u, MEMPOOL_CACHE_SIZE = 256;
-    struct rte_mempool *pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    // struct rte_mempool *pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    nbMbufPool  = rte_pktmbuf_pool_create("nb_mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     if (pktmbufPool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
     // it is hard to determine the corrent value for them...

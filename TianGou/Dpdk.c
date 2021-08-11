@@ -17,25 +17,25 @@ void rte_exit(int exit_code, const char *format, ...)
     exit(exit_code);
 }
 
-void *rte_zmalloc_socket(const char *type, size_t size, unsigned int align, int socket)
-{
-    MESSAGE("type = %s, size = %lu, align = %u, socket = %d", type, size, align, socket);
-    if (align != 0)
-    {
-        MESSAGE("not implemented");
-        return NULL;
-    }
-    return (interface.malloc)(size);
-}
+// void *rte_zmalloc_socket(const char *type, size_t size, unsigned int align, int socket)
+// {
+//     MESSAGE("type = %s, size = %lu, align = %u, socket = %d", type, size, align, socket);
+//     if (align != 0)
+//     {
+//         MESSAGE("not implemented");
+//         return NULL;
+//     }
+//     return (interface.malloc)(size);
+// }
 
-struct rte_mempool *rte_pktmbuf_pool_create(
-    const char *name, unsigned int n,
-    unsigned int cache_size, uint16_t priv_size, uint16_t data_room_size,
-    int socket_id)
-{
-    MESSAGE("return 0x42");
-    return (struct rte_mempool *)0x42;
-}
+// struct rte_mempool *rte_pktmbuf_pool_create(
+//     const char *name, unsigned int n,
+//     unsigned int cache_size, uint16_t priv_size, uint16_t data_room_size,
+//     int socket_id)
+// {
+//     MESSAGE("return 0x42");
+//     return (struct rte_mempool *)0x42;
+// }
 
 // DPDK VM: 2 ports (#0 and #1), where all packets comes from
 // #0 rx, and all packets send to #1 tx will be actaully sent
@@ -49,7 +49,7 @@ uint16_t rte_eth_dev_count_avail()
 
 uint64_t rte_eth_find_next_owned_by(uint16_t port_id, const uint64_t owner_id)
 {
-    MESSAGE("port_id = %u", port_id);
+    // MESSAGE("port_id = %u", port_id);
     return port_id > 1 ? RTE_MAX_ETHPORTS : port_id;
 }
 
@@ -138,35 +138,35 @@ int rte_log(uint32_t level, uint32_t logtype, const char *format, ...)
     return 0;
 }
 
-const struct rte_memzone *
-rte_memzone_reserve_aligned(
-    const char *name, size_t len, int socket_id,
-    unsigned flags, unsigned align)
-{
-    MESSAGE("name = %s, len = %lu, socket_id = %d, flags = %u, align = %u", name, len, socket_id, flags, align);
-    struct rte_memzone *mz = (interface.malloc)(sizeof(struct rte_memzone));
-    strncpy(mz->name, name, RTE_MEMZONE_NAMESIZE);
-    // mz->iova = RTE_BAD_IOVA;
-    mz->addr = (interface.alignedAlloc)(align, len);
-    mz->iova = (rte_iova_t)mz->addr;
-    if (!mz->addr)
-    {
-        abort();
-    }
-    mz->len = len;
-    mz->hugepage_sz = sysconf(_SC_PAGESIZE);
-    mz->socket_id = 0;
-    mz->flags = 0;
-    return mz;
-}
+// const struct rte_memzone *
+// rte_memzone_reserve_aligned(
+//     const char *name, size_t len, int socket_id,
+//     unsigned flags, unsigned align)
+// {
+//     MESSAGE("name = %s, len = %lu, socket_id = %d, flags = %u, align = %u", name, len, socket_id, flags, align);
+//     struct rte_memzone *mz = (interface.malloc)(sizeof(struct rte_memzone));
+//     strncpy(mz->name, name, RTE_MEMZONE_NAMESIZE);
+//     // mz->iova = RTE_BAD_IOVA;
+//     mz->addr = (interface.alignedAlloc)(align, len);
+//     mz->iova = (rte_iova_t)mz->addr;
+//     if (!mz->addr)
+//     {
+//         abort();
+//     }
+//     mz->len = len;
+//     mz->hugepage_sz = sysconf(_SC_PAGESIZE);
+//     mz->socket_id = 0;
+//     mz->flags = 0;
+//     return mz;
+// }
 
-const struct rte_memzone *
-rte_memzone_reserve(
-    const char *name, size_t len, int socket_id,
-    unsigned flags)
-{
-    return rte_memzone_reserve_aligned(name, len, socket_id, flags, 0);
-}
+// const struct rte_memzone *
+// rte_memzone_reserve(
+//     const char *name, size_t len, int socket_id,
+//     unsigned flags)
+// {
+//     return rte_memzone_reserve_aligned(name, len, socket_id, flags, 0);
+// }
 
 // nop below here
 int rte_eth_dev_configure(uint16_t port_id, uint16_t nb_rx_queue,
@@ -267,4 +267,63 @@ int rte_flow_isolate(uint16_t port_id, int set, struct rte_flow_error *error)
 {
     MESSAGE("return 0");
     return 0;
+}
+
+int rte_eth_dev_set_ptypes(uint16_t port_id, uint32_t ptype_mask,
+			   uint32_t *set_ptypes, unsigned int num)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_link_get_nowait (uint16_t port_id, struct rte_eth_link *link)
+{
+    // MESSAGE("return 0");
+    return 0;
+}
+
+// WARNING: this is for debugging only
+// void rte_mempool_free(struct rte_mempool *mp)
+// {
+//     MESSAGE("nor freeing when debugging");
+//     return;
+// }
+int rte_dev_probe(const char *devargs)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+// ***hard code for NetBricks***
+#define portid_t uint16_t
+int attach_device(char *identifier, portid_t *portid_ptr, unsigned int max_ports)
+{
+    MESSAGE("return 1");
+    portid_ptr[0] = 0;
+    return 1;
+}
+
+int max_rxqs(uint16_t dev)
+{
+    MESSAGE("return 1");
+    return 1;
+}
+
+int max_txqs(uint16_t dev)
+{
+    MESSAGE("return 1");
+    return 1;
+}
+
+int init_pmd_port(uint16_t port, uint16_t rxqs, uint16_t txqs, int rxq_core[], int txq_core[], uint16_t nrxd, uint16_t ntxd,
+                  int loopback, int tso, int csumoffload, enum rte_eth_rx_mq_mode rx_mq_mode, struct rte_fdir_conf const *p_fdir_conf)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+void free_pmd_port(uint16_t port)
+{
+    MESSAGE("return");
+    return;
 }

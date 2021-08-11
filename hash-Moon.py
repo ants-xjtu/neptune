@@ -11,6 +11,8 @@ process = []
 sysPath = ['/home/hypermoon/Qcloud/glib/_build/glib/', \
         '/home/hypermoon/dpdk-20.11/build/lib/', \
         '/home/hypermoon/Qcloud/numactl/.libs/', \
+        '/home/hypermoon/neptune-yh/libs/', \
+        '/home/hypermoon/neptune-yh/build/', \
         '/usr/lib/x86_64-linux-gnu/',\
         '/lib/x86_64-linux-gnu/',\
         '/usr/local/lib/',\
@@ -21,7 +23,8 @@ unchanged = ['libc.so.6', \
         'libpthread.so.0', \
         'libm.so.6', \
         'libgcc_s.so.1', \
-        'libstdc++.so.6']
+        'libstdc++.so.6', \
+        'libTianGou.so']
 
 
 def hash(key, filename):
@@ -94,9 +97,9 @@ def worker():
                     if(sec.get_tag(dtId).entry.d_tag == 'DT_NEEDED'):
                         #print(strtab.get_string(sec.get_tag(dtId).entry.d_val))
                         depName = strtab.get_string(sec.get_tag(dtId).entry.d_val)
-                        if depName == "libTianGou.so":
-                            print("You are using a processed library! Please use a fresh copy instead")
-                            exit(1)
+                        # if depName == "libTianGou.so":
+                        #     print("You are using a processed library! Please use a fresh copy instead")
+                        #     exit(1)
 
                         # use simple hashing
                         # print("hashing file:", depName)
@@ -153,12 +156,15 @@ if __name__ == '__main__':
     process.append(sys.argv[1])
     worker()
     # OK, hashing dependency is done. Now we insert tiangou
-    print("Injecting tiangou...")
-    import lief
-    binary = lief.parse(sys.argv[1])
-    binary.add_library("libTianGou.so")
-    binary.write(sys.argv[1])
-    print("done")
+    # NB: in some NFs, after patchelf pass, lief will corrupt the binary
+    # In this case maybe you should do lief first
+    # TODO: finish the two steps using the same tool
+    # print("Injecting tiangou...")
+    # import lief
+    # binary = lief.parse(sys.argv[1])
+    # binary.add_library("libTianGou.so")
+    # binary.write(sys.argv[1])
+    # print("done")
 
     # test hash function
     # hash("prads", "libc.so.6")
@@ -166,3 +172,4 @@ if __name__ == '__main__':
     # hash("prads", "libfoo.so")
     # hash("Libnids", "libglib-2.0.so")
     # hash("L2Fwd", "librte_eal.so.21")
+    # hash("NetBricks", "librte_mempool.so.21")

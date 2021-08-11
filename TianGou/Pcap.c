@@ -67,7 +67,8 @@ pcap_t *pcap_open_live(const char *device, int snaplen,
 
 int pcap_datalink(pcap_t *p)
 {
-    MESSAGE("return DLT_EN10MB");
+    // why would any NF call this in pcap_loop?
+    // MESSAGE("return DLT_EN10MB");
     return DLT_EN10MB;
 }
 
@@ -102,8 +103,10 @@ int pcap_set_buffer_size(pcap_t *p, int buffer_size)
 
 int pcap_inject(pcap_t *p, const void *buf, size_t size)
 {
-    MESSAGE("not implemented");
-    abort();
+    // MESSAGE("not implemented");
+    // MESSAGE("return packet size");
+    // abort();
+    return (int) size;
 }
 
 int pcap_set_snaplen(pcap_t *p, int snaplen)

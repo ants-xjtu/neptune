@@ -20,7 +20,8 @@ static RegSet nfStack[MAX_STACK_NUM];
 
 // static struct StackHeader *globalStack;
 static __thread int currStackId = -1;
-static __thread RegSet mainStack;
+// static __thread RegSet mainStack;
+static RegSet mainStack;
 
 static int savedCurrStackId;
 static RegSet savedMainStack;
@@ -48,6 +49,13 @@ void StackSwitch(int stackId)
     // //I know this is ugly... I will fix it later
     // int realStack = (stackId < 0) ? (MAX_STACK_NUM - 1) : stackId;
     // int realCurrStack = (currStackId < 0) ? (MAX_STACK_NUM - 1) : currStackId;
+    if (stackId == currStackId)
+    {
+        // uninitialized thread cause stackswitch try to switch to itself
+        // hard code stackId=16 for now
+        printf("uninitialized stack detected, using default stackId\n");
+        currStackId = 16;
+    }
     RegSet *current = currStackId < 0 ? &mainStack : &nfStack[currStackId];
     RegSet *next = stackId < 0 ? &mainStack : &nfStack[stackId];
     currStackId = stackId;

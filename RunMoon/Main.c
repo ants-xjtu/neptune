@@ -14,10 +14,17 @@ static struct MoonConfig CONFIG[] = {
     // {.path = "./build/libMoon_MidStat_NoSFI.so", .argv = {}, .argc = 0},
     // {.path = "./build/libMoon_L2Fwd_NoSFI.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     // {.path = "./Vendor/fastclick/userlevel/click", .argv = {"-f", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"}, .argc = 2},
+    // legacy path using /usr/local/lib as export path
     {.path = "./libs/libMoon_Libnids.so", .argv = {}, .argc = 0},
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
     {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
+    {.path = "./libs/Libnids/forward.so", .argv = {}, .argc = 0},
+    {.path = "./libs/ndpi/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
+    // {.path = "./libs/Libnids-old/libMoon_Libnids.so", .argv = {}, .argc = 0},
+    // #6: this config might not be used to directly call main
+    {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
+    {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
 };
 
 // static const char *CONFIG[][2] = {
@@ -93,7 +100,54 @@ int main(int argc, char *argv[])
     {
         char *moonPath = CONFIG[configIndex[moonId]].path;
         printf("START LOADING moon#%d\n", moonId);
+        int rewrite = 0;
+        char *savedArgv[10];
+        if (configIndex[moonId] == 6)
+        {
+            // hard code for NetBricks
+            rewrite = 1;
+            // rewind
+            argc += ret;
+            argv -= ret;
+            if (CONFIG[configIndex[moonId]].argc + 1 > argc)
+            {
+                fprintf(stderr, "Not enough arguments in RunMoon!\n");
+                abort();
+            }
+            printf("[RunMoon] Rust NF detected, Rewriting arguments:\nOriginal arguments: ");
+            int i;
+            for (i = 0; i < CONFIG[configIndex[moonId]].argc; i++)
+            {
+                printf("%s ", argv[i]);
+                savedArgv[i] = strdup(argv[i]);
+            }
+            printf("%s\n", argv[i]);
+            savedArgv[i] = strdup(argv[i]);
+            printf("Modified arguments: ");
+            for (i = 0; i < CONFIG[configIndex[moonId]].argc; i++)
+            {
+                argv[i] = CONFIG[configIndex[moonId]].argv[i];
+                printf("%s ", argv[i]);
+            }
+            // don't forget to null terminate it
+            argv[i] = NULL;
+            printf("(NULL)\n");
+        }
         LoadMoon(moonPath, moonId, configIndex[moonId]);
+        if (rewrite)
+        {
+            printf("[RunMoon] Restoring arguments:\nRestored ones: ");
+            for (int i = 0; i < CONFIG[configIndex[moonId]].argc + 1; i++)
+            {
+                argv[i] = savedArgv[i];
+                printf("%s ", argv[i]);
+                free(savedArgv[i]);
+            }
+            printf("\n");
+            // rewind, again
+            argc -= ret;
+            argv += ret;
+        }
     }
     loading.inProgress = 0;
 
@@ -300,13 +354,16 @@ void MoonSwitch(unsigned int workerId)
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 #define MEMPOOL_CACHE_SIZE 256
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
+struct rte_mbuf *copied_pkts[MAX_PKT_BURST];
+unsigned nb_rx;
 
 int MainLoop(void *_arg)
 {
     int sent;
     unsigned lcore_id, workerId;
     uint64_t prev_tsc, diff_tsc, cur_tsc, timer_tsc;
-    unsigned i, j, portid, nb_rx;
+    // unsigned i, j, portid, nb_rx;
+    unsigned i, j, portid;
     const uint64_t drain_tsc =
         (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S * BURST_TX_DRAIN_US;
     struct rte_eth_dev_tx_buffer *buffer;
@@ -352,9 +409,35 @@ int MainLoop(void *_arg)
 
         // prevent unnecessary pkey overhead
         // IMPORTANT: careful when change code below this
+        extern struct rte_mempool *pktmbufPool;
+        extern struct rte_mempool *nbMbufPool;
         if (nb_rx == 0)
         {
+            // int used = rte_mempool_in_use_count(pktmbufPool);
+            // int full = rte_mempool_full(pktmbufPool);
+            // printf("host mempool used count: %d, full: %d\n", used, full);
             continue;
+        }
+
+        // memcpy(tmp, workerDataList[workerId].packetBurst, nb_rx);
+        // again:
+        for (int i = 0;i < nb_rx; i++)
+        {
+            // copied_pkts[i] = rte_pktmbuf_copy(workerDataList[workerId].packetBurst[i], nbMbufPool, 0, 4096);
+            copied_pkts[i] = rte_pktmbuf_clone(workerDataList[workerId].packetBurst[i], nbMbufPool);
+            // if (copied_pkts[i] == NULL)
+            // {
+            //     // nbMbufPool full!
+            //     rte_mempool_free(nbMbufPool);
+            //     nbMbufPool  = rte_pktmbuf_pool_create("nb_mbuf_pool", 1024*1024*4, 256, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+            //     // copied_pkts[i] = rte_pktmbuf_copy(workerDataList[workerId].packetBurst[i], nbMbufPool, 0, 4096);
+            //     goto again;
+            //     if (copied_pkts[i] == NULL)
+            //     {
+            //         printf("free mempool not working\n");
+            //         abort();
+            //     }
+            // }
         }
 
         // switch into the first MOON in the chain
@@ -363,11 +446,20 @@ int MainLoop(void *_arg)
         MoonSwitch(workerId);
         DisablePkey(0);
         // now we are back from the last MOON, the packet burst is done!
+        rte_pktmbuf_free_bulk (copied_pkts, nb_rx);
 
         sent = rte_eth_tx_burst(
             // dstPort, workerDataList[workerId].txQueue,
             srcPort, workerDataList[workerId].txQueue,
-            workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
+            workerDataList[workerId].packetBurst, nb_rx);
+        // sent = rte_eth_tx_burst(
+        //     // dstPort, workerDataList[workerId].txQueue,
+        //     srcPort, workerDataList[workerId].txQueue,
+        //     workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
+        // if (sent < nb_rx)
+        // {
+            // rte_pktmbuf_free_bulk(workerDataList[workerId].packetBurst + sent, nb_rx - sent);
+        // }
         if (sent)
             workerDataList[workerId].stat.tx += sent;
         for (int i = 0;i < sent; i++)
@@ -543,6 +635,7 @@ uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
     if (loading.inProgress)
     {
         loading.isDpdkMoon = 1;
+        // printf("Moon is going to switch stack\n");
         StackSwitch(-1);
         workerId = rte_lcore_id();
     }
@@ -553,14 +646,17 @@ uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
         // printf("switch to %d\n", workerDataList[workerId].current);
         MoonSwitch(workerId);
     }
+    // printf("inside rxburst: nb_pkt:%u\n", workerDataList[workerId].burstSize);
 
     if (nb_pkts < workerDataList[workerId].burstSize)
     {
         fprintf(stderr, "MOON rx burst size too small: %u\n", nb_pkts);
         abort();
     }
-    uint16_t size = workerDataList[workerId].burstSize;
-    memcpy(rx_pkts, workerDataList[workerId].packetBurst, size * sizeof(struct rte_mbuf *));
+    // uint16_t size = workerDataList[workerId].burstSize;
+    uint16_t size = nb_rx;
+    // memcpy(rx_pkts, workerDataList[workerId].packetBurst, size * sizeof(struct rte_mbuf *));
+    memcpy(rx_pkts, copied_pkts, size * sizeof(struct rte_mbuf *));
     // clear burst
     workerDataList[workerId].burstSize = 0;
     return size;
@@ -574,9 +670,14 @@ uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
         fprintf(stderr, "MOON tx burst size too large\n");
         abort();
     }
-    memcpy(
-        &workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize],
-        tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
+    rte_pktmbuf_free_bulk (tx_pkts, nb_pkts);
+    // for (int i = 0; i < nb_pkts; i++)
+    // {
+    //     printf("No.%d, refcnt: %d\n", i, workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize + i] ->refcnt);
+    // }
+    // memcpy(
+    //     &workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize],
+    //     tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
     workerDataList[workerId].burstSize += nb_pkts;
     return nb_pkts;
 }
