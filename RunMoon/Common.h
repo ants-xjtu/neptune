@@ -112,6 +112,8 @@ struct l2fwd_port_statistics
     double Mcycle[CYCLE_SIZE];
     int cycleIndex;
     double prevAvg;
+    uint64_t cpCycle;
+    uint64_t cmpCycle;
 } __rte_cache_aligned;
 // struct l2fwd_port_statistics port_statistics;
 struct WorkerData

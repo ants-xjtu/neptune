@@ -205,6 +205,8 @@ smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
     return 0;
 }
 
+struct rte_mempool *copyPool;
+
 void SetupDpdk()
 {
     int ret;
@@ -236,6 +238,7 @@ void SetupDpdk()
     struct rte_mempool *pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     if (pktmbufPool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
+    copyPool = rte_pktmbuf_pool_create("copy_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     // it is hard to determine the corrent value for them...
     // TODO
     mbufLow = 0;
@@ -262,7 +265,7 @@ void SetupDpdk()
     uint32_t portMask = 0;
     portMask |= (1 << srcPort);
     portMask |= (1 << dstPort);
-    check_all_ports_link_status(portMask);
+    // check_all_ports_link_status(portMask);
 }
 
 uint16_t RxBurstNop(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
