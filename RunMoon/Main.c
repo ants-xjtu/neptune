@@ -151,6 +151,29 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+static void RewriteMoonPath(struct PrivateLibrary *library, int workerId)
+{
+    // hard code fix for multi-threading dlopen, getting each core a seperate instance
+    //     specified by instanceId. NB: each core has the same chain
+    if (workerId == 1)
+        // lcore 1 is handled by default
+        return;
+    char *p = malloc(strlen(library->file) + 5);
+    char workerid[16];
+    sprintf(workerid, "%d", workerId);
+    strcpy(p, library->file);
+    // reversely find the last '/'
+    int pos;
+    for (pos = strlen(library->file);; pos--)
+    {
+        if (*(library->file + pos) == '/')
+            break;
+    }
+    strcpy(p + pos, workerid);
+    strcat(p, library->file + pos);
+    library->file = p;
+}
+
 void LoadMoon(char *moonPath, int moonId, int configIndex)
 {
     printf("[LoadMoon] MOON#%d global registration\n", moonId);
@@ -176,6 +199,7 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 
         struct PrivateLibrary library;
         library.file = moonPath;
+        RewriteMoonPath(&library, workerId);
         // we don't need to know the size of a library beforehand now
         // LoadLibrary(&library);
         // printf("library requires space: %#lx\n", library.length);
@@ -363,7 +387,7 @@ int MainLoop(void *_arg)
             continue;
         }
 
-        // extern struct rte_mempool *copyPool;
+        extern struct rte_mempool *copyPool;
         // uint64_t preCopy, postCopy, preCompare, postCompare;
         // preCopy = rte_rdtsc();
         // struct rte_mbuf *copied_pkts[MAX_PKT_BURST];
@@ -448,10 +472,14 @@ int MainLoop(void *_arg)
 // i.e. on private stack with private heap
 void InitMoon()
 {
-    char **argv = CONFIG[loading.configIndex].argv;
+    // in multi-core settings, we cannot assume argv remain unchanged given 
+    // it's not 'const'. This might cause minor memory leak, though
+    int argc = CONFIG[loading.configIndex].argc;
+    char **argv = malloc(argc * sizeof(char *));
+    memcpy(argv, CONFIG[loading.configIndex].argv, argc * sizeof(char *));
     // char *argv[0];
     printf("[InitMoon] calling moonStart\n");
-    loading.moonStart(CONFIG[loading.configIndex].argc, argv);
+    loading.moonStart(argc, argv);
     // loading.moonStart(0, argv);
     printf("[InitMoon] nf exited before blocking on packets, intended?\n");
     exit(0);

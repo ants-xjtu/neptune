@@ -55,11 +55,14 @@ uint64_t rte_eth_find_next_owned_by(uint16_t port_id, const uint64_t owner_id)
 
 int rte_eth_dev_info_get(uint16_t port_id, struct rte_eth_dev_info *dev_info)
 {
+    MESSAGE("called with port_id = %d", port_id);
     if (port_id > 1)
     {
         return -ENODEV;
     }
     struct rte_eth_dev_info *info = port_id == 0 ? interface.srcInfo : interface.dstInfo;
+    info->nb_rx_queues = 1;
+    info->nb_tx_queues = 1;
     memcpy(dev_info, info, sizeof(struct rte_eth_dev_info));
     return 0;
 }

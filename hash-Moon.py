@@ -30,6 +30,8 @@ def hash(key, filename):
         return filename
 
     exeName = key
+    # TODO: use a more messy hash function. Hash key 'L2Fwd' and 'L2Fwd2' would have
+    #       no difference on 'libdl.so.2'
     # hash up the argument within its length, so I choose simple Casear shifting
     # for example, if the filename of executable is /path/to/click
     # and currently we are processing libc.so.6
@@ -58,7 +60,9 @@ def worker():
         filename = process.pop(0)
         visited.append(filename)
         # trying filename in absolute directory -> system dir -> export dir
-        export_path = "./libs/" + sys.argv[2] + '/'
+        import os
+        export_path = os.path.dirname(sys.argv[1])
+        export_path = export_path + '/'
         try:
             f = open(filename, 'rb')
         except FileNotFoundError:
@@ -142,7 +146,6 @@ if __name__ == '__main__':
     if len(sys.argv) != 3:
         # NB: the alias should be the same as the directory name under libs/, otherwise
         # there is nowhere to export it.
-        # TODO: reduce the alias and use the directory containing the so to export
         print("usage: python hash-dep.py absolute-filename alias(i.e. hash key)")
         exit(1)
     
