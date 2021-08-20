@@ -306,8 +306,8 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 }
 
 uint64_t ss_clk0, ss_clk1, up_clk0, up_clk1;
-uint64_t ss_sum = 0, ss_sum1 = 0, up_sum = 0;
-int benchCounter = 0, benchCounter1 = 0;
+uint64_t ss_sum = 0, ss_sum1 = 0, ss_sum2 = 0, up_sum = 0;
+int benchCounter = 0, benchCounter1 = 0, benchCounter2 = 0;
 
 static inline void UpdatePkeyBench(unsigned int workerId)
 {
@@ -335,8 +335,19 @@ void MoonSwitch(unsigned int workerId)
         // TODO: making evaluating overhead an compile option, and wrap this in #ifdef
         // clock 1: NF is now back to runtime
         ss_clk1 = rte_rdtsc();
-        ss_sum += ss_clk1 - ss_clk0;
-        benchCounter += 1;
+        if (workerDataList[workerId].current == -1)
+        {
+            // NF2 -> RT
+            ss_sum2 += ss_clk1 - ss_clk0;
+            benchCounter2 += 1;
+        }
+        else
+        {
+            // NF1 -> NF2
+            ss_sum += ss_clk1 - ss_clk0;
+            benchCounter += 1;
+        }
+        
         // *** end ***
     }
     else
@@ -358,19 +369,23 @@ static void ssPrintBench()
     {
         double avgSSCycle = 0.0;
         double avgSSCycle1 = 0.0;
+        double avgSSCycle2 = 0.0;
         double avgUPCycle = 0.0;
         avgSSCycle = (double)ss_sum / benchCounter;
         avgSSCycle1 = (double)ss_sum1 / benchCounter1;
+        avgSSCycle2 = (double)ss_sum2 / benchCounter2;
         avgUPCycle = (double)up_sum / benchCounter;
         double ss_time = avgSSCycle / rte_get_tsc_hz() * 1000000000;
         // printf("StackSwitch cycle: %f  Counter:%d  realtime: %fns  UpdatePkey cycle:%f\n", 
         //     avgSSCycle, benchCounter, ss_time, avgUPCycle);
-        printf("StackSwitch cycle: %f  Counter:%d  SScycle1(RT->NF1): %f  Counter:%d\n", 
-            avgSSCycle, benchCounter, avgSSCycle1, benchCounter1);
+        printf("SSCycle(NF1->NF2): %f  Counter:%d  SSCycle2(NF2->RT): %f  Counter:%d  SScycle1(RT->NF1): %f  Counter:%d\n", 
+            avgSSCycle, benchCounter, avgSSCycle2, benchCounter2, avgSSCycle1, benchCounter1);
         benchCounter = 0;
         ss_sum = 0;
         benchCounter1 = 0;
         ss_sum1 = 0;
+        benchCounter2 = 0;
+        ss_sum2 = 0;
         up_sum = 0;
     }
 }
@@ -524,8 +539,13 @@ void InitMoon()
     // in multi-core settings, we cannot assume argv remain unchanged given 
     // it's not 'const'. This might cause minor memory leak, though
     int argc = CONFIG[loading.configIndex].argc;
-    char **argv = malloc(argc * sizeof(char *));
+    char **argv = malloc((argc+1) * sizeof(char *));
     memcpy(argv, CONFIG[loading.configIndex].argv, argc * sizeof(char *));
+    argv[argc] = NULL;
+    optind = 1;
+    printf("[InitMoon] printing arguments\n");
+    for (int i = 0; i < argc; i++)
+        printf("%s\n", argv[i]);
     // char *argv[0];
     printf("[InitMoon] calling moonStart\n");
     loading.moonStart(argc, argv);

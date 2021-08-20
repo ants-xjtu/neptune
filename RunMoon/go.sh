@@ -33,13 +33,30 @@ coreMask=$( printf "%x" $coreMask )
 libraryPath="LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:"
 moonConfig=""
 
+# TODO: clear this message
+# WARNING: if you want to duplicate MOON on a single SFC, then do not use
+#   multi-core and vice versa. These issue will disappear once we switch
+#   to dlmopen neatly.
+
 for i in "${!moonList[@]}"; do
     currDir=${allMoonDirs[${moonList[$i]}]}
     # echo "moonList[$i] = ${moonList[$i]}, currDir = $currDir"
+    ctr=0
+    for (( j=0; j<$i; j++ )); do
+        if [ ${moonList[$i]} == ${moonList[$j]} ]
+        then
+            ctr=$(( $ctr+1 ))
+        fi
+    done
     if [ -d "$absoluteDir$currDir" ]
     then
         moonConfig="$moonConfig ${moonList[$i]}"
-        libraryPath="$libraryPath$absoluteDir$currDir:"
+        if [ $ctr == 0 ]
+        then
+            libraryPath="$libraryPath$absoluteDir$currDir:"
+        else
+            libraryPath="$libraryPath$absoluteDir$currDir$(( ctr+1 )):"
+        fi
     else
         echo "$currDir: dir not exist";
         exit 1;
