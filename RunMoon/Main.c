@@ -10,20 +10,16 @@ struct MoonConfig
     int argc;
 };
 static struct MoonConfig CONFIG[] = {
-    // {.path = "./build/libMoon_Libnids_NoSFI.so", .argv = {}, .argc = 0},
-    // {.path = "./build/libMoon_MidStat_NoSFI.so", .argv = {}, .argc = 0},
-    // {.path = "./build/libMoon_L2Fwd_NoSFI.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
-    // {.path = "./Vendor/fastclick/userlevel/click", .argv = {"-f", "./Vendor/fastclick/conf/dpdk/dpdk-bounce.click"}, .argc = 2},
     {.path = "./libs/libMoon_Libnids.so", .argv = {}, .argc = 0},
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
     {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
     {.path = "./libs/Libnids/forward.so", .argv = {}, .argc = 0},
     {.path = "./libs/ndpi/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
-    // {.path = "./libs/Libnids-old/libMoon_Libnids.so", .argv = {}, .argc = 0},
     // #6: this config might not be used to directly call main
     {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
     {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
+    {.path = "./libs/Libnids-slow/libMoon_Libnids_Slow.so", .argv = {}, .argc = 0},
 };
 
 // static const char *CONFIG[][2] = {
@@ -151,16 +147,24 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-static void RewriteMoonPath(struct PrivateLibrary *library, int workerId)
+static void RewriteMoonPath(struct PrivateLibrary *library, int workerId, int moonId)
 {
-    // hard code fix for multi-threading dlopen, getting each core a seperate instance
-    //     specified by instanceId. NB: each core has the same chain
-    if (workerId == 1)
+    // using renaming to fix multi-instance Moon. Works for multi-core and 
+    // uni-core duplicated instances.
+    int instanceCtr = 0;
+    for (int i = 0; i < moonId; i++)
+    {
+        if (moonDataList[i].id == moonDataList[moonId].id)
+            instanceCtr++;
+    }
+    if (workerId == 1 && instanceCtr == 0)
         // lcore 1 is handled by default
         return;
-    char *p = malloc(strlen(library->file) + 5);
+    // NB: simply do not duplicate instance in MC
+    int newId = (workerId == 1)? instanceCtr+1 : workerId;
     char workerid[16];
-    sprintf(workerid, "%d", workerId);
+    sprintf(workerid, "%d", newId);
+    char *p = malloc(strlen(library->file) + 5);
     strcpy(p, library->file);
     // reversely find the last '/'
     int pos;
@@ -172,12 +176,15 @@ static void RewriteMoonPath(struct PrivateLibrary *library, int workerId)
     strcpy(p + pos, workerid);
     strcat(p, library->file + pos);
     library->file = p;
+    printf("[RewriteMoonPath] moon path is now at: %s\n", p);
 }
 
 void LoadMoon(char *moonPath, int moonId, int configIndex)
 {
     printf("[LoadMoon] MOON#%d global registration\n", moonId);
-    moonDataList[moonId].id = moonId;
+    // Q: cannot understand the function of this line for mDL[i] == i always holds
+    // moonDataList[moonId].id = moonId;
+    moonDataList[moonId].id = configIndex;
     moonDataList[moonId + 1].id = -1;
     moonDataList[moonId].pkey = pkey_alloc(0, 0);
     printf("moon pkey %%%d\n", moonDataList[moonId].pkey);
@@ -199,7 +206,7 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 
         struct PrivateLibrary library;
         library.file = moonPath;
-        RewriteMoonPath(&library, workerId);
+        RewriteMoonPath(&library, workerId, moonId);
         // we don't need to know the size of a library beforehand now
         // LoadLibrary(&library);
         // printf("library requires space: %#lx\n", library.length);
@@ -215,17 +222,6 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
         printf("initializing regions\n");
         SetStack(instanceId, stackStart, STACK_SIZE);
 
-        // Q: the problem here is somewhat clear: ld.so need to run the constructor of SOs, which explain 
-        // why `ld.so` is calling `glib-2.0` or `rte_eal`.
-        // During the initialization of these libraries, their call to malloc cause unpredictable problems
-        // which I currently cannot figure it out.
-        // necessary to correctly run Libnids!
-        // dlopen("/usr/local/lib/ccoffxfrz.0.so.0", RTLD_NOW);
-        // an attempt in vain to bypass segfault in L2Fwd
-        // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmvjdr.so.1", RTLD_NOW);
-        // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivppia.so.21", RTLD_NOW);
-        // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivpxmbgfzt.so.21", RTLD_NOW);
-        // dlopen("/home/hypermoon/neptune-yh/libs/L2Fwd/czmzivpcqcx.so.21", RTLD_NOW);
         SetHeap(heapStart, heapSize, instanceId);
         InitHeap();
         printf("%s: initialized\n", DONE_STRING);
@@ -309,6 +305,19 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
     }
 }
 
+uint64_t ss_clk0, ss_clk1, up_clk0, up_clk1;
+uint64_t ss_sum = 0, ss_sum1 = 0, up_sum = 0;
+int benchCounter = 0, benchCounter1 = 0;
+
+static inline void UpdatePkeyBench(unsigned int workerId)
+{
+    // update pkey, with overhead recorded
+    up_clk0 = rte_rdtsc();
+    UpdatePkey(workerId);
+    up_clk1 = rte_rdtsc();
+    up_sum += up_clk1 - up_clk0;
+}
+
 void MoonSwitch(unsigned int workerId)
 {
     if (workerDataList[workerId].current != -1) // not switching back to runtime
@@ -318,12 +327,51 @@ void MoonSwitch(unsigned int workerId)
                 .workers[workerId]
                 .instanceId;
         HeapSwitch(instanceId);
-        UpdatePkey(workerId);
+        // UpdatePkey(workerId);
+        UpdatePkeyBench(workerId);
+        ss_clk0 = rte_rdtsc();
         StackSwitch(instanceId);
+        //  *** evaluating stackswitch performance ***
+        // TODO: making evaluating overhead an compile option, and wrap this in #ifdef
+        // clock 1: NF is now back to runtime
+        ss_clk1 = rte_rdtsc();
+        ss_sum += ss_clk1 - ss_clk0;
+        benchCounter += 1;
+        // *** end ***
     }
     else
     {
+        //  *** evaluating stackswitch performance ***
+        // clock 0: NF trying to switch to runtime
+        ss_clk0 = rte_rdtsc();
+        // *** end ***
         StackSwitch(-1);
+        ss_clk1 = rte_rdtsc();
+        ss_sum1 += ss_clk1 - ss_clk0;
+        benchCounter1 += 1;
+    }
+}
+
+static void ssPrintBench()
+{
+    if (benchCounter)
+    {
+        double avgSSCycle = 0.0;
+        double avgSSCycle1 = 0.0;
+        double avgUPCycle = 0.0;
+        avgSSCycle = (double)ss_sum / benchCounter;
+        avgSSCycle1 = (double)ss_sum1 / benchCounter1;
+        avgUPCycle = (double)up_sum / benchCounter;
+        double ss_time = avgSSCycle / rte_get_tsc_hz() * 1000000000;
+        // printf("StackSwitch cycle: %f  Counter:%d  realtime: %fns  UpdatePkey cycle:%f\n", 
+        //     avgSSCycle, benchCounter, ss_time, avgUPCycle);
+        printf("StackSwitch cycle: %f  Counter:%d  SScycle1(RT->NF1): %f  Counter:%d\n", 
+            avgSSCycle, benchCounter, avgSSCycle1, benchCounter1);
+        benchCounter = 0;
+        ss_sum = 0;
+        benchCounter1 = 0;
+        ss_sum1 = 0;
+        up_sum = 0;
     }
 }
 
@@ -366,6 +414,7 @@ int MainLoop(void *_arg)
                     /* reset the timer */
                     timer_tsc = 0;
                     RecordBench(cur_tsc);
+                    ssPrintBench();
                 }
             }
             prev_tsc = cur_tsc;

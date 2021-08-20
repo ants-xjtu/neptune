@@ -67,7 +67,7 @@ pcap_t *pcap_open_live(const char *device, int snaplen,
 
 int pcap_datalink(pcap_t *p)
 {
-    MESSAGE("return DLT_EN10MB");
+    // MESSAGE("return DLT_EN10MB");
     return DLT_EN10MB;
 }
 
