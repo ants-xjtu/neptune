@@ -154,7 +154,7 @@ static void RewriteMoonPath(struct PrivateLibrary *library, int workerId, int mo
     int instanceCtr = 0;
     for (int i = 0; i < moonId; i++)
     {
-        if (moonDataList[i].id == moonDataList[moonId].id)
+        if (moonDataList[i].config == moonDataList[moonId].config)
             instanceCtr++;
     }
     if (workerId == 1 && instanceCtr == 0)
@@ -182,9 +182,8 @@ static void RewriteMoonPath(struct PrivateLibrary *library, int workerId, int mo
 void LoadMoon(char *moonPath, int moonId, int configIndex)
 {
     printf("[LoadMoon] MOON#%d global registration\n", moonId);
-    // Q: cannot understand the function of this line for mDL[i] == i always holds
-    // moonDataList[moonId].id = moonId;
-    moonDataList[moonId].id = configIndex;
+    moonDataList[moonId].id = moonId;
+    moonDataList[moonId].config = configIndex;
     moonDataList[moonId + 1].id = -1;
     moonDataList[moonId].pkey = pkey_alloc(0, 0);
     printf("moon pkey %%%d\n", moonDataList[moonId].pkey);
@@ -318,7 +317,7 @@ static inline void UpdatePkeyBench(unsigned int workerId)
     UpdatePkey(workerId);
     up_clk1 = rte_rdtsc();
     up_sum += up_clk1 - up_clk0;
-    upCounter += 1;
+    // upCounter += 1;
 }
 
 static inline void StackSwitchBench(unsigned int workerId, unsigned int instanceId)
@@ -374,8 +373,8 @@ void MoonSwitch(unsigned int workerId)
                 .workers[workerId]
                 .instanceId;
         HeapSwitch(instanceId);
-        UpdatePkey(workerId);
-        // UpdatePkeyBench(workerId);
+        // UpdatePkey(workerId);
+        UpdatePkeyBench(workerId);
         StackSwitch(instanceId);
         // StackSwitchBench(workerId, instanceId);
     }
@@ -454,7 +453,7 @@ int MainLoop(void *_arg)
                     /* reset the timer */
                     timer_tsc = 0;
                     RecordBench(cur_tsc);
-                    // ssPrintBench();
+                    ssPrintBench();
                 }
             }
             prev_tsc = cur_tsc;

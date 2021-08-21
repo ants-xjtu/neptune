@@ -92,6 +92,7 @@ struct Loading loading;
 struct MoonData
 {
     int id; // -1 for end of MOONs
+    int config;
     int pkey;
     int switchTo;
     struct
