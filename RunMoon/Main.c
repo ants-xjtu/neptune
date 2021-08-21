@@ -306,8 +306,10 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 }
 
 uint64_t ss_clk0, ss_clk1, up_clk0, up_clk1;
+uint64_t nf1_clk0, nf1_clk1, nf2_clk0, nf2_clk1, rt_clk0, rt_clk1;
 uint64_t ss_sum = 0, ss_sum1 = 0, ss_sum2 = 0, up_sum = 0;
 int benchCounter = 0, benchCounter1 = 0, benchCounter2 = 0;
+int upCounter = 0;
 
 static inline void UpdatePkeyBench(unsigned int workerId)
 {
@@ -316,6 +318,51 @@ static inline void UpdatePkeyBench(unsigned int workerId)
     UpdatePkey(workerId);
     up_clk1 = rte_rdtsc();
     up_sum += up_clk1 - up_clk0;
+    upCounter += 1;
+}
+
+static inline void StackSwitchBench(unsigned int workerId, unsigned int instanceId)
+{
+    // hard code evaluation for 2NF chain
+    // TODO1: scale it up to multi-NF chain
+    // TODO2: making evaluating benchmark a compile option
+    if (instanceId != -1)
+    {
+        if (workerDataList[workerId].current == 0)
+        {
+            // RT -> NF1
+            rt_clk0 = rte_rdtsc();
+        }
+        else if (workerDataList[workerId].current == 1)
+        {
+            // NF1 -> NF2
+            nf1_clk0 = rte_rdtsc();
+        }
+        StackSwitch(instanceId);
+        if (workerDataList[workerId].current == -1)
+        {
+            // NF2 -> RT
+            nf2_clk1 = rte_rdtsc();
+            ss_sum2 += nf2_clk1 - nf2_clk0;
+            benchCounter2 += 1;
+        }
+        else if (workerDataList[workerId].current == 0)
+        {
+            // RT -> NF1
+            rt_clk1 = rte_rdtsc();
+            ss_sum += rt_clk1 - rt_clk0;
+            benchCounter += 1;
+        }
+    }
+    else
+    {
+        nf2_clk0 = rte_rdtsc();
+        StackSwitch(-1);
+        // NF1 -> NF2
+        nf1_clk1 = rte_rdtsc();
+        ss_sum1 += nf1_clk1 - nf1_clk0;
+        benchCounter1 += 1;
+    }
 }
 
 void MoonSwitch(unsigned int workerId)
@@ -327,45 +374,21 @@ void MoonSwitch(unsigned int workerId)
                 .workers[workerId]
                 .instanceId;
         HeapSwitch(instanceId);
-        // UpdatePkey(workerId);
-        UpdatePkeyBench(workerId);
-        ss_clk0 = rte_rdtsc();
+        UpdatePkey(workerId);
+        // UpdatePkeyBench(workerId);
         StackSwitch(instanceId);
-        //  *** evaluating stackswitch performance ***
-        // TODO: making evaluating overhead an compile option, and wrap this in #ifdef
-        // clock 1: NF is now back to runtime
-        ss_clk1 = rte_rdtsc();
-        if (workerDataList[workerId].current == -1)
-        {
-            // NF2 -> RT
-            ss_sum2 += ss_clk1 - ss_clk0;
-            benchCounter2 += 1;
-        }
-        else
-        {
-            // NF1 -> NF2
-            ss_sum += ss_clk1 - ss_clk0;
-            benchCounter += 1;
-        }
-        
-        // *** end ***
+        // StackSwitchBench(workerId, instanceId);
     }
     else
     {
-        //  *** evaluating stackswitch performance ***
-        // clock 0: NF trying to switch to runtime
-        ss_clk0 = rte_rdtsc();
-        // *** end ***
         StackSwitch(-1);
-        ss_clk1 = rte_rdtsc();
-        ss_sum1 += ss_clk1 - ss_clk0;
-        benchCounter1 += 1;
+        // StackSwitchBench(workerId, -1);
     }
 }
 
 static void ssPrintBench()
 {
-    if (benchCounter)
+    if (benchCounter || upCounter)
     {
         double avgSSCycle = 0.0;
         double avgSSCycle1 = 0.0;
@@ -374,12 +397,13 @@ static void ssPrintBench()
         avgSSCycle = (double)ss_sum / benchCounter;
         avgSSCycle1 = (double)ss_sum1 / benchCounter1;
         avgSSCycle2 = (double)ss_sum2 / benchCounter2;
-        avgUPCycle = (double)up_sum / benchCounter;
+        avgUPCycle = (double)up_sum / upCounter;
         double ss_time = avgSSCycle / rte_get_tsc_hz() * 1000000000;
         // printf("StackSwitch cycle: %f  Counter:%d  realtime: %fns  UpdatePkey cycle:%f\n", 
         //     avgSSCycle, benchCounter, ss_time, avgUPCycle);
-        printf("SSCycle(NF1->NF2): %f  Counter:%d  SSCycle2(NF2->RT): %f  Counter:%d  SScycle1(RT->NF1): %f  Counter:%d\n", 
-            avgSSCycle, benchCounter, avgSSCycle2, benchCounter2, avgSSCycle1, benchCounter1);
+        // printf("SSCycle1(NF1->NF2): %f  Counter:%d  SSCycle2(NF2->RT): %f  Counter:%d  SScycle(RT->NF1): %f  Counter:%d\n", 
+        //     avgSSCycle1, benchCounter1, avgSSCycle2, benchCounter2, avgSSCycle, benchCounter);
+        printf("UpdatePkey cycle: %f\n", avgUPCycle);
         benchCounter = 0;
         ss_sum = 0;
         benchCounter1 = 0;
@@ -387,6 +411,7 @@ static void ssPrintBench()
         benchCounter2 = 0;
         ss_sum2 = 0;
         up_sum = 0;
+        upCounter = 0;
     }
 }
 
@@ -429,7 +454,7 @@ int MainLoop(void *_arg)
                     /* reset the timer */
                     timer_tsc = 0;
                     RecordBench(cur_tsc);
-                    ssPrintBench();
+                    // ssPrintBench();
                 }
             }
             prev_tsc = cur_tsc;
@@ -516,7 +541,11 @@ int MainLoop(void *_arg)
         // that MOON will switch into the next one instead of return here
         workerDataList[workerId].current = 0;
         MoonSwitch(workerId);
+        up_clk0 = rte_rdtsc();
         DisablePkey(0);
+        up_clk1 = rte_rdtsc();
+        up_sum += up_clk1 - up_clk0;
+        upCounter++;
         // now we are back from the last MOON, the packet burst is done!
 
         sent = rte_eth_tx_burst(
