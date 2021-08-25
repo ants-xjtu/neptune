@@ -197,6 +197,8 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
     RTE_LCORE_FOREACH_WORKER(workerId)
     {
         int instanceId = (workerId << 4) | (unsigned)moonId;
+        struct timeval loadStart, loadFinish;
+        gettimeofday(&loadStart, NULL);
         printf("[LoadMoon] MOON#%d @ worker$%d (inst!%03x)\n", moonId, workerId, instanceId);
         printf("allocating memory for MOON %s\n", moonPath);
         // void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
@@ -285,6 +287,9 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
             struct NF_link_map *l = library.loadAddress;
             loading.moonStart = (void *)(l->l_addr + 0x16db70);
         }
+        gettimeofday(&loadFinish, NULL);
+        double loadTime = (double)(loadFinish.tv_usec - loadStart.tv_usec) / 1000000 + loadFinish.tv_sec - loadStart.tv_sec;
+        printf("MOON#%d on worker$%d finished loading, time elapsed: %fs\n", moonId, workerId, loadTime);
         printf("entering MOON for initial running, start = %p\n", loading.moonStart);
         loading.isDpdkMoon = 0;
         loading.instanceId = instanceId;
@@ -373,15 +378,15 @@ void MoonSwitch(unsigned int workerId)
                 .workers[workerId]
                 .instanceId;
         HeapSwitch(instanceId);
-        // UpdatePkey(workerId);
-        UpdatePkeyBench(workerId);
-        StackSwitch(instanceId);
-        // StackSwitchBench(workerId, instanceId);
+        UpdatePkey(workerId);
+        // UpdatePkeyBench(workerId);
+        // StackSwitch(instanceId);
+        StackSwitchBench(workerId, instanceId);
     }
     else
     {
-        StackSwitch(-1);
-        // StackSwitchBench(workerId, -1);
+        // StackSwitch(-1);
+        StackSwitchBench(workerId, -1);
     }
 }
 
@@ -400,9 +405,9 @@ static void ssPrintBench()
         double ss_time = avgSSCycle / rte_get_tsc_hz() * 1000000000;
         // printf("StackSwitch cycle: %f  Counter:%d  realtime: %fns  UpdatePkey cycle:%f\n", 
         //     avgSSCycle, benchCounter, ss_time, avgUPCycle);
-        // printf("SSCycle1(NF1->NF2): %f  Counter:%d  SSCycle2(NF2->RT): %f  Counter:%d  SScycle(RT->NF1): %f  Counter:%d\n", 
-        //     avgSSCycle1, benchCounter1, avgSSCycle2, benchCounter2, avgSSCycle, benchCounter);
-        printf("UpdatePkey cycle: %f\n", avgUPCycle);
+        printf("SSCycle1(NF1->NF2): %f  Counter:%d  SSCycle2(NF2->RT): %f  Counter:%d  SScycle(RT->NF1): %f  Counter:%d\n", 
+            avgSSCycle1, benchCounter1, avgSSCycle2, benchCounter2, avgSSCycle, benchCounter);
+        // printf("UpdatePkey cycle: %f\n", avgUPCycle);
         benchCounter = 0;
         ss_sum = 0;
         benchCounter1 = 0;
@@ -540,11 +545,11 @@ int MainLoop(void *_arg)
         // that MOON will switch into the next one instead of return here
         workerDataList[workerId].current = 0;
         MoonSwitch(workerId);
-        up_clk0 = rte_rdtsc();
+        // up_clk0 = rte_rdtsc();
         DisablePkey(0);
-        up_clk1 = rte_rdtsc();
-        up_sum += up_clk1 - up_clk0;
-        upCounter++;
+        // up_clk1 = rte_rdtsc();
+        // up_sum += up_clk1 - up_clk0;
+        // upCounter++;
         // now we are back from the last MOON, the packet burst is done!
 
         sent = rte_eth_tx_burst(
@@ -571,9 +576,6 @@ void InitMoon()
     memcpy(argv, CONFIG[loading.configIndex].argv, argc * sizeof(char *));
     argv[argc] = NULL;
     optind = 1;
-    printf("[InitMoon] printing arguments\n");
-    for (int i = 0; i < argc; i++)
-        printf("%s\n", argv[i]);
     // char *argv[0];
     printf("[InitMoon] calling moonStart\n");
     loading.moonStart(argc, argv);

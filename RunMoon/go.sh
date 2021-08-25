@@ -21,6 +21,7 @@ while [[ "$#" -gt 0 ]]; do
         -m|--moon) moonList+=("$2"); shift; shift;;
         -c|--core) numCore="$2"; shift; shift;;
         -p|--pku) enablePku="--pku"; shift;;
+        -g|--debug) debugFlag="gdb --args"; shift;;
         *) echo "bad argument $1"; exit 1;;
     esac
 done
@@ -86,6 +87,6 @@ libraryPath="$libraryPath$buildPath"
 perm="sudo"
 progName="./build/RunMoon"
 tiangouPath="./build/libTianGou.so"
-cmd="$perm $libraryPath $progName -c 0x$coreMask -- $tiangouPath $enablePku $moonConfig"
+cmd="$perm $libraryPath $debugFlag $progName -c 0x$coreMask -- $tiangouPath $enablePku $moonConfig"
 echo $cmd
 eval $cmd
