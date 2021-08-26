@@ -310,9 +310,11 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 }
 
 uint64_t ss_clk0, ss_clk1, up_clk0, up_clk1;
-uint64_t nf1_clk0, nf1_clk1, nf2_clk0, nf2_clk1, rt_clk0, rt_clk1;
-uint64_t ss_sum = 0, ss_sum1 = 0, ss_sum2 = 0, up_sum = 0;
-int benchCounter = 0, benchCounter1 = 0, benchCounter2 = 0;
+uint64_t up_sum = 0;
+// idx 0 is the last but one NF to last NF, and so on
+uint64_t sum_array[16];
+int sum_idx = 0;
+int benchCounter = 0;
 int upCounter = 0;
 
 static inline void UpdatePkeyBench(unsigned int workerId)
@@ -327,45 +329,22 @@ static inline void UpdatePkeyBench(unsigned int workerId)
 
 static inline void StackSwitchBench(unsigned int workerId, unsigned int instanceId)
 {
-    // hard code evaluation for 2NF chain
-    // TODO1: scale it up to multi-NF chain
     // TODO2: making evaluating benchmark a compile option
     if (instanceId != -1)
     {
-        if (workerDataList[workerId].current == 0)
-        {
-            // RT -> NF1
-            rt_clk0 = rte_rdtsc();
-        }
-        else if (workerDataList[workerId].current == 1)
-        {
-            // NF1 -> NF2
-            nf1_clk0 = rte_rdtsc();
-        }
+        ss_clk0 = rte_rdtsc();
         StackSwitch(instanceId);
-        if (workerDataList[workerId].current == -1)
-        {
-            // NF2 -> RT
-            nf2_clk1 = rte_rdtsc();
-            ss_sum2 += nf2_clk1 - nf2_clk0;
-            benchCounter2 += 1;
-        }
-        else if (workerDataList[workerId].current == 0)
-        {
-            // RT -> NF1
-            rt_clk1 = rte_rdtsc();
-            ss_sum += rt_clk1 - rt_clk0;
-            benchCounter += 1;
-        }
+        ss_clk1 = rte_rdtsc();
+        sum_array[sum_idx++] += ss_clk1 - ss_clk0;
     }
     else
     {
-        nf2_clk0 = rte_rdtsc();
+        ss_clk0 = rte_rdtsc();
         StackSwitch(-1);
-        // NF1 -> NF2
-        nf1_clk1 = rte_rdtsc();
-        ss_sum1 += nf1_clk1 - nf1_clk0;
-        benchCounter1 += 1;
+        ss_clk1 = rte_rdtsc();
+        sum_idx = 0;
+        sum_array[sum_idx++] += ss_clk1 - ss_clk0;
+        benchCounter++;
     }
 }
 
@@ -394,28 +373,13 @@ static void ssPrintBench()
 {
     if (benchCounter || upCounter)
     {
-        double avgSSCycle = 0.0;
-        double avgSSCycle1 = 0.0;
-        double avgSSCycle2 = 0.0;
-        double avgUPCycle = 0.0;
-        avgSSCycle = (double)ss_sum / benchCounter;
-        avgSSCycle1 = (double)ss_sum1 / benchCounter1;
-        avgSSCycle2 = (double)ss_sum2 / benchCounter2;
-        avgUPCycle = (double)up_sum / upCounter;
-        double ss_time = avgSSCycle / rte_get_tsc_hz() * 1000000000;
-        // printf("StackSwitch cycle: %f  Counter:%d  realtime: %fns  UpdatePkey cycle:%f\n", 
-        //     avgSSCycle, benchCounter, ss_time, avgUPCycle);
-        printf("SSCycle1(NF1->NF2): %f  Counter:%d  SSCycle2(NF2->RT): %f  Counter:%d  SScycle(RT->NF1): %f  Counter:%d\n", 
-            avgSSCycle1, benchCounter1, avgSSCycle2, benchCounter2, avgSSCycle, benchCounter);
-        // printf("UpdatePkey cycle: %f\n", avgUPCycle);
+        for (int i = 0; sum_array[i] != 0; i++)
+        {
+            printf("overhead #%d: %fcycles\t", i, (double)sum_array[i]/benchCounter);
+        }
+        printf("\n");
+        memset(sum_array, 0, sizeof(uint64_t) * 16);
         benchCounter = 0;
-        ss_sum = 0;
-        benchCounter1 = 0;
-        ss_sum1 = 0;
-        benchCounter2 = 0;
-        ss_sum2 = 0;
-        up_sum = 0;
-        upCounter = 0;
     }
 }
 
