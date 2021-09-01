@@ -18,7 +18,9 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./libs/ndpi/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
     // #6: this config might not be used to directly call main
     {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
-    {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
+    // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
+    {.path = "./libs/rubik-new/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
+    // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     {.path = "./libs/Libnids-slow/libMoon_Libnids_Slow.so", .argv = {}, .argc = 0},
 };
 
@@ -161,7 +163,17 @@ static void RewriteMoonPath(struct PrivateLibrary *library, int workerId, int mo
         // lcore 1 is handled by default
         return;
     // NB: simply do not duplicate instance in MC
-    int newId = (workerId == 1)? instanceCtr+1 : workerId;
+    int newId;
+    if (workerId == 1)
+    {
+        // if we are duplicating instances, assume we are on worker$1
+        newId = instanceCtr + 1;
+    }
+    else
+    {
+        // otherwise, the index will increase with the number of worker count
+        newId = loading.workerCount + 1;
+    }
     char workerid[16];
     sprintf(workerid, "%d", newId);
     char *p = malloc(strlen(library->file) + 5);
@@ -194,6 +206,7 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
     }
 
     unsigned int workerId;
+    loading.workerCount = 0;
     RTE_LCORE_FOREACH_WORKER(workerId)
     {
         int instanceId = (workerId << 4) | (unsigned)moonId;
@@ -298,6 +311,7 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
         loading.threadStackIndex = 0;
         loading.stackStart = stackStart;
         loading.configIndex = configIndex;
+        loading.workerCount++;
         StackStart(instanceId, InitMoon);
         printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, loading.isDpdkMoon);
         // if (loading.isDpdkMoon)
@@ -359,13 +373,13 @@ void MoonSwitch(unsigned int workerId)
         HeapSwitch(instanceId);
         UpdatePkey(workerId);
         // UpdatePkeyBench(workerId);
-        // StackSwitch(instanceId);
-        StackSwitchBench(workerId, instanceId);
+        StackSwitch(instanceId);
+        // StackSwitchBench(workerId, instanceId);
     }
     else
     {
-        // StackSwitch(-1);
-        StackSwitchBench(workerId, -1);
+        StackSwitch(-1);
+        // StackSwitchBench(workerId, -1);
     }
 }
 
@@ -402,6 +416,11 @@ int MainLoop(void *_arg)
 
     DisablePkey(1);
     RTE_LOG(INFO, L2FWD, "entering main loop on lcore $%u\n", lcore_id);
+    printf("entering main loop on lcore $%u\n", lcore_id);
+    printf("lcore %u is processing rx queue %d, tx queue %d\n", 
+            workerId,
+            workerDataList[workerId].rxQueue, 
+            workerDataList[workerId].txQueue);
     while (!force_quit)
     {
         cur_tsc = rte_rdtsc();
@@ -422,7 +441,7 @@ int MainLoop(void *_arg)
                     /* reset the timer */
                     timer_tsc = 0;
                     RecordBench(cur_tsc);
-                    ssPrintBench();
+                    // ssPrintBench();
                 }
             }
             prev_tsc = cur_tsc;

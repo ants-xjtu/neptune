@@ -83,6 +83,8 @@ struct Loading
     size_t heapSize;
     void *stackStart;
     int threadStackIndex;
+    // how many core has finished processing for this moon
+    int workerCount;
 };
 struct Loading loading;
 // moonDataList[] is only set during loading/reconfiguration(WIP), and

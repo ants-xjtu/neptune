@@ -27,8 +27,14 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # echo "c = $((numCore))"
-coreMask=$(( (1<<(numCore+1))-1 ))
-coreMask=$( printf "%x" $coreMask )
+if [ ${numCore:0:2} != "0x" ]
+then
+    echo "please input a core mask"
+    exit 1;
+fi
+coreMask=$numCore
+# coreMask=$(( (1<<(numCore+1))-1 ))
+# coreMask=$( printf "%x" $coreMask )
 # echo "core mask=$coreMask"
 
 libraryPath="LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:"
@@ -87,6 +93,7 @@ libraryPath="$libraryPath$buildPath"
 perm="sudo"
 progName="./build/RunMoon"
 tiangouPath="./build/libTianGou.so"
-cmd="$perm $libraryPath $debugFlag $progName -c 0x$coreMask -- $tiangouPath $enablePku $moonConfig"
+# cmd="$perm $libraryPath $debugFlag $progName -c 0x$coreMask -- $tiangouPath $enablePku $moonConfig"
+cmd="$perm $libraryPath $debugFlag $progName -c $coreMask -- $tiangouPath $enablePku $moonConfig"
 echo $cmd
 eval $cmd

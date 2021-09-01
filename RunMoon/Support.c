@@ -97,6 +97,14 @@ void check_all_ports_link_status(uint32_t port_mask)
 
 static size_t NumberQueue;
 
+static uint8_t seed[40] = {
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A
+};
+
 static inline int
 smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
               uint16_t num_queues)
@@ -111,9 +119,12 @@ smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
         },
         .rx_adv_conf = {
             .rss_conf = {
-                .rss_key = NULL,
+                // .rss_key = NULL,
                 // .rss_hf = ETH_RSS_IP,
-                .rss_hf = ETH_RSS_TCP,
+                // .rss_hf = ETH_RSS_TCP,
+                .rss_key = seed,
+                .rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP | ETH_RSS_L2_PAYLOAD,
+                .rss_key_len = sizeof(seed)
             },
         },
         .txmode = {
@@ -136,6 +147,7 @@ smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
         return -1;
 
     printf("# Initialising port %u... \n", port);
+    printf("# Rx Queue: %u, Tx Queue: %u \n", rx_rings, tx_rings);
     fflush(stdout);
 
     retval = rte_eth_dev_info_get(port, &info);
