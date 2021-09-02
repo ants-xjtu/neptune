@@ -21,7 +21,13 @@ static struct MoonConfig CONFIG[] = {
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
     {.path = "./libs/rubik-new/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
-    {.path = "./libs/Libnids-slow/libMoon_Libnids_Slow.so", .argv = {}, .argc = 0},
+    // {.path = "./libs/Libnids-slow/libMoon_Libnids_Slow.so", .argv = {}, .argc = 0},
+    {.path = "./nfd/five/rtc.so", .argv = {"<program>"}, .argc = 1},
+    {.path = "./nfd/napt/napt", .argv = {"<program>"}, .argc = 1},
+    {.path = "./nfd/hhd/hhd", .argv = {"<program>"}, .argc = 1},
+    {.path = "./nfd/firewall/firewall", .argv = {"<program>"}, .argc = 1},
+    {.path = "./nfd/ssd/ssd", .argv = {"<program>"}, .argc = 1},
+    {.path = "./nfd/udpfm/udpfm", .argv = {"<program>"}, .argc = 1},
 };
 
 // static const char *CONFIG[][2] = {
@@ -216,6 +222,12 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
         printf("allocating memory for MOON %s\n", moonPath);
         // void *arena = aligned_alloc(MOON_SIZE, MOON_SIZE);
         void *arena = aligned_alloc(sysconf(_SC_PAGESIZE), MOON_SIZE);
+        if (arena == NULL)
+        {
+            // if there are really a lot of NFs, this could fail
+            printf("[LoadMoon] Not enough memory when allocating memory for MOON#%d @ worker$%d\n", moonId, workerId);
+            exit(-1);
+        }
         printf("arena address %p size %#lx\n", arena, MOON_SIZE);
 
         struct PrivateLibrary library;

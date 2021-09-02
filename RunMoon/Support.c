@@ -237,11 +237,13 @@ void SetupDpdk()
         if (portCount == 0)
         {
             srcPort = portid;
-        }
-        else if (portCount == 1)
-        {
+            // modified to use the same port for rx/tx
             dstPort = portid;
         }
+        // else if (portCount == 1)
+        // {
+        //     dstPort = portid;
+        // }
         portCount += 1;
     }
     printf("ethernet rx port: %u, tx port: %u\n", srcPort, dstPort);

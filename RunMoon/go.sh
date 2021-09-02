@@ -11,6 +11,12 @@ allMoonDirs=(
     "/libs/ndpi"
     "/libs/NetBricks"
     "/libs/rubik"
+    "/nfd/five"
+    "/nfd/napt"
+    "/nfd/hhd"
+    "/nfd/firewall"
+    "/nfd/ssd"
+    "/nfd/udpfm"
 )
 
 absoluteDir="/home/hypermoon/neptune-yh"
@@ -19,7 +25,7 @@ moonList=()
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         -m|--moon) moonList+=("$2"); shift; shift;;
-        -c|--core) numCore="$2"; shift; shift;;
+        -c|--core) coreMask="$2"; shift; shift;;
         -p|--pku) enablePku="--pku"; shift;;
         -g|--debug) debugFlag="gdb --args"; shift;;
         *) echo "bad argument $1"; exit 1;;
@@ -27,12 +33,26 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # echo "c = $((numCore))"
-if [ ${numCore:0:2} != "0x" ]
+if [ ${coreMask:0:2} != "0x" ]
 then
     echo "please input a core mask"
     exit 1;
 fi
-coreMask=$numCore
+
+detectCore=$coreMask
+numCore=0
+
+# ignore main core which is always on lcore 0
+detectCore=$((detectCore>>1))
+while [ ! "$detectCore" -eq "0" ]
+do
+    # echo $detectCore
+    if (( $detectCore&1 != 0 ))
+    then
+        numCore=$((numCore+1))
+    fi
+    detectCore=$((detectCore>>1))
+done
 # coreMask=$(( (1<<(numCore+1))-1 ))
 # coreMask=$( printf "%x" $coreMask )
 # echo "core mask=$coreMask"

@@ -75,8 +75,8 @@ void PrintBench()
         // cycle += workerRecordList[workerId].avgCopyCycles;
         // cmpcycle += workerRecordList[workerId].avgCompareCycles;
         // helper to see the load on each core
-        printf("[worker$%02d] pps: %fK\tbps:%fM\n", workerId,
-             workerRecordList[workerId].avgPps, workerRecordList[workerId].avgMbps);
+        // printf("[worker$%02d] pps: %fK\tbps:%fM\n", workerId,
+        //      workerRecordList[workerId].avgPps, workerRecordList[workerId].avgMbps);
     }
     // printf("pps: %fK\tbps:%fM\tavgCopyCycle:%f\tavgCmpCycle:%f\n", pps, bps, cycle, cmpcycle);
     // printf("pps: %fK\tbps:%fM\tavgCopyCycle:%f\n", pps, bps, cycle);
