@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/mman.h>
+#include <dirent.h>
 
 #include <rte_common.h>
 #include <rte_log.h>
@@ -169,5 +170,8 @@ void PrintBench();
 // pkey
 void UpdatePkey(unsigned int workerId);
 void DisablePkey(int force);
+
+// Protect
+void ProtectMoon(const char *moonPath, int pkey);
 
 #endif

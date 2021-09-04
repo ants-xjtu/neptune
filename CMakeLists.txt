@@ -54,6 +54,7 @@ add_executable(RunMoon
     RunMoon/Support.c
     RunMoon/Bench.c
     RunMoon/Pkey.c
+    RunMoon/Protect.c
 )
 target_compile_definitions(RunMoon PRIVATE ALLOW_EXPERIMENTAL_API)
 target_include_directories(RunMoon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -94,6 +95,16 @@ add_library(Moon_Libnids MODULE
 # target_link_libraries(Moon_Libnids PRIVATE gthread-2.0 nsl glib-2.0 net)
 target_link_libraries(Moon_Libnids PRIVATE nids)
 target_link_libraries(Moon_Libnids PRIVATE Threads::Threads)
+
+# add_library(Moon_Libnids_Slow MODULE
+#     # Moon/LibnidsMain.c 
+#     Moon/LibnidsSlow.c
+#     # originally statically linked with libnids
+#     # Vendor/libnids/src/NIDS-link_pic.bc
+# )
+# # target_link_libraries(Moon_Libnids PRIVATE gthread-2.0 nsl glib-2.0 net)
+# target_link_libraries(Moon_Libnids_Slow PRIVATE nids)
+# target_link_libraries(Moon_Libnids_Slow PRIVATE Threads::Threads)
 
 # No, Prads is already a shared object
 # add_moon(TARGET Moon_Prads SOURCES

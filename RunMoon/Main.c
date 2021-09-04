@@ -270,6 +270,7 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 
         // TODO: find a way to correctly protect the shared object's region
         pkey_mprotect(arena + STACK_SIZE, MOON_SIZE - STACK_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
+        // ProtectMoon(library.file, moonDataList[moonId].pkey);
 
         // wierd thing here: `*core_id = 0` must after `pkey_mprotect`, or SEGFAULT
         // totally cannot understand
