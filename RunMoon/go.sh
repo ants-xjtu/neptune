@@ -17,6 +17,10 @@ allMoonDirs=(
     "/nfd/firewall"
     "/nfd/ssd"
     "/nfd/udpfm"
+    "/onvm/scan"
+    "/onvm/firewall"
+    "/onvm/encrypt"
+    "/onvm/decrypt"
 )
 
 absoluteDir="/home/hypermoon/neptune-yh"

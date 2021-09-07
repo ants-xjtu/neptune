@@ -14,7 +14,8 @@ sysPath = ['/home/hypermoon/Qcloud/glib/_build/glib/', \
         '/usr/lib/x86_64-linux-gnu/',\
         '/lib/x86_64-linux-gnu/',\
         '/usr/local/lib/',\
-        '/usr/local/lib/x86_64-linux-gnu/']
+        '/usr/local/lib/x86_64-linux-gnu/', \
+        '/home/hypermoon/Qcloud/pure_rtc/libonvm/']
 # specify those libraries that are shared, i.e., not hashed as a dependency
 unchanged = ['libc.so.6', \
         'ld-linux-x86-64.so.2', \

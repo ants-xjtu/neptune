@@ -109,6 +109,13 @@ int rte_eal_mp_remote_launch(
     return 0;
 }
 
+// int rte_eal_remote_launch(lcore_function_t *f, void *arg, unsigned int worker_id)
+// {
+//     MESSAGE("f = %p, arg = %p, worker_id = %d", f, arg, worker_id);
+//     f(arg);
+//     return 0;
+// }
+
 unsigned int rte_get_next_lcore(unsigned int i, int skip_main, int wrap)
 {
     MESSAGE("i = %u, skip_main = %d, wrap = %d", i, skip_main, wrap);
@@ -295,4 +302,30 @@ int rte_dev_probe(const char *devargs)
 {
     MESSAGE("return 0");
     return 0;
+}
+
+// void rte_pktmbuf_free_bulk(struct rte_mbuf **mbufs, unsigned int count)
+// {
+//     // NFs will try to free the mbuf if they fail to send all the pkts received
+//     return;
+// }
+
+// lpm-related functions
+struct rte_lpm *rte_lpm_create(const char *name, int socket_id,
+		const struct rte_lpm_config *config)
+{
+    MESSAGE("call runtime lpm_create");
+    return interface.lpm_create(name, socket_id, config);
+}
+
+struct rte_lpm *rte_lpm_find_existing(const char *name)
+{
+    MESSAGE("call runtime lpm_find_existing");
+    return interface.lpm_find_existing(name);
+}
+
+int rte_lpm_add(struct rte_lpm *lpm, uint32_t ip, uint8_t depth, uint32_t next_hop)
+{
+    MESSAGE("call runtime lpm_add");
+    return interface.lpm_add(lpm, ip, depth, next_hop);
 }

@@ -45,6 +45,7 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 #include <rte_string_fns.h>
+#include <rte_lpm.h>
 
 #include "PrivateHeap.h"
 #include "PrivateStack.h"
@@ -112,12 +113,13 @@ struct l2fwd_port_statistics
     uint64_t rx;
     uint64_t dropped;
     uint64_t bytes;
+    double latency;
+    int batch;
     double cycle[CYCLE_SIZE];
     double Mcycle[CYCLE_SIZE];
+    double Lcycle[CYCLE_SIZE];
     int cycleIndex;
     double prevAvg;
-    uint64_t cpCycle;
-    uint64_t cmpCycle;
 } __rte_cache_aligned;
 // struct l2fwd_port_statistics port_statistics;
 struct WorkerData

@@ -1,17 +1,15 @@
-# script to copy and hash single nfd NF for multiple times
+# script to copy and hash single onvm NF for multiple times
+# TODO: seperate main function to avoid code duplication
 
 import os
 import shutil
 import subprocess
-import sys
 
-# allNF = ['napt', 'hhd', 'firewall', 'ssd', 'udpfm']
-allNF = ['napt', 'hhd', 'ssd', 'udpfm']
+allNF = ['scan', 'firewall', 'encrypt', 'decrypt']
 # use a short and simple hash key
-# hashKey = ['n', 'h', 'f', 's', 'u']
-hashKey = ['n', 'h', 's', 'u']
+hashKey = ['s', 'f', 'e', 'd']
 sourceDir = '/home/hypermoon/Qcloud/pure_rtc/build'
-destDir = '/home/hypermoon/neptune-yh/nfd'
+destDir = '/home/hypermoon/neptune-yh/onvm'
 maxCore = 16
 
 

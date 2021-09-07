@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <pcap/pcap.h>
 #include <rte_ethdev.h>
+#include <rte_lpm.h>
 
 typedef struct
 {
@@ -27,6 +28,12 @@ typedef struct
     // but they always return constant, so value is better
     struct rte_eth_dev_info *srcInfo, *dstInfo;
     uint64_t tscHz;
+    // temporary fix for uninitialized lpm functions
+    struct rte_lpm *(*lpm_create)(const char *name, int socket_id,
+		const struct rte_lpm_config *config);
+    struct rte_lpm *(*lpm_find_existing)(const char *name);
+    int (*lpm_add)(struct rte_lpm *lpm, uint32_t ip, uint8_t depth, uint32_t next_hop);
+
 
     int (*pthreadCreate)(
         pthread_t *restrict thread,

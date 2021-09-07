@@ -28,6 +28,10 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./nfd/firewall/firewall", .argv = {"<program>"}, .argc = 1},
     {.path = "./nfd/ssd/ssd", .argv = {"<program>"}, .argc = 1},
     {.path = "./nfd/udpfm/udpfm", .argv = {"<program>"}, .argc = 1},
+    {.path = "./onvm/scan/scan", .argv = {"<program>"}, .argc = 1},
+    {.path = "./onvm/firewall/firewall", .argv = {"<program>"}, .argc = 1},
+    {.path = "./onvm/encrypt/encrypt", .argv = {"<program>"}, .argc = 1},
+    {.path = "./onvm/decrypt/decrypt", .argv = {"<program>"}, .argc = 1},
 };
 
 // static const char *CONFIG[][2] = {
@@ -79,6 +83,9 @@ int main(int argc, char *argv[])
     interfacePointer->pthreadCreate = PthreadCreate;
     interfacePointer->pthreadCondTimedwait = PthreadCondTimedwait;
     interfacePointer->pthreadCondWait = PthreadCondWait;
+    interfacePointer->lpm_create = rte_lpm_create;
+    interfacePointer->lpm_find_existing = rte_lpm_find_existing;
+    interfacePointer->lpm_add = rte_lpm_add;
     printf("configure preloading for tiangou\n");
     // no need for we are hard-coding tiangou in binaries
     // PreloadLibrary(tiangou);
@@ -423,6 +430,7 @@ int MainLoop(void *_arg)
     const uint64_t drain_tsc =
         (rte_get_tsc_hz() + US_PER_S - 1) / US_PER_S * BURST_TX_DRAIN_US;
     struct rte_eth_dev_tx_buffer *buffer;
+    uint64_t postRx, preTx;
     prev_tsc = 0;
     timer_tsc = 0;
     workerId = lcore_id = rte_lcore_id();
@@ -476,66 +484,7 @@ int MainLoop(void *_arg)
             continue;
         }
 
-        extern struct rte_mempool *copyPool;
-        // uint64_t preCopy, postCopy, preCompare, postCompare;
-        // preCopy = rte_rdtsc();
-        // struct rte_mbuf *copied_pkts[MAX_PKT_BURST];
-        // for (int i = 0; i < nb_rx; i++)
-        // {
-        //     copied_pkts[i] = rte_pktmbuf_copy(workerDataList[workerId].packetBurst[i], copyPool, 0, UINT32_MAX);
-        // }
-        /* Added by Hao */
-//         rte_pktmbuf_alloc_bulk(copyPool, copied_pkts, nb_rx);
-//         int left = 0;
-//         const int factor = 1;
-//         // printf("left: %d, nb_rx: %d\n", left, nb_rx);
-//         if (nb_rx < factor)
-//             goto CollectLeft;
-//         for (left = 0; left < nb_rx - factor; left += factor)
-//         {
-//             copied_pkts[left]->data_len = workerDataList[workerId].packetBurst[left]->data_len;
-//             // copied_pkts[left]->pkt_len = workerDataList[workerId].packetBurst[left]->pkt_len;
-//             int cache_index = copied_pkts[left]->data_len / 64;
-//             for (int i=0; i<cache_index; i++) {
-//                 rte_prefetch0(rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[left], void *)+64*i);
-//                 rte_prefetch0_write(rte_pktmbuf_mtod(copied_pkts[left], void *)+64*i);
-//             }
-//             rte_memcpy(rte_pktmbuf_mtod(copied_pkts[left], void *), rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[left], void *), copied_pkts[left]->data_len);
-//             printf("mbuf: %p, data: %p, data len: %d\n", workerDataList[workerId].packetBurst[left] , rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[left], void *), copied_pkts[left]->data_len);
-//         }
-//         // printf("left: %d, nb_rx: %d\n\n", left, nb_rx);
-// CollectLeft:
-//         for (; left < nb_rx; left++) {
-//             copied_pkts[left]->data_len = workerDataList[workerId].packetBurst[left]->data_len;
-//             rte_prefetch0_write(rte_pktmbuf_mtod(copied_pkts[left], void *));
-//             // copied_pkts[left]->pkt_len = workerDataList[workerId].packetBurst[left]->pkt_len;
-//             rte_prefetch0(rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[left], void *));
-//             rte_memcpy(rte_pktmbuf_mtod(copied_pkts[left], void *), rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[left], void *), copied_pkts[left]->data_len);
-//         }
-        /* End */
-
-        // postCopy = rte_rdtsc();
-        // workerDataList[workerId].stat.cpCycle += postCopy - preCopy;
-
-        // compare the packets using memcmp
-        // preCompare = rte_rdtsc();
-        // prefetch it into cache?
-        // for (int i = 0; i < nb_rx; i++)
-        // {
-        //     if (memcmp(rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], void *), 
-        //             rte_pktmbuf_mtod(copied_pkts[i], void *), 
-        //             rte_pktmbuf_data_len(workerDataList[workerId].packetBurst[i])
-        //         ) != 0)
-        //     {
-        //         fprintf(stderr, "compare failed!\n");
-        //         abort();
-        //     }
-        // }
-        // postCompare = rte_rdtsc();
-        // workerDataList[workerId].stat.cmpCycle += postCompare - preCompare;        
-        // free the mempool so that it won't be full
-        // should it be considered as overhead?
-        // rte_pktmbuf_free_bulk(copied_pkts, nb_rx);
+        postRx = rte_rdtsc();
 
         // switch into the first MOON in the chain
         // that MOON will switch into the next one instead of return here
@@ -547,6 +496,11 @@ int MainLoop(void *_arg)
         // up_sum += up_clk1 - up_clk0;
         // upCounter++;
         // now we are back from the last MOON, the packet burst is done!
+
+        preTx = rte_rdtsc();
+        workerDataList[workerId].stat.latency += (double)(preTx - postRx) * 1000 * 1000 / rte_get_tsc_hz();
+        workerDataList[workerId].stat.batch++;
+
 
         sent = rte_eth_tx_burst(
             // dstPort, workerDataList[workerId].txQueue,
