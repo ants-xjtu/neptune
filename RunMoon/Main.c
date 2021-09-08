@@ -346,18 +346,28 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 uint64_t ss_clk0, ss_clk1, up_clk0, up_clk1;
 uint64_t up_sum = 0;
 // idx 0 is the last but one NF to last NF, and so on
+// TODO: scale these variables up for multi-core
 uint64_t sum_array[16];
 int sum_idx = 0;
 int benchCounter = 0;
 int upCounter = 0;
 
-static inline void UpdatePkeyBench(unsigned int workerId)
+int up_idx = 0;
+uint64_t up_array[16];
+
+int hsCounter = 0;
+uint64_t hs_clk0, hs_clk1;
+uint64_t hsSum = 0;
+
+static void UpdatePkeyBench(unsigned int workerId)
 {
     // update pkey, with overhead recorded
     up_clk0 = rte_rdtsc();
     UpdatePkey(workerId);
     up_clk1 = rte_rdtsc();
-    up_sum += up_clk1 - up_clk0;
+    // printf("hs_clk0: %" PRIu64 "\ths_clk1: %" PRIu64 " diff: %" PRIu64 "\n", up_clk0, up_clk1, up_clk1 - up_clk0);
+    // up_sum += up_clk1 - up_clk0;
+    up_array[up_idx++] += up_clk1 - up_clk0;
     // upCounter += 1;
 }
 
@@ -390,9 +400,15 @@ void MoonSwitch(unsigned int workerId)
             moonDataList[workerDataList[workerId].current]
                 .workers[workerId]
                 .instanceId;
+        hs_clk0 = rte_rdtsc();
         HeapSwitch(instanceId);
+        // hs_clk1 = rte_rdtsc();
         UpdatePkey(workerId);
         // UpdatePkeyBench(workerId);
+        hs_clk1 = rte_rdtsc();
+        // printf("hs_clk0: %" PRIu64 "\ths_clk1: %" PRIu64 "diff: %" PRIu64 "\n", hs_clk0, hs_clk1, hs_clk1 - hs_clk0);
+        hsSum += hs_clk1 - hs_clk0;
+        hsCounter++;
         StackSwitch(instanceId);
         // StackSwitchBench(workerId, instanceId);
     }
@@ -405,7 +421,9 @@ void MoonSwitch(unsigned int workerId)
 
 static void ssPrintBench()
 {
-    if (benchCounter || upCounter)
+    // TODO: move this function next to PrintBench and do not share the
+    // timer with tx drain
+    if (benchCounter)
     {
         for (int i = 0; sum_array[i] != 0; i++)
         {
@@ -414,6 +432,31 @@ static void ssPrintBench()
         printf("\n");
         memset(sum_array, 0, sizeof(uint64_t) * 16);
         benchCounter = 0;
+    }
+}
+
+static void upPrintBench()
+{
+    if (upCounter)
+    {
+        for (int i = 0; up_array[i] != 0; i++)
+        {
+            printf("overhead #%d: %fcycles\t", i, (double)up_array[i]/upCounter);
+        }
+        printf("\n");
+        memset(up_array, 0, sizeof(uint64_t) * 16);
+        upCounter = 0;
+    }
+}
+
+static void hsPrintBench()
+{
+    if (hsCounter)
+    {
+        double overhead = (double)hsSum / hsCounter;
+        printf("heapSwitch overhead: %f\n", overhead);
+        hsCounter = 0;
+        hsSum = 0;
     }
 }
 
@@ -463,6 +506,8 @@ int MainLoop(void *_arg)
                     timer_tsc = 0;
                     RecordBench(cur_tsc);
                     // ssPrintBench();
+                    // upPrintBench();
+                    hsPrintBench();
                 }
             }
             prev_tsc = cur_tsc;
@@ -493,6 +538,8 @@ int MainLoop(void *_arg)
         // up_clk0 = rte_rdtsc();
         DisablePkey(0);
         // up_clk1 = rte_rdtsc();
+        // up_idx = 0;
+        // up_array[up_idx++] += up_clk1 - up_clk0;
         // up_sum += up_clk1 - up_clk0;
         // upCounter++;
         // now we are back from the last MOON, the packet burst is done!
