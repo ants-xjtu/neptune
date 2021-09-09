@@ -70,3 +70,21 @@ void DisablePkey(int force)
     }
     pkey_write(pkru);
 }
+
+// UpdatePkey happens only when switch from MOON A to MOON B
+// so the only thing we need to do is revert permission for these two MOONs
+// void UpdatePkey(unsigned int workerId)
+// {
+//     if (unlikely(!enablePku))
+//     {
+//         return;
+//     }
+//     unsigned int pkru = pkey_read();
+//     // the following code assume moonDataList[id].id == id, which holds when 
+//     // there is no unloading
+//     int current = workerDataList[workerId].current;
+//     int prevKey = current == 0? runtimePkey : moonDataList[current - 1].pkey;
+//     UpdatePkru(moonDataList[current].pkey, 0, &pkru);
+//     UpdatePkru(prevKey, PKEY_DISABLE_WRITE, &pkru);
+//     pkey_write(pkru);
+// }
