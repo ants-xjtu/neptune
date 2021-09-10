@@ -40,6 +40,9 @@ static struct MoonConfig CONFIG[] = {
 //     {"./build/libMoon_MidStat_NoSFI.so", ""},
 // };
 
+static uint8_t migrated_flow0 = 255;
+static uint8_t migrated_flow1 = 255;
+
 int main(int argc, char *argv[])
 {
     int ret = rte_eal_init(argc, argv);
@@ -110,7 +113,7 @@ int main(int argc, char *argv[])
     {
         char *moonPath = CONFIG[configIndex[moonId]].path;
         printf("START LOADING moon#%d\n", moonId);
-        LoadMoon(moonPath, moonId, configIndex[moonId]);
+        LoadMoonLoose(moonPath, moonId, configIndex[moonId], MAX_FLOW);
     }
     loading.inProgress = 0;
 
@@ -140,6 +143,12 @@ int main(int argc, char *argv[])
         tx += 1;
     }
 
+    printf("create and install initial flow rules\n");
+    PrepareRules();
+    printf("%s\n", DONE_STRING);
+    printf("pause before proceed\n");
+    getchar();
+
     printf("[RunMoon] launch workers\n");
     RTE_LCORE_FOREACH_WORKER(workerId)
     {
@@ -147,10 +156,25 @@ int main(int argc, char *argv[])
     }
 
     printf("*** START RUNTIME MAIN LOOP ***\n");
+    uint64_t preUpdate, curTsc;
+    int updated = 0;
+    preUpdate = rte_rdtsc();
     while (!force_quit)
     {
         PrintBench();
         // TODO: supervisor tasks, update chain, redirect traffic, etc.
+        curTsc = rte_rdtsc();
+        uint64_t diff = curTsc - preUpdate;
+        if (unlikely(diff > timer_period * 10))
+        {
+            if (updated)
+                continue;
+            migrated_flow0 = 5;
+            migrated_flow1 = 6;
+            printf("[RunMoon] flow rules updated\n");
+            UpdateRules();
+            updated = 1;
+        }
     }
 
     RTE_LCORE_FOREACH_WORKER(workerId)
@@ -343,52 +367,107 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
     }
 }
 
-uint64_t ss_clk0, ss_clk1, up_clk0, up_clk1;
-uint64_t up_sum = 0;
-// idx 0 is the last but one NF to last NF, and so on
-// TODO: scale these variables up for multi-core
-uint64_t sum_array[16];
-int sum_idx = 0;
-int benchCounter = 0;
-int upCounter = 0;
-
-int up_idx = 0;
-uint64_t up_array[16];
-
-int hsCounter = 0;
-uint64_t hs_clk0, hs_clk1;
-uint64_t hsSum = 0;
-
-static void UpdatePkeyBench(unsigned int workerId)
+// LoadMoon, a 'loose' version such that a worker core is not bind to one SFC
+void LoadMoonLoose(char *moonPath, int moonId, int configIndex, int numInstance)
 {
-    // update pkey, with overhead recorded
-    up_clk0 = rte_rdtsc();
-    UpdatePkey(workerId);
-    up_clk1 = rte_rdtsc();
-    // printf("hs_clk0: %" PRIu64 "\ths_clk1: %" PRIu64 " diff: %" PRIu64 "\n", up_clk0, up_clk1, up_clk1 - up_clk0);
-    // up_sum += up_clk1 - up_clk0;
-    up_array[up_idx++] += up_clk1 - up_clk0;
-    // upCounter += 1;
-}
-
-static inline void StackSwitchBench(unsigned int workerId, unsigned int instanceId)
-{
-    // TODO2: making evaluating benchmark a compile option
-    if (instanceId != -1)
+    // maintaining chain information is the same
+    printf("[LoadMoonLoose] MOON#%d global registration\n", moonId);
+    moonDataList[moonId].id = moonId;
+    moonDataList[moonId].config = configIndex;
+    moonDataList[moonId + 1].id = -1;
+    moonDataList[moonId].pkey = pkey_alloc(0, 0);
+    printf("moon pkey %%%d\n", moonDataList[moonId].pkey);
+    moonDataList[moonId].switchTo = -1;
+    if (moonId != 0)
     {
-        ss_clk0 = rte_rdtsc();
-        StackSwitch(instanceId);
-        ss_clk1 = rte_rdtsc();
-        sum_array[sum_idx++] += ss_clk1 - ss_clk0;
+        moonDataList[moonId - 1].switchTo = moonId;
     }
-    else
+
+    loading.workerCount = 0;
+    for (int chainId = 0; chainId < numInstance; chainId++)
     {
-        ss_clk0 = rte_rdtsc();
-        StackSwitch(-1);
-        ss_clk1 = rte_rdtsc();
-        sum_idx = 0;
-        sum_array[sum_idx++] += ss_clk1 - ss_clk0;
-        benchCounter++;
+        int instanceId = (chainId << 4) | (unsigned)moonId;
+        printf("[LoadMoonLoose] MOON#%d @ SFC$%d (inst!%03x)\n", 
+            moonId, chainId, instanceId);
+
+        // TODO: use a seperate rename method to decouple from workerId
+        struct PrivateLibrary lib;
+        lib.file = moonPath;
+        // do not use chainId+1, which is only to adapt to RewriteMoonPath
+        RewriteMoonPath(&lib, chainId+1, moonId);
+        // arena
+        printf("allocating memory for MOON %s\n", lib.file);
+        void *arena = aligned_alloc(sysconf(_SC_PAGESIZE), MOON_SIZE);
+        if (arena == NULL)
+        {
+            // if there are really a lot of NFs, this could fail
+            printf("Not enough memory when allocating memory for MOON#%d @ chain$%d\n",
+                    moonId, chainId);
+            exit(-1);
+        }
+        printf("arena address %p size %#lx\n", arena, MOON_SIZE);
+        void *stackStart = arena;
+        void *heapStart = arena + NUMBER_STACK * STACK_SIZE;
+        size_t heapSize = MOON_SIZE - NUMBER_STACK * STACK_SIZE;
+
+        printf("*** MOON memory layout ***\n");
+        printf("Stack#0\t%p - %p\tsize: %#lx\n", stackStart, stackStart + STACK_SIZE, STACK_SIZE);
+        printf("Heap\t%p - %p\tsize: %#lx\n", heapStart, heapStart + heapSize, heapSize);
+        // stack
+        printf("initializing regions\n");
+        SetStack(instanceId, stackStart, STACK_SIZE);
+        // heap
+        SetHeap(heapStart, heapSize, instanceId);
+        InitHeap();
+        printf("%s: initialized\n", DONE_STRING);
+        // lib
+        if (DeployLibrary(&lib))
+        {
+            fprintf(stderr, "loading %s as MOON failed, reason: %s\n", lib.file, dlerror());
+            exit(-1);
+        }
+
+        // protect heap
+        printf("setting protection region for MOON\n");
+        pkey_mprotect(arena + STACK_SIZE, MOON_SIZE - STACK_SIZE, PROT_READ | PROT_WRITE, moonDataList[moonId].pkey);
+
+        // injecting tiangou
+        printf("inject global variable for MOON library\n");
+        unsigned *core_id = LibraryFind(&lib, "per_lcore__lcore_id");
+        printf("core_id at %p\n", core_id);
+        if (core_id)
+        {
+            *core_id = 0;
+        }
+        struct rte_eth_dev *rteEthDevices = LibraryFind(&lib, "rte_eth_devices");
+        if (rteEthDevices)
+        {
+            RedirectEthDevices(rteEthDevices);
+        }
+        printf("%s\n", DONE_STRING);
+
+        // building chainId -> instanceId
+        moonDataList[moonId].workers[chainId].instanceId = instanceId;
+        printf("Associate MOON#%d (inst!%03x) with chain$%d\n", moonId, instanceId, chainId);
+
+        // init
+        loading.moonStart = LibraryFind(&lib, "main");
+        if (loading.moonStart == NULL)
+        {
+            printf("main function not found in %s! Is it intentional?\n", lib.file);
+            abort();
+        }
+        printf("entering MOON for initial running, start = %p\n", loading.moonStart);
+        loading.isDpdkMoon = 0;
+        loading.instanceId = instanceId;
+        loading.heapStart = heapStart;
+        loading.heapSize = heapSize;
+        loading.threadStackIndex = 0;
+        loading.stackStart = stackStart;
+        loading.configIndex = configIndex;
+        loading.workerCount++;
+        StackStart(instanceId, InitMoon);
+        printf("%s: MOON initialization, isDpdk = %d\n", DONE_STRING, loading.isDpdkMoon);
     }
 }
 
@@ -400,69 +479,41 @@ void MoonSwitch(unsigned int workerId)
             moonDataList[workerDataList[workerId].current]
                 .workers[workerId]
                 .instanceId;
-        hs_clk0 = rte_rdtsc();
         HeapSwitch(instanceId);
-        // hs_clk1 = rte_rdtsc();
         UpdatePkey(workerId);
-        // UpdatePkeyBench(workerId);
-        hs_clk1 = rte_rdtsc();
-        // printf("hs_clk0: %" PRIu64 "\ths_clk1: %" PRIu64 "diff: %" PRIu64 "\n", hs_clk0, hs_clk1, hs_clk1 - hs_clk0);
-        hsSum += hs_clk1 - hs_clk0;
-        hsCounter++;
         StackSwitch(instanceId);
-        // StackSwitchBench(workerId, instanceId);
     }
     else
     {
         StackSwitch(-1);
-        // StackSwitchBench(workerId, -1);
     }
 }
 
-static void ssPrintBench()
+// MoonSwitch, with both knowledge to SFC topo and instanceId
+void MoonSwitchLoose(unsigned int workerId, int flowId)
 {
-    // TODO: move this function next to PrintBench and do not share the
-    // timer with tx drain
-    if (benchCounter)
+    if (workerDataList[workerId].current != -1) // not switching back to runtime
     {
-        for (int i = 0; sum_array[i] != 0; i++)
-        {
-            printf("overhead #%d: %fcycles\t", i, (double)sum_array[i]/benchCounter);
-        }
-        printf("\n");
-        memset(sum_array, 0, sizeof(uint64_t) * 16);
-        benchCounter = 0;
+        int instanceId =
+            moonDataList[workerDataList[workerId].current]
+                .workers[flowId]
+                .instanceId;
+        HeapSwitch(instanceId);
+        UpdatePkey(workerId);
+        StackSwitch(instanceId);
     }
-}
-
-static void upPrintBench()
-{
-    if (upCounter)
+    else
     {
-        for (int i = 0; up_array[i] != 0; i++)
-        {
-            printf("overhead #%d: %fcycles\t", i, (double)up_array[i]/upCounter);
-        }
-        printf("\n");
-        memset(up_array, 0, sizeof(uint64_t) * 16);
-        upCounter = 0;
-    }
-}
-
-static void hsPrintBench()
-{
-    if (hsCounter)
-    {
-        double overhead = (double)hsSum / hsCounter;
-        printf("heapSwitch overhead: %f\n", overhead);
-        hsCounter = 0;
-        hsSum = 0;
+        StackSwitch(-1);
     }
 }
 
 #define BURST_TX_DRAIN_US 100 /* TX drain every ~100us */
 #define MEMPOOL_CACHE_SIZE 256
 #define RTE_LOGTYPE_L2FWD RTE_LOGTYPE_USER1
+
+struct rte_mbuf *flowDesc[MAX_FLOW][MAX_PKT_BURST];
+int flowNum[MAX_WORKER_ID][MAX_FLOW];
 
 int MainLoop(void *_arg)
 {
@@ -491,27 +542,24 @@ int MainLoop(void *_arg)
         /*
 		 * TX burst queue drain
 		 */
-        diff_tsc = cur_tsc - prev_tsc;
-        if (unlikely(diff_tsc > drain_tsc))
-        {
-            /* if timer is enabled */
-            if (timer_period > 0)
-            {
-                /* advance the timer */
-                timer_tsc += diff_tsc;
-                /* if timer has reached its timeout */
-                if (unlikely(timer_tsc >= timer_period))
-                {
-                    /* reset the timer */
-                    timer_tsc = 0;
-                    RecordBench(cur_tsc);
-                    // ssPrintBench();
-                    // upPrintBench();
-                    hsPrintBench();
-                }
-            }
-            prev_tsc = cur_tsc;
-        }
+        // diff_tsc = cur_tsc - prev_tsc;
+        // if (unlikely(diff_tsc > drain_tsc))
+        // {
+        //     /* if timer is enabled */
+        //     if (timer_period > 0)
+        //     {
+        //         /* advance the timer */
+        //         timer_tsc += diff_tsc;
+        //         /* if timer has reached its timeout */
+        //         if (unlikely(timer_tsc >= timer_period))
+        //         {
+        //             /* reset the timer */
+        //             timer_tsc = 0;
+        //             RecordBench(cur_tsc);
+        //         }
+        //     }
+        //     prev_tsc = cur_tsc;
+        // }
 
         /*
 		 * Read packet from RX queues
@@ -519,7 +567,7 @@ int MainLoop(void *_arg)
         portid = srcPort;
         nb_rx = rte_eth_rx_burst(
             portid, workerDataList[workerId].rxQueue, workerDataList[workerId].packetBurst, MAX_PKT_BURST);
-        workerDataList[workerId].stat.rx += nb_rx;
+        // workerDataList[workerId].stat.rx += nb_rx;
         workerDataList[workerId].burstSize = nb_rx;
 
         // prevent unnecessary pkey overhead
@@ -529,34 +577,64 @@ int MainLoop(void *_arg)
             continue;
         }
 
-        postRx = rte_rdtsc();
+        // separate packets into different flows
+        for (int i = 0; i < nb_rx; i++)
+        {
+            struct rte_ether_hdr *ehdr = rte_pktmbuf_mtod(
+                workerDataList[workerId].packetBurst[i], struct rte_ether_hdr *);
+            struct rte_ether_addr *dst_mac = &ehdr->d_addr;
+            uint8_t flowId = dst_mac->addr_bytes[5];
+            // printf("flowId: %" PRIu8 "\n", flowId);
+            if (unlikely(flowId > MAX_FLOW))
+            {
+                // if we encounter a 'natural' packet, don't feed it to the SFC
+                // instead, count it as 'processed' and send it out, for the 
+                // behavior of passing a half-freed array to tx_burst is unknown
+                continue;
+            }
+            // hard code for flows that are migrated
+            if (workerId == 3)
+            {
+                if (unlikely(migrated_flow0 == flowId || migrated_flow1 == flowId))
+                    continue;
+            }
+            flowDesc[flowId][flowNum[workerId][flowId]++] = workerDataList[workerId].packetBurst[i];
+        }
 
-        // switch into the first MOON in the chain
-        // that MOON will switch into the next one instead of return here
-        workerDataList[workerId].current = 0;
-        MoonSwitch(workerId);
-        // up_clk0 = rte_rdtsc();
-        DisablePkey(0);
-        // up_clk1 = rte_rdtsc();
-        // up_idx = 0;
-        // up_array[up_idx++] += up_clk1 - up_clk0;
-        // up_sum += up_clk1 - up_clk0;
-        // upCounter++;
+        for (int flow = 0; flow < MAX_FLOW; flow++)
+        {
+            if (!flowNum[workerId][flow])
+                continue;
+            // the SFC structure a core see remains the same
+            workerDataList[workerId].current = 0;
+            workerDataList[workerId].flowId = flow;
+            // TODO: check which MOON you are switching into
+            MoonSwitchLoose(workerId, flow);
+            // TODO: see if this is redundant
+            DisablePkey(0);
+        }
+
+        // hard code for per core throughput measurement
+        for (int i = 0; i < nb_rx; i++)
+        {
+            struct rte_ether_hdr *ehdr = rte_pktmbuf_mtod(
+                workerDataList[workerId].packetBurst[i], struct rte_ether_hdr *);
+            struct rte_ether_addr *dst_mac = &ehdr->d_addr;
+            dst_mac->addr_bytes[4] = (uint8_t) workerId;
+        }
+
         // now we are back from the last MOON, the packet burst is done!
-
-        preTx = rte_rdtsc();
-        workerDataList[workerId].stat.latency += (double)(preTx - postRx) * 1000 * 1000 / rte_get_tsc_hz();
-        workerDataList[workerId].stat.batch++;
-
-
+        // original mbufs are stil in workerDataList[workerId].packetBurst, simply send it out
         sent = rte_eth_tx_burst(
             // dstPort, workerDataList[workerId].txQueue,
             srcPort, workerDataList[workerId].txQueue,
-            workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
-        if (sent)
-            workerDataList[workerId].stat.tx += sent;
-        for (int i = 0;i < sent; i++)
-            workerDataList[workerId].stat.bytes += rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
+            workerDataList[workerId].packetBurst, nb_rx);
+        // if (sent)
+        //     workerDataList[workerId].stat.tx += sent;
+        // for (int i = 0;i < sent; i++)
+        //     workerDataList[workerId].stat.bytes += rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
+        // no need to clear out flowDesc because it is indicated by flowNum
+        memset(flowNum[workerId], 0, sizeof(int) * MAX_FLOW);
     }
     printf("[RunMoon] worker on lcore$%d exit\n", lcore_id);
     return 0;
@@ -742,7 +820,7 @@ uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
         workerId = rte_lcore_id();
         workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
         // printf("switch to %d\n", workerDataList[workerId].current);
-        MoonSwitch(workerId);
+        MoonSwitchLoose(workerId, workerDataList[workerId].flowId);
     }
 
     if (nb_pkts < workerDataList[workerId].burstSize)
@@ -750,8 +828,11 @@ uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
         fprintf(stderr, "MOON rx burst size too small: %u\n", nb_pkts);
         abort();
     }
-    uint16_t size = workerDataList[workerId].burstSize;
-    memcpy(rx_pkts, workerDataList[workerId].packetBurst, size * sizeof(struct rte_mbuf *));
+    // uint16_t size = workerDataList[workerId].burstSize;
+    // memcpy(rx_pkts, workerDataList[workerId].packetBurst, size * sizeof(struct rte_mbuf *));
+    // change where rx_burst get the packets
+    int size = flowNum[workerId][workerDataList[workerId].flowId];
+    memcpy(rx_pkts, flowDesc[workerDataList[workerId].flowId], size * sizeof(struct rte_mbuf *));
     // clear burst
     workerDataList[workerId].burstSize = 0;
     return size;
@@ -759,16 +840,16 @@ uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 
 uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
 {
-    unsigned int workerId = rte_lcore_id();
-    if (workerDataList[workerId].burstSize + nb_pkts > MAX_PKT_BURST)
-    {
-        fprintf(stderr, "MOON tx burst size too large\n");
-        abort();
-    }
-    memcpy(
-        &workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize],
-        tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
-    workerDataList[workerId].burstSize += nb_pkts;
+    // unsigned int workerId = rte_lcore_id();
+    // if (workerDataList[workerId].burstSize + nb_pkts > MAX_PKT_BURST)
+    // {
+    //     fprintf(stderr, "MOON tx burst size too large\n");
+    //     abort();
+    // }
+    // memcpy(
+    //     &workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize],
+    //     tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
+    // workerDataList[workerId].burstSize += nb_pkts;
     return nb_pkts;
 }
 

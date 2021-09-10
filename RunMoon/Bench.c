@@ -63,19 +63,25 @@ void PrintBench()
     double latency = 0.0;
     // double cycle = 0.0;
     // double cmpcycle = 0.0;
+    int bad = 1;
     RTE_LCORE_FOREACH_WORKER(workerId)
     {
         if (workerRecordList[workerId].tsc + timer_period < currentTsc)
         {
-            return;
+            // return;
+            continue;
         }
         pps += workerRecordList[workerId].avgPps;
         bps += workerRecordList[workerId].avgMbps;
         latency += workerRecordList[workerId].avgLatency;
+        // if one core can get meaningful results, count it as 'not bad'
+        bad = 0;
         // helper to see the load on each core
-        // printf("[worker$%02d] pps: %fK\tbps:%fM\n", workerId,
-        //      workerRecordList[workerId].avgPps, workerRecordList[workerId].avgMbps);
+        printf("[worker$%02d] pps: %fK\tbps:%fM\n", workerId,
+             workerRecordList[workerId].avgPps, workerRecordList[workerId].avgMbps);
     }
+    if (bad)
+        return;
     printf("pps: %fK\tbps:%fM\tlatency:%fus\n", pps, bps, latency);
     prevPrintTsc = currentTsc;
 }

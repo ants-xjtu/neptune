@@ -46,6 +46,9 @@
 #include <rte_mbuf.h>
 #include <rte_string_fns.h>
 #include <rte_lpm.h>
+#include <rte_net.h>
+#include <rte_flow.h>
+#include <rte_ether.h>
 
 #include "PrivateHeap.h"
 #include "PrivateStack.h"
@@ -65,6 +68,7 @@ static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 #define MAX_PKT_BURST 32
 #define MAX_WORKER_ID 96
 #define CYCLE_SIZE 40
+#define MAX_FLOW 10
 
 // global variables of runtime supervisor & workers
 // constant that will only be set once during runtime init
@@ -130,6 +134,8 @@ struct WorkerData
     unsigned int burstSize;
     int pcapNextIndex;
 
+    int flowId;
+
     struct l2fwd_port_statistics stat;
 };
 struct WorkerData workerDataList[MAX_WORKER_ID];
@@ -138,6 +144,7 @@ struct WorkerData workerDataList[MAX_WORKER_ID];
 void InitMoon();
 int MainLoop(void *);
 void LoadMoon(char *, int, int);
+void LoadMoonLoose(char *, int, int, int);
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h);
 int PcapDispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
@@ -175,5 +182,9 @@ void DisablePkey(int force);
 
 // Protect
 void ProtectMoon(const char *moonPath, int pkey);
+
+// Migration
+void PrepareRules();
+void UpdateRules();
 
 #endif
