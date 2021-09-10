@@ -102,8 +102,9 @@ int pcap_set_buffer_size(pcap_t *p, int buffer_size)
 
 int pcap_inject(pcap_t *p, const void *buf, size_t size)
 {
-    MESSAGE("not implemented");
-    abort();
+    // MESSAGE("not implemented");
+    // abort();
+    return (int )size;
 }
 
 int pcap_set_snaplen(pcap_t *p, int snaplen)
