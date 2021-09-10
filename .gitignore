@@ -3,3 +3,5 @@ build
 *.o
 libs
 nfd
+onvm
+onvm_nf
