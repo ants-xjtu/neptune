@@ -13,9 +13,10 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./libs/libMoon_Libnids.so", .argv = {}, .argc = 0},
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
     {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
-    {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
+    // {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
+    {.path = "./libs/fastclick-new/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
     {.path = "./libs/Libnids/forward.so", .argv = {}, .argc = 0},
-    {.path = "./libs/ndpi/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
+    {.path = "./libs/ndpi-new/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
     // #6: this config might not be used to directly call main
     {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
@@ -400,15 +401,15 @@ void MoonSwitch(unsigned int workerId)
             moonDataList[workerDataList[workerId].current]
                 .workers[workerId]
                 .instanceId;
-        hs_clk0 = rte_rdtsc();
+        // hs_clk0 = rte_rdtsc();
         HeapSwitch(instanceId);
         // hs_clk1 = rte_rdtsc();
         UpdatePkey(workerId);
         // UpdatePkeyBench(workerId);
-        hs_clk1 = rte_rdtsc();
+        // hs_clk1 = rte_rdtsc();
         // printf("hs_clk0: %" PRIu64 "\ths_clk1: %" PRIu64 "diff: %" PRIu64 "\n", hs_clk0, hs_clk1, hs_clk1 - hs_clk0);
-        hsSum += hs_clk1 - hs_clk0;
-        hsCounter++;
+        // hsSum += hs_clk1 - hs_clk0;
+        // hsCounter++;
         StackSwitch(instanceId);
         // StackSwitchBench(workerId, instanceId);
     }
@@ -487,31 +488,31 @@ int MainLoop(void *_arg)
             workerDataList[workerId].txQueue);
     while (!force_quit)
     {
-        cur_tsc = rte_rdtsc();
+        // cur_tsc = rte_rdtsc();
         /*
 		 * TX burst queue drain
 		 */
-        diff_tsc = cur_tsc - prev_tsc;
-        if (unlikely(diff_tsc > drain_tsc))
-        {
-            /* if timer is enabled */
-            if (timer_period > 0)
-            {
-                /* advance the timer */
-                timer_tsc += diff_tsc;
-                /* if timer has reached its timeout */
-                if (unlikely(timer_tsc >= timer_period))
-                {
-                    /* reset the timer */
-                    timer_tsc = 0;
-                    RecordBench(cur_tsc);
-                    // ssPrintBench();
-                    // upPrintBench();
-                    hsPrintBench();
-                }
-            }
-            prev_tsc = cur_tsc;
-        }
+        // diff_tsc = cur_tsc - prev_tsc;
+        // if (unlikely(diff_tsc > drain_tsc))
+        // {
+        //     /* if timer is enabled */
+        //     if (timer_period > 0)
+        //     {
+        //         /* advance the timer */
+        //         timer_tsc += diff_tsc;
+        //         /* if timer has reached its timeout */
+        //         if (unlikely(timer_tsc >= timer_period))
+        //         {
+        //             /* reset the timer */
+        //             timer_tsc = 0;
+        //             RecordBench(cur_tsc);
+        //             // ssPrintBench();
+        //             // upPrintBench();
+        //             // hsPrintBench();
+        //         }
+        //     }
+        //     prev_tsc = cur_tsc;
+        // }
 
         /*
 		 * Read packet from RX queues
@@ -519,7 +520,7 @@ int MainLoop(void *_arg)
         portid = srcPort;
         nb_rx = rte_eth_rx_burst(
             portid, workerDataList[workerId].rxQueue, workerDataList[workerId].packetBurst, MAX_PKT_BURST);
-        workerDataList[workerId].stat.rx += nb_rx;
+        // workerDataList[workerId].stat.rx += nb_rx;
         workerDataList[workerId].burstSize = nb_rx;
 
         // prevent unnecessary pkey overhead
@@ -529,7 +530,7 @@ int MainLoop(void *_arg)
             continue;
         }
 
-        postRx = rte_rdtsc();
+        // postRx = rte_rdtsc();
 
         // switch into the first MOON in the chain
         // that MOON will switch into the next one instead of return here
@@ -544,9 +545,9 @@ int MainLoop(void *_arg)
         // upCounter++;
         // now we are back from the last MOON, the packet burst is done!
 
-        preTx = rte_rdtsc();
-        workerDataList[workerId].stat.latency += (double)(preTx - postRx) * 1000 * 1000 / rte_get_tsc_hz();
-        workerDataList[workerId].stat.batch++;
+        // preTx = rte_rdtsc();
+        // workerDataList[workerId].stat.latency += (double)(preTx - postRx) * 1000 * 1000 / rte_get_tsc_hz();
+        // workerDataList[workerId].stat.batch++;
 
 
         sent = rte_eth_tx_burst(
@@ -557,6 +558,10 @@ int MainLoop(void *_arg)
             workerDataList[workerId].stat.tx += sent;
         for (int i = 0;i < sent; i++)
             workerDataList[workerId].stat.bytes += rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
+        // if (unlikely(sent < nb_rx))
+        // {
+        //     rte_pktmbuf_free_bulk(workerDataList[workerId].packetBurst + sent, nb_rx-sent);
+        // }
     }
     printf("[RunMoon] worker on lcore$%d exit\n", lcore_id);
     return 0;
