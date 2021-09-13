@@ -8,7 +8,7 @@
 
 define ($print false)
 
-FromDPDKDevice(0)
+FromDPDKDevice(0, NDESC 256)
 	-> EtherMirror()
         -> EtherMirror()
         -> EtherMirror()
@@ -24,4 +24,4 @@ FromDPDKDevice(0)
         -> MoveData(15, 15, 50)
         -> MoveData(15, 15, 50)
 //        -> RandomBitErrors(1)
-	-> ToDPDKDevice(0)
+	-> ToDPDKDevice(0, NDESC 256)
