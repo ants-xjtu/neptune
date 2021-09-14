@@ -421,10 +421,10 @@ int MainLoop(void *_arg)
 
         // memcpy(tmp, workerDataList[workerId].packetBurst, nb_rx);
         // again:
-        for (int i = 0;i < nb_rx; i++)
-        {
+        // for (int i = 0;i < nb_rx; i++)
+        // {
             // copied_pkts[i] = rte_pktmbuf_copy(workerDataList[workerId].packetBurst[i], nbMbufPool, 0, 4096);
-            copied_pkts[i] = rte_pktmbuf_clone(workerDataList[workerId].packetBurst[i], nbMbufPool);
+            // copied_pkts[i] = rte_pktmbuf_clone(workerDataList[workerId].packetBurst[i], nbMbufPool);
             // if (copied_pkts[i] == NULL)
             // {
             //     // nbMbufPool full!
@@ -438,7 +438,7 @@ int MainLoop(void *_arg)
             //         abort();
             //     }
             // }
-        }
+        // }
 
         // switch into the first MOON in the chain
         // that MOON will switch into the next one instead of return here
@@ -446,12 +446,28 @@ int MainLoop(void *_arg)
         MoonSwitch(workerId);
         DisablePkey(0);
         // now we are back from the last MOON, the packet burst is done!
-        rte_pktmbuf_free_bulk (copied_pkts, nb_rx);
+        // rte_pktmbuf_free_bulk (copied_pkts, nb_rx);
 
+        // sanity check if the mbuf has been handled by netbricks
+        struct rte_mbuf *tmp[MAX_PKT_BURST];
+        int tmp_ctr = 0;
+        for (int i = 0; i < workerDataList[workerId].burstSize; i++)
+        {
+            if (workerDataList[workerId].packetBurst[i] >= (struct rte_mbuf *)0x100000000
+                && workerDataList[workerId].packetBurst[i] <= (struct rte_mbuf *)0x300000000)
+                tmp[tmp_ctr++] = workerDataList[workerId].packetBurst[i];
+            else
+                printf("faulty mbuf pointer: %p\n", workerDataList[workerId].packetBurst[i]);
+            //     rte_pktmbuf_free_bulk(&workerDataList[workerId].packetBurst[i], 1);
+        }
+
+        printf("call tx_burst with tmp_ctr: %d\n", tmp_ctr);
         sent = rte_eth_tx_burst(
             // dstPort, workerDataList[workerId].txQueue,
             srcPort, workerDataList[workerId].txQueue,
-            workerDataList[workerId].packetBurst, nb_rx);
+            // workerDataList[workerId].packetBurst, nb_rx);
+            tmp, tmp_ctr);
+        // rte_pktmbuf_free_bulk(workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
         // sent = rte_eth_tx_burst(
         //     // dstPort, workerDataList[workerId].txQueue,
         //     srcPort, workerDataList[workerId].txQueue,
@@ -655,8 +671,8 @@ uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
     }
     // uint16_t size = workerDataList[workerId].burstSize;
     uint16_t size = nb_rx;
-    // memcpy(rx_pkts, workerDataList[workerId].packetBurst, size * sizeof(struct rte_mbuf *));
-    memcpy(rx_pkts, copied_pkts, size * sizeof(struct rte_mbuf *));
+    memcpy(rx_pkts, workerDataList[workerId].packetBurst, size * sizeof(struct rte_mbuf *));
+    // memcpy(rx_pkts, copied_pkts, size * sizeof(struct rte_mbuf *));
     // clear burst
     workerDataList[workerId].burstSize = 0;
     return size;
@@ -670,14 +686,14 @@ uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
         fprintf(stderr, "MOON tx burst size too large\n");
         abort();
     }
-    rte_pktmbuf_free_bulk (tx_pkts, nb_pkts);
+    // rte_pktmbuf_free_bulk (tx_pkts, nb_pkts);
     // for (int i = 0; i < nb_pkts; i++)
     // {
     //     printf("No.%d, refcnt: %d\n", i, workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize + i] ->refcnt);
     // }
-    // memcpy(
-    //     &workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize],
-    //     tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
+    memcpy(
+        &workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize],
+        tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
     workerDataList[workerId].burstSize += nb_pkts;
     return nb_pkts;
 }
