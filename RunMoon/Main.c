@@ -14,11 +14,11 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
     {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     // {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
-    {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce-heavy.click"}, .argc = 6},
+    {.path = "./libs/fastclick-final/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce-heavy.click"}, .argc = 6},
     {.path = "./libs/Libnids/forward.so", .argv = {}, .argc = 0},
     {.path = "./libs/ndpi-new/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
     // #6: this config might not be used to directly call main
-    {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
+    {.path = "./libs/NetBricks-new/libzcsi_aclfw_so.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
     {.path = "./libs/rubik-final/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
@@ -41,6 +41,47 @@ static struct MoonConfig CONFIG[] = {
 //     {"./build/libMoon_MidStat_NoSFI.so", ""},
 // };
 
+static struct rte_eth_dev_info devInfo;
+
+static void SetupTianGou(const char *tiangouPath)
+{
+    // provide a per-MOON tiangou for easy disabling hijacking
+    void *tiangou = dlopen(tiangouPath, RTLD_LAZY);
+    if (!tiangou)
+    {
+        fprintf(stderr, "Cannot load tiangou: %s\n", dlerror());
+        abort();
+    }
+    Interface *interfacePointer = dlsym(tiangou, "interface");
+    if (!interfacePointer)
+    {
+        fprintf(stderr, "Cannot find interface pointer in tiangou: %s\n", dlerror());
+        abort();
+    }
+    printf("injecting TIANGOU interface at %p\n", interfacePointer);
+    interfacePointer->malloc = HeapMalloc;
+    interfacePointer->realloc = HeapRealloc;
+    interfacePointer->calloc = HeapCalloc;
+    interfacePointer->alignedAlloc = HeapAlignedAlloc;
+    interfacePointer->free = HeapFree;
+    interfacePointer->signal = signal;
+    interfacePointer->sigaction = sigaction;
+    interfacePointer->pcapLoop = PcapLoop;
+    interfacePointer->pcapNext = PcapNext;
+    interfacePointer->pcapDispatch = PcapDispatch;
+    // currently assume rx/tx use the same port, thus sharing devInfo
+    // rte_eth_dev_info_get(srcPort, &devInfo);
+    interfacePointer->srcInfo = &devInfo;
+    interfacePointer->dstInfo = &devInfo;
+    interfacePointer->tscHz = rte_get_tsc_hz();
+    interfacePointer->pthreadCreate = PthreadCreate;
+    interfacePointer->pthreadCondTimedwait = PthreadCondTimedwait;
+    interfacePointer->pthreadCondWait = PthreadCondWait;
+    interfacePointer->lpm_create = rte_lpm_create;
+    interfacePointer->lpm_find_existing = rte_lpm_find_existing;
+    interfacePointer->lpm_add = rte_lpm_add;
+}
+
 int main(int argc, char *argv[])
 {
     int ret = rte_eal_init(argc, argv);
@@ -56,41 +97,14 @@ int main(int argc, char *argv[])
     rte_eth_dev_info_get(srcPort, &srcInfo);
     rte_eth_dev_info_get(dstPort, &dstInfo);
 
+    rte_eth_dev_info_get(srcPort, &devInfo);
+
     if (argc < 3)
     {
         printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon_idx> [<moon_idxs>]\n", argv[0]);
         return 0;
     }
     // InitLoader(argc, argv, environ);
-
-    const char *tiangouPath = argv[1];
-    printf("loading tiangou library %s\n", tiangouPath);
-    void *tiangou = dlopen(tiangouPath, RTLD_LAZY);
-    Interface *interfacePointer = dlsym(tiangou, "interface");
-    printf("injecting TIANGOU interface at %p\n", interfacePointer);
-    interfacePointer->malloc = HeapMalloc;
-    interfacePointer->realloc = HeapRealloc;
-    interfacePointer->calloc = HeapCalloc;
-    interfacePointer->alignedAlloc = HeapAlignedAlloc;
-    interfacePointer->free = HeapFree;
-    interfacePointer->signal = signal;
-    interfacePointer->sigaction = sigaction;
-    interfacePointer->pcapLoop = PcapLoop;
-    interfacePointer->pcapNext = PcapNext;
-    interfacePointer->pcapDispatch = PcapDispatch;
-    interfacePointer->srcInfo = &srcInfo;
-    interfacePointer->dstInfo = &dstInfo;
-    interfacePointer->tscHz = rte_get_tsc_hz();
-    interfacePointer->pthreadCreate = PthreadCreate;
-    interfacePointer->pthreadCondTimedwait = PthreadCondTimedwait;
-    interfacePointer->pthreadCondWait = PthreadCondWait;
-    interfacePointer->lpm_create = rte_lpm_create;
-    interfacePointer->lpm_find_existing = rte_lpm_find_existing;
-    interfacePointer->lpm_add = rte_lpm_add;
-    printf("configure preloading for tiangou\n");
-    // no need for we are hard-coding tiangou in binaries
-    // PreloadLibrary(tiangou);
-    printf("%s: tiangou\n", DONE_STRING);
 
     int i = 2;
     enablePku = 0;
@@ -205,6 +219,25 @@ static void RewriteMoonPath(struct PrivateLibrary *library, int workerId, int mo
     printf("[RewriteMoonPath] moon path is now at: %s\n", p);
 }
 
+static const char *tiangouBase = "./libTianGou/libTianGou.so";
+
+static char *RewriteTianGouPath(int moonId)
+{
+    // hard code for path of multi-instance tiangou
+    if (moonId == 0)
+        // BAD!
+        return strdup(tiangouBase);
+    else
+    {
+        char *newName = malloc(strlen(tiangouBase) + 16);
+        strcpy(newName, tiangouBase);
+        char *nameEnd = newName + strlen(tiangouBase);
+        sprintf(nameEnd, ".%d", moonId);
+        printf("[RewriteTianGouPath] tiangou at: %p\n", newName);
+        return newName;
+    }
+}
+
 void LoadMoon(char *moonPath, int moonId, int configIndex)
 {
     printf("[LoadMoon] MOON#%d global registration\n", moonId);
@@ -218,6 +251,11 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
     {
         moonDataList[moonId - 1].switchTo = moonId;
     }
+
+    // initialize tiangou for each type of MOON
+    // TODO: this approach makes the name of tiangou unknown till LoadMoon
+    //      either turn to dlmopen, or run hash-Moon here(no...)
+    SetupTianGou(RewriteTianGouPath(moonId));
 
     unsigned int workerId;
     loading.workerCount = 0;

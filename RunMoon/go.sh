@@ -6,10 +6,10 @@ allMoonDirs=(
     "depreated"
     "depreated"
     "/libs/L2Fwd"
-    "/libs/fastclick"
+    "/libs/fastclick-final"
     "/libs/Libnids"
     "/libs/ndpi-new"
-    "/libs/NetBricks"
+    "/libs/NetBricks-new"
     "/libs/rubik-final"
     "/nfd/five"
     "/nfd/napt"
@@ -109,7 +109,7 @@ for (( j=1; j<$numCore; j++ )); do
     done
 done
 
-buildPath="/home/hypermoon/neptune-yh/build"
+buildPath="/home/hypermoon/neptune-yh/libTianGou"
 libraryPath="$libraryPath$buildPath"
 # echo "moonConfig = $moonConfig"
 # echo "library path = $libraryPath"

@@ -4,6 +4,8 @@
 
 #include "PrivateStack.h"
 
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+
 typedef void *RegSet[9];
 extern int SaveState(RegSet *regs);
 extern void RestoreState(RegSet *regs);
@@ -20,7 +22,8 @@ static RegSet nfStack[MAX_STACK_NUM];
 
 // static struct StackHeader *globalStack;
 static __thread int currStackId = -1;
-static __thread RegSet mainStack;
+// static __thread RegSet mainStack;
+static RegSet mainStack;
 
 static int savedCurrStackId;
 static RegSet savedMainStack;
@@ -48,6 +51,12 @@ void StackSwitch(int stackId)
     // //I know this is ugly... I will fix it later
     // int realStack = (stackId < 0) ? (MAX_STACK_NUM - 1) : stackId;
     // int realCurrStack = (currStackId < 0) ? (MAX_STACK_NUM - 1) : currStackId;
+    if(stackId == currStackId)
+    {
+        printf("uninitialized stack detected, using default stackId(NB on lcore 1, NF 3)\n");
+        currStackId = 18;
+    }
+
     RegSet *current = currStackId < 0 ? &mainStack : &nfStack[currStackId];
     RegSet *next = stackId < 0 ? &mainStack : &nfStack[stackId];
     currStackId = stackId;
