@@ -10,7 +10,7 @@ allMoonDirs=(
     "/libs/Libnids"
     "/libs/ndpi-new"
     "/libs/NetBricks"
-    "/libs/rubik-final"
+    "/libs/rubik-new"
     "/nfd/five"
     "/nfd/napt"
     "/nfd/hhd"
