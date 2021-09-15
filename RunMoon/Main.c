@@ -23,7 +23,7 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./libs/ndpi/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
     // {.path = "./libs/Libnids-old/libMoon_Libnids.so", .argv = {}, .argc = 0},
     // #6: this config might not be used to directly call main
-    {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
+    {.path = "./libs/NetBricks-new/libzcsi_aclfw_so.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
     {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
 };
 
@@ -449,24 +449,24 @@ int MainLoop(void *_arg)
         // rte_pktmbuf_free_bulk (copied_pkts, nb_rx);
 
         // sanity check if the mbuf has been handled by netbricks
-        struct rte_mbuf *tmp[MAX_PKT_BURST];
-        int tmp_ctr = 0;
-        for (int i = 0; i < workerDataList[workerId].burstSize; i++)
-        {
-            if (workerDataList[workerId].packetBurst[i] >= (struct rte_mbuf *)0x100000000
-                && workerDataList[workerId].packetBurst[i] <= (struct rte_mbuf *)0x300000000)
-                tmp[tmp_ctr++] = workerDataList[workerId].packetBurst[i];
-            else
-                printf("faulty mbuf pointer: %p\n", workerDataList[workerId].packetBurst[i]);
-            //     rte_pktmbuf_free_bulk(&workerDataList[workerId].packetBurst[i], 1);
-        }
+        // struct rte_mbuf *tmp[MAX_PKT_BURST];
+        // int tmp_ctr = 0;
+        // for (int i = 0; i < workerDataList[workerId].burstSize; i++)
+        // {
+        //     if (workerDataList[workerId].packetBurst[i] >= (struct rte_mbuf *)0x100000000
+        //         && workerDataList[workerId].packetBurst[i] <= (struct rte_mbuf *)0x300000000)
+        //         tmp[tmp_ctr++] = workerDataList[workerId].packetBurst[i];
+        //     else
+        //         printf("faulty mbuf pointer: %p\n", workerDataList[workerId].packetBurst[i]);
+        // }
 
-        printf("call tx_burst with tmp_ctr: %d\n", tmp_ctr);
+        // printf("call tx_burst with tmp_ctr: %d\n", tmp_ctr);
         sent = rte_eth_tx_burst(
             // dstPort, workerDataList[workerId].txQueue,
             srcPort, workerDataList[workerId].txQueue,
             // workerDataList[workerId].packetBurst, nb_rx);
-            tmp, tmp_ctr);
+            // tmp, tmp_ctr);
+            workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
         // rte_pktmbuf_free_bulk(workerDataList[workerId].packetBurst, workerDataList[workerId].burstSize);
         // sent = rte_eth_tx_burst(
         //     // dstPort, workerDataList[workerId].txQueue,

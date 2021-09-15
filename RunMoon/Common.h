@@ -56,8 +56,8 @@ static const size_t MOON_SIZE = 2ul << 30; // 32GB
 // Heap size = MOON_SIZE - NUMBER_STACK * STACK_SIZE - library.length
 
 // static const char *DONE_STRING = "\xe2\x86\x91 done";
-#define RTE_TEST_RX_DESC_DEFAULT 1024
-#define RTE_TEST_TX_DESC_DEFAULT 1024
+#define RTE_TEST_RX_DESC_DEFAULT 256
+#define RTE_TEST_TX_DESC_DEFAULT 256
 static uint16_t nb_rxd = RTE_TEST_RX_DESC_DEFAULT;
 static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 #define MAX_PKT_BURST 32

@@ -89,11 +89,11 @@ void check_all_ports_link_status(uint32_t port_mask)
 }
 
 // #define NB_MBUFS 64 * 1024 /* use 64k mbufs */
-#define NB_MBUFS 1024 * 1024
-#define MBUF_CACHE_SIZE 256
+#define NB_MBUFS 1024
+#define MBUF_CACHE_SIZE 32
 #define PKT_BURST 32
-#define RX_RING_SIZE 1024
-#define TX_RING_SIZE 1024
+#define RX_RING_SIZE 256
+#define TX_RING_SIZE 256
 
 static size_t NumberQueue;
 struct rte_mempool *pktmbufPool = NULL;
