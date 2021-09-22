@@ -1,4 +1,5 @@
 #include "TianGou.h"
+#include <poll.h>
 
 // malloc
 void *malloc(size_t size)
@@ -21,6 +22,11 @@ void *calloc(size_t size, size_t count)
     return (interface.calloc)(size, count);
 }
 
+void *aligned_alloc(size_t align, size_t size)
+{
+    return (interface.alignedAlloc)(align, size);
+}
+
 // crucial part of glibc
 void exit(int stat)
 {
@@ -37,6 +43,19 @@ sighandler_t signal(int signum, sighandler_t handler)
     }
     return NULL;
 }
+
+int sigaction(int signum, const struct sigaction *restrict act,
+                     struct sigaction *restrict oldact)
+{
+    MESSAGE("nf try to change behavior of signal %d", signum);
+    if (signum != SIGINT && signum != SIGTERM)
+    {
+        (interface.sigaction)(signum, act, oldact);
+        return 0;
+    }
+    return 0;
+}
+
 
 char *strdup(const char *str)
 {
@@ -59,4 +78,20 @@ char *strdup(const char *str)
     }
     *cx = '\0';
     return x;
+}
+
+int usleep(useconds_t usec)
+{
+    MESSAGE("usec = %u, return immediately\n", usec);
+    return 0;
+}
+
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+    // MESSAGE("nfds = %lu, timeout = %d", nfds, timeout);
+    for (int i = 0; i < nfds; i += 1)
+    {
+        fds[i].revents = POLLIN;
+    }
+    return nfds;
 }

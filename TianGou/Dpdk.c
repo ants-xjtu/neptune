@@ -1,4 +1,5 @@
 #include "TianGou.h"
+#include <unistd.h>
 
 int rte_eal_init(int argc, char **argv)
 {
@@ -48,17 +49,20 @@ uint16_t rte_eth_dev_count_avail()
 
 uint64_t rte_eth_find_next_owned_by(uint16_t port_id, const uint64_t owner_id)
 {
-    MESSAGE("port_id = %u", port_id);
+    // MESSAGE("port_id = %u", port_id);
     return port_id > 1 ? RTE_MAX_ETHPORTS : port_id;
 }
 
 int rte_eth_dev_info_get(uint16_t port_id, struct rte_eth_dev_info *dev_info)
 {
+    MESSAGE("called with port_id = %d", port_id);
     if (port_id > 1)
     {
         return -ENODEV;
     }
     struct rte_eth_dev_info *info = port_id == 0 ? interface.srcInfo : interface.dstInfo;
+    info->nb_rx_queues = 1;
+    info->nb_tx_queues = 1;
     memcpy(dev_info, info, sizeof(struct rte_eth_dev_info));
     return 0;
 }
@@ -71,6 +75,7 @@ int rte_eth_dev_socket_id(uint16_t port_id)
 
 int rte_eth_macaddr_get(uint16_t port_id, struct rte_ether_addr *mac_addr)
 {
+    MESSAGE("port_id = %u", port_id);
     for (int i = 0; i < 5; i += 1)
     {
         mac_addr->addr_bytes[i] = 0xff;
@@ -104,6 +109,13 @@ int rte_eal_mp_remote_launch(
     return 0;
 }
 
+// int rte_eal_remote_launch(lcore_function_t *f, void *arg, unsigned int worker_id)
+// {
+//     MESSAGE("f = %p, arg = %p, worker_id = %d", f, arg, worker_id);
+//     f(arg);
+//     return 0;
+// }
+
 unsigned int rte_get_next_lcore(unsigned int i, int skip_main, int wrap)
 {
     MESSAGE("i = %u, skip_main = %d, wrap = %d", i, skip_main, wrap);
@@ -121,31 +133,6 @@ int rte_eal_wait_lcore(unsigned worker_id)
     return 0;
 }
 
-// const struct rte_memzone *rte_memzone_reserve(
-//     const char *name, size_t len, int socket_id, unsigned flags)
-// {
-//     MESSAGE("name = %s, len = %lu, socket_id = %d, flags = %u", name, len, socket_id, flags);
-//     struct rte_memzone *mz = (interface.malloc)(sizeof(struct rte_memzone));
-//     if (!mz)
-//     {
-//         return NULL;
-//     }
-//     void *mzAddr = (interface.malloc)(len);
-//     if (!mzAddr)
-//     {
-//         (interface.free)(mz);
-//         return NULL;
-//     }
-//     mz->addr = mzAddr;
-//     mz->iova = (uint64_t)mzAddr;
-//     mz->len = len;
-//     mz->hugepage_sz = sysconf(_SC_PAGESIZE);
-//     mz->socket_id = 0;
-//     mz->flags = 0;
-//     MESSAGE("return memzone = %p, mz->addr = %p", mz, mz->addr);
-//     return mz;
-// }
-
 uint64_t rte_get_tsc_hz(void)
 {
     return interface.tscHz;
@@ -159,6 +146,36 @@ int rte_log(uint32_t level, uint32_t logtype, const char *format, ...)
     vprintf(format, ap);
     va_end(ap);
     return 0;
+}
+
+const struct rte_memzone *
+rte_memzone_reserve_aligned(
+    const char *name, size_t len, int socket_id,
+    unsigned flags, unsigned align)
+{
+    MESSAGE("name = %s, len = %lu, socket_id = %d, flags = %u, align = %u", name, len, socket_id, flags, align);
+    struct rte_memzone *mz = (interface.malloc)(sizeof(struct rte_memzone));
+    strncpy(mz->name, name, RTE_MEMZONE_NAMESIZE);
+    // mz->iova = RTE_BAD_IOVA;
+    mz->addr = (interface.alignedAlloc)(align, len);
+    mz->iova = (rte_iova_t)mz->addr;
+    if (!mz->addr)
+    {
+        abort();
+    }
+    mz->len = len;
+    mz->hugepage_sz = sysconf(_SC_PAGESIZE);
+    mz->socket_id = 0;
+    mz->flags = 0;
+    return mz;
+}
+
+const struct rte_memzone *
+rte_memzone_reserve(
+    const char *name, size_t len, int socket_id,
+    unsigned flags)
+{
+    return rte_memzone_reserve_aligned(name, len, socket_id, flags, 0);
 }
 
 // nop below here
@@ -230,4 +247,85 @@ int rte_eth_dev_close(uint16_t port_id)
 {
     MESSAGE("return 0");
     return 0;
+}
+
+unsigned int rte_lcore_count()
+{
+    MESSAGE("return 1");
+    return 1;
+}
+
+int rte_mbuf_dyn_rx_timestamp_register(int *field_offset, uint64_t *rx_flag)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_dev_set_vlan_offload(uint16_t port_id, int offload_mask)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_dev_is_valid_port(uint16_t port_id)
+{
+    MESSAGE("always valid");
+    return 1;
+}
+
+int rte_flow_isolate(uint16_t port_id, int set, struct rte_flow_error *error)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_dev_set_ptypes(uint16_t port_id, uint32_t ptype_mask,
+			   uint32_t *set_ptypes, unsigned int num)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int rte_eth_link_get_nowait (uint16_t port_id, struct rte_eth_link *link)
+{
+    // MESSAGE("return 0");
+    return 0;
+}
+
+// WARNING: this is for debugging only
+// void rte_mempool_free(struct rte_mempool *mp)
+// {
+//     MESSAGE("nor freeing when debugging");
+//     return;
+// }
+int rte_dev_probe(const char *devargs)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+// void rte_pktmbuf_free_bulk(struct rte_mbuf **mbufs, unsigned int count)
+// {
+//     // NFs will try to free the mbuf if they fail to send all the pkts received
+//     return;
+// }
+
+// lpm-related functions
+struct rte_lpm *rte_lpm_create(const char *name, int socket_id,
+		const struct rte_lpm_config *config)
+{
+    MESSAGE("call runtime lpm_create");
+    return interface.lpm_create(name, socket_id, config);
+}
+
+struct rte_lpm *rte_lpm_find_existing(const char *name)
+{
+    MESSAGE("call runtime lpm_find_existing");
+    return interface.lpm_find_existing(name);
+}
+
+int rte_lpm_add(struct rte_lpm *lpm, uint32_t ip, uint8_t depth, uint32_t next_hop)
+{
+    MESSAGE("call runtime lpm_add");
+    return interface.lpm_add(lpm, ip, depth, next_hop);
 }

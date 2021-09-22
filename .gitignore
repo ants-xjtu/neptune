@@ -1,3 +1,7 @@
 build
 *.bc
 *.o
+libs
+nfd
+onvm
+onvm_nf

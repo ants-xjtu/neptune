@@ -2506,6 +2506,9 @@ void *HeapMalloc(size_t size) {
 }
 
 void HeapFree(void *object) {
+  // TODO: redo this if you believe all glibc functions are correctly handled
+  if (object > heap_end || object < heap_start)
+    return;
   dlfree(object);
 }
 
@@ -2515,6 +2518,10 @@ void *HeapRealloc(void *object, size_t size) {
 
 void *HeapCalloc(size_t count, size_t size) {
   return dlcalloc(count, size);
+}
+
+void *HeapAlignedAlloc(size_t align, size_t size) {
+  return dlmemalign(align, size);
 }
 
 // Add by sgdxbc end

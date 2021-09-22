@@ -97,6 +97,14 @@ void check_all_ports_link_status(uint32_t port_mask)
 
 static size_t NumberQueue;
 
+static uint8_t seed[40] = {
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A,
+    0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A, 0x6D, 0x5A
+};
+
 static inline int
 smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
               uint16_t num_queues)
@@ -111,9 +119,12 @@ smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
         },
         .rx_adv_conf = {
             .rss_conf = {
-                .rss_key = NULL,
+                // .rss_key = NULL,
                 // .rss_hf = ETH_RSS_IP,
-                .rss_hf = ETH_RSS_TCP,
+                // .rss_hf = ETH_RSS_TCP,
+                .rss_key = seed,
+                .rss_hf = ETH_RSS_IP | ETH_RSS_UDP | ETH_RSS_TCP | ETH_RSS_L2_PAYLOAD,
+                .rss_key_len = sizeof(seed)
             },
         },
         .txmode = {
@@ -136,6 +147,7 @@ smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
         return -1;
 
     printf("# Initialising port %u... \n", port);
+    printf("# Rx Queue: %u, Tx Queue: %u \n", rx_rings, tx_rings);
     fflush(stdout);
 
     retval = rte_eth_dev_info_get(port, &info);
@@ -205,6 +217,8 @@ smp_port_init(uint16_t port, struct rte_mempool *mbuf_pool,
     return 0;
 }
 
+struct rte_mempool *copyPool;
+
 void SetupDpdk()
 {
     int ret;
@@ -223,11 +237,13 @@ void SetupDpdk()
         if (portCount == 0)
         {
             srcPort = portid;
-        }
-        else if (portCount == 1)
-        {
+            // modified to use the same port for rx/tx
             dstPort = portid;
         }
+        // else if (portCount == 1)
+        // {
+        //     dstPort = portid;
+        // }
         portCount += 1;
     }
     printf("ethernet rx port: %u, tx port: %u\n", srcPort, dstPort);
@@ -236,6 +252,7 @@ void SetupDpdk()
     struct rte_mempool *pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     if (pktmbufPool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
+    copyPool = rte_pktmbuf_pool_create("copy_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     // it is hard to determine the corrent value for them...
     // TODO
     mbufLow = 0;
@@ -262,7 +279,7 @@ void SetupDpdk()
     uint32_t portMask = 0;
     portMask |= (1 << srcPort);
     portMask |= (1 << dstPort);
-    check_all_ports_link_status(portMask);
+    // check_all_ports_link_status(portMask);
 }
 
 uint16_t RxBurstNop(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
@@ -286,7 +303,8 @@ void RedirectEthDevices(struct rte_eth_dev *devices)
         dev->data->tx_queues = malloc(sizeof(void *) * NumberQueue);
     }
     devices[0].rx_pkt_burst = RxBurst;
-    devices[0].tx_pkt_burst = TxBurstNop;
+    // devices[0].tx_pkt_burst = TxBurstNop;
+    devices[0].tx_pkt_burst = TxBurst;
     devices[1].rx_pkt_burst = RxBurstNop;
     devices[1].tx_pkt_burst = TxBurst;
 }

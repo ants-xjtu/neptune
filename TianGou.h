@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <pcap/pcap.h>
 #include <rte_ethdev.h>
+#include <rte_lpm.h>
 
 typedef struct
 {
@@ -13,22 +14,39 @@ typedef struct
     void *(*realloc)(void *, size_t);
     void *(*calloc)(size_t, size_t);
     void (*free)(void *);
+    void *(*alignedAlloc)(size_t, size_t);
 
     sighandler_t (*signal)(int signum, sighandler_t handler);
+    int (*sigaction)(int signum, const struct sigaction *restrict act,
+                     struct sigaction *restrict oldact);
 
     int (*pcapLoop)(pcap_t *, int, pcap_handler, u_char *);
     const u_char *(*pcapNext)(pcap_t *p, struct pcap_pkthdr *h);
+    int (*pcapDispatch)(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 
     // this two could be function pointer
     // but they always return constant, so value is better
     struct rte_eth_dev_info *srcInfo, *dstInfo;
     uint64_t tscHz;
+    // temporary fix for uninitialized lpm functions
+    struct rte_lpm *(*lpm_create)(const char *name, int socket_id,
+		const struct rte_lpm_config *config);
+    struct rte_lpm *(*lpm_find_existing)(const char *name);
+    int (*lpm_add)(struct rte_lpm *lpm, uint32_t ip, uint8_t depth, uint32_t next_hop);
+
 
     int (*pthreadCreate)(
         pthread_t *restrict thread,
         const pthread_attr_t *restrict attr,
         void *(*start_routine)(void *),
         void *restrict arg);
+    int (*pthreadCondTimedwait)(
+        pthread_cond_t *restrict cond,
+        pthread_mutex_t *restrict mutex,
+        const struct timespec *restrict abstime);
+    int (*pthreadCondWait)(
+        pthread_cond_t *restrict cond,
+        pthread_mutex_t *restrict mutex);
 } Interface;
 
 extern Interface interface;

@@ -18,6 +18,8 @@ void HeapFree(void *);
 
 void *HeapRealloc(void *, size_t);
 
+void *HeapAlignedAlloc(size_t align, size_t size);
+
 void *HeapCalloc(size_t, size_t);
 
 #endif

@@ -67,14 +67,13 @@ pcap_t *pcap_open_live(const char *device, int snaplen,
 
 int pcap_datalink(pcap_t *p)
 {
-    MESSAGE("return DLT_EN10MB");
+    // MESSAGE("return DLT_EN10MB");
     return DLT_EN10MB;
 }
 
 int pcap_dispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 {
-    MESSAGE("return -1");
-    return -1;
+    return (interface.pcapDispatch)(p, cnt, callback, user);
 }
 
 int pcap_stats(pcap_t *p, struct pcap_stat *pt)
@@ -103,6 +102,76 @@ int pcap_set_buffer_size(pcap_t *p, int buffer_size)
 
 int pcap_inject(pcap_t *p, const void *buf, size_t size)
 {
-    MESSAGE("not implemented");
-    abort();
+    // MESSAGE("not implemented");
+    // abort();
+    return (int )size;
+}
+
+int pcap_set_snaplen(pcap_t *p, int snaplen)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int pcap_set_promisc(pcap_t *p, int promisc)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int pcap_set_timeout(pcap_t *p, int to_ms)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int pcap_set_tstamp_precision(pcap_t *p, int tstamp_precision)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int pcap_set_immediate_mode(pcap_t *p, int immediate_mode)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int pcap_setnonblock(pcap_t *p, int nonblock, char *errbuf)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int pcap_fileno(pcap_t *p)
+{
+    MESSAGE("return 42");
+    return 42;
+}
+
+int pcap_get_tstamp_precision(pcap_t *p)
+{
+    MESSAGE("return PCAP_TSTAMP_PRECISION_MICRO");
+    return PCAP_TSTAMP_PRECISION_MICRO;
+}
+
+int pcap_setdirection(pcap_t *p, pcap_direction_t d)
+{
+    MESSAGE("return 0");
+    return 0;
+}
+
+int pcap_lookupnet(
+    const char *device, bpf_u_int32 *netp,
+    bpf_u_int32 *maskp, char *errbuf)
+{
+    MESSAGE("device = %s", device);
+    return 0;
+}
+
+void
+pcap_freecode(struct bpf_program *program)
+{
+    MESSAGE("return");
+    return;
 }

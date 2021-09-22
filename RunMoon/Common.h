@@ -22,6 +22,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <sys/mman.h>
+#include <dirent.h>
 
 #include <rte_common.h>
 #include <rte_log.h>
@@ -44,6 +45,7 @@
 #include <rte_mempool.h>
 #include <rte_mbuf.h>
 #include <rte_string_fns.h>
+#include <rte_lpm.h>
 
 #include "PrivateHeap.h"
 #include "PrivateStack.h"
@@ -51,8 +53,8 @@
 #include "TianGou.h"
 
 static const size_t STACK_SIZE = 32ul << 20; // 32MB
-static const int NUMBER_STACK = 16;
-static const size_t MOON_SIZE = 32ul << 30; // 32GB
+static const int NUMBER_STACK = 4;
+static const size_t MOON_SIZE = 1ul << 30; // 32GB
 // Heap size = MOON_SIZE - NUMBER_STACK * STACK_SIZE - library.length
 
 // static const char *DONE_STRING = "\xe2\x86\x91 done";
@@ -77,11 +79,14 @@ struct Loading
     int inProgress;
     int instanceId;
     int (*moonStart)(int argc, char *argv[]);
+    int configIndex;
     int isDpdkMoon;
     void *heapStart;
     size_t heapSize;
     void *stackStart;
     int threadStackIndex;
+    // how many core has finished processing for this moon
+    int workerCount;
 };
 struct Loading loading;
 // moonDataList[] is only set during loading/reconfiguration(WIP), and
@@ -91,6 +96,7 @@ struct Loading loading;
 struct MoonData
 {
     int id; // -1 for end of MOONs
+    int config;
     int pkey;
     int switchTo;
     struct
@@ -106,7 +112,12 @@ struct l2fwd_port_statistics
     uint64_t tx;
     uint64_t rx;
     uint64_t dropped;
+    uint64_t bytes;
+    double latency;
+    int batch;
     double cycle[CYCLE_SIZE];
+    double Mcycle[CYCLE_SIZE];
+    double Lcycle[CYCLE_SIZE];
     int cycleIndex;
     double prevAvg;
 } __rte_cache_aligned;
@@ -126,9 +137,10 @@ struct WorkerData workerDataList[MAX_WORKER_ID];
 // forward decalrations for runtime main
 void InitMoon();
 int MainLoop(void *);
-void LoadMoon(char *, int);
+void LoadMoon(char *, int, int);
 int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h);
+int PcapDispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user);
 uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts);
 uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts);
 int PthreadCreate(
@@ -136,6 +148,13 @@ int PthreadCreate(
     const pthread_attr_t *restrict attr,
     void *(*start_routine)(void *),
     void *restrict arg);
+int PthreadCondTimedwait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex,
+    const struct timespec *restrict abstime);
+int PthreadCondWait(
+    pthread_cond_t *restrict cond,
+    pthread_mutex_t *restrict mutex);
 
 // support library APIs and global shared with main
 volatile bool force_quit;
@@ -153,5 +172,8 @@ void PrintBench();
 // pkey
 void UpdatePkey(unsigned int workerId);
 void DisablePkey(int force);
+
+// Protect
+void ProtectMoon(const char *moonPath, int pkey);
 
 #endif
