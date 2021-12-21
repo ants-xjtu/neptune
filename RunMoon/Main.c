@@ -33,6 +33,7 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./onvm/firewall/firewall", .argv = {"<program>"}, .argc = 1},
     {.path = "./onvm/encrypt/encrypt", .argv = {"<program>"}, .argc = 1},
     {.path = "./onvm/decrypt/decrypt", .argv = {"<program>"}, .argc = 1},
+    {.path = "./libs/acl-fw/acl-fw.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
 };
 
 // static const char *CONFIG[][2] = {

@@ -21,6 +21,7 @@ allMoonDirs=(
     "/onvm/firewall"
     "/onvm/encrypt"
     "/onvm/decrypt"
+    "/libs/acl-fw"
 )
 
 absoluteDir="/home/hypermoon/neptune-yh"
