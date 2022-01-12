@@ -96,6 +96,14 @@ add_library(Moon_Libnids MODULE
 target_link_libraries(Moon_Libnids PRIVATE nids)
 target_link_libraries(Moon_Libnids PRIVATE Threads::Threads)
 
+# add_executable(Libnids_exe Moon/LibnidsWtf.c)
+# target_link_libraries(Libnids_exe PRIVATE nids)
+# target_link_libraries(Libnids_exe PRIVATE Threads::Threads)
+
+# add_executable(Exe_TestPlusPlus Moon/Test++.cxx)
+# set_target_properties(Exe_TestPlusPlus PROPERTIES LINKER_LANGUAGE CXX)
+# target_link_libraries(Exe_TestPlusPlus pcap)
+
 # add_library(Moon_Libnids_Slow MODULE
 #     # Moon/LibnidsMain.c 
 #     Moon/LibnidsSlow.c
