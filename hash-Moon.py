@@ -23,6 +23,7 @@ unchanged = ['libc.so.6', \
         'libm.so.6', \
         'libgcc_s.so.1', \
         'libstdc++.so.6']
+# unchanged = []
 
 
 def hash(key, filename):
@@ -161,6 +162,8 @@ if __name__ == '__main__':
     import lief
     binary = lief.parse(sys.argv[1])
     binary.add_library("libTianGou.so")
+    # print("overwriting PIE flag...")
+    # binary[lief.ELF.DYNAMIC_TAGS.FLAGS_1].remove(lief.ELF.DYNAMIC_FLAGS_1.PIE)
     binary.write(sys.argv[1])
     print("done")
 

@@ -34,6 +34,10 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./onvm/encrypt/encrypt", .argv = {"<program>"}, .argc = 1},
     {.path = "./onvm/decrypt/decrypt", .argv = {"<program>"}, .argc = 1},
     {.path = "./libs/acl-fw/acl-fw.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
+    {.path = "./exe/click.patched", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
+    {.path = "./exe/libnids/Libnids_exe", .argv = {"<program>"}, .argc = 1},
+    {.path = "./exe/testpp/Exe_TestPlusPlus", .argv = {"<program>"}, .argc = 1},
+    {.path = "./exe/dpdk-hello/hw", .argv = {"<program>", "-c", "0x1", "--"}, .argc = 4},
 };
 
 // static const char *CONFIG[][2] = {
@@ -319,8 +323,9 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
             // hard code for fast click now
             // this may cause problems, so print it verbosely
             printf("main function not found in %s! Is it intentional?\n", library.file);
+            printf("using hard-coded address + 0x3200, just for testpp\n");
             struct NF_link_map *l = library.loadAddress;
-            loading.moonStart = (void *)(l->l_addr + 0x16db70);
+            loading.moonStart = (void *)(l->l_addr + 0x31e0);
         }
         gettimeofday(&loadFinish, NULL);
         double loadTime = (double)(loadFinish.tv_usec - loadStart.tv_usec) / 1000000 + loadFinish.tv_sec - loadStart.tv_sec;
