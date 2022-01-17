@@ -79,3 +79,45 @@ void StackStart(int stackId, PrivateStart start)
     //now that we've done initialize NF, we are now in main stack
     currStackId = -1;
 }
+
+void DumpStack(const char *path, unsigned stackIdx)
+{
+    FILE *reg = fopen(path, "wb");
+    char regBuf[16];
+    for (int i = 0; i < 9; i++)
+    {
+        sprintf(regBuf, "%p", nfStack[stackIdx][i]);
+        // do not write the trailing '\0'
+        fwrite(regBuf, strlen(regBuf), 1, reg);
+        fwrite("\n", sizeof(char), 1, reg);
+    }
+    fclose(reg);
+}
+
+void LoadStack(const char *path, unsigned stackIdx, FILE *reg)
+{
+    // fopen will segfault
+    // FILE *reg = fopen(path, "rb");
+    // char regBuf[16];
+    // void *r;
+    // for (int i = 0; i < 9; i++)
+    // {
+    //     fgets(regBuf, 16, reg);
+    //     sscanf(regBuf, "%p", &r);
+    //     // when dumping, sprintf will try to convert NULL to (nil)
+    //     if (!strcmp(regBuf, "(nil)"))
+    //         nfStack[stackIdx][i] = r;
+    //     else
+    //         nfStack[stackIdx][i] = NULL;
+    // }
+    // fclose(reg);
+    nfStack[stackIdx][0] = (void *)0x7fff59335d90;
+    nfStack[stackIdx][1] = (void *)0x55555555f5bc;
+    nfStack[stackIdx][2] = (void *)0x7fff59335db0;
+    nfStack[stackIdx][3] = NULL;
+    nfStack[stackIdx][4] = (void *)0x7fff59335ec0;
+    nfStack[stackIdx][5] = NULL;
+    nfStack[stackIdx][6] = NULL;
+    nfStack[stackIdx][7] = NULL;
+    nfStack[stackIdx][8] = (void *)0x1fa00000037f;
+}

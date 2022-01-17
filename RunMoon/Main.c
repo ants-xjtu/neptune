@@ -3,13 +3,8 @@
 
 uint64_t timer_period = 1; /* default period is 10 seconds */
 
-struct MoonConfig
-{
-    char *path;
-    char *argv[10];
-    int argc;
-};
-static struct MoonConfig CONFIG[] = {
+
+struct MoonConfig CONFIG[] = {
     {.path = "./libs/libMoon_Libnids.so", .argv = {}, .argc = 0},
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
     {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
@@ -146,6 +141,10 @@ int main(int argc, char *argv[])
         tx += 1;
     }
 
+    printf("[RunMoon] see memory layout\n");
+    int sleeper;
+    scanf("%d", &sleeper);
+
     printf("[RunMoon] launch workers\n");
     RTE_LCORE_FOREACH_WORKER(workerId)
     {
@@ -252,6 +251,8 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
         void *stackStart = arena;
         void *heapStart = arena + NUMBER_STACK * STACK_SIZE;
         size_t heapSize = MOON_SIZE - NUMBER_STACK * STACK_SIZE;
+        moonDataList[moonId].workers[workerId].arenaStart = arena;
+        moonDataList[moonId].workers[workerId].arenaEnd = heapStart + heapSize;
 
         printf("*** MOON memory layout ***\n");
         printf("Stack#0\t%p - %p\tsize: %#lx\n", stackStart, stackStart + STACK_SIZE, STACK_SIZE);
@@ -484,6 +485,9 @@ int MainLoop(void *_arg)
     prev_tsc = 0;
     timer_tsc = 0;
     workerId = lcore_id = rte_lcore_id();
+    int loaded = 0;
+    // do not dump the stack immediately after we step into the loop
+    int numPass = 0;
 
     DisablePkey(1);
     RTE_LOG(INFO, L2FWD, "entering main loop on lcore $%u\n", lcore_id);
@@ -568,6 +572,23 @@ int MainLoop(void *_arg)
         // {
         //     rte_pktmbuf_free_bulk(workerDataList[workerId].packetBurst + sent, nb_rx-sent);
         // }
+
+        // NB: code changes in neptune will invalidate previous dump files
+        // if we have more than one MOON, then dump the second one
+        if (moonDataList[0].switchTo != -1 && loaded == 0 && numPass++ == 10)
+        {
+            DumpMoon(1, (workerId << 4) | (unsigned)1);
+            return 0;
+        }
+        
+        // a quick test of system malloc
+        // free(malloc(42));
+        if (moonDataList[0].switchTo == -1 && !loaded)
+        {
+            MapMoon(7, (workerId << 4) | (unsigned)1);
+            loaded = 1;
+        }
+        // return 0;
     }
     printf("[RunMoon] worker on lcore$%d exit\n", lcore_id);
     return 0;

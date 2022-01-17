@@ -55,6 +55,7 @@ add_executable(RunMoon
     RunMoon/Bench.c
     RunMoon/Pkey.c
     RunMoon/Protect.c
+    RunMoon/CrossMach.c
 )
 target_compile_definitions(RunMoon PRIVATE ALLOW_EXPERIMENTAL_API)
 target_include_directories(RunMoon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
