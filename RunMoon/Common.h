@@ -103,6 +103,7 @@ struct MoonData
     {
         int instanceId; // for stack/heap registration
         uintptr_t *extraLowPtr, *extraHighPtr;
+        void *arenaStart, *arenaEnd;
     } workers[MAX_WORKER_ID];
 };
 struct MoonData moonDataList[16];
@@ -133,6 +134,14 @@ struct WorkerData
     struct l2fwd_port_statistics stat;
 };
 struct WorkerData workerDataList[MAX_WORKER_ID];
+
+struct MoonConfig
+{
+    char *path;
+    char *argv[10];
+    int argc;
+};
+extern struct MoonConfig CONFIG[];
 
 // forward decalrations for runtime main
 void InitMoon();
@@ -175,5 +184,9 @@ void DisablePkey(int force);
 
 // Protect
 void ProtectMoon(const char *moonPath, int pkey);
+
+// CrossMach
+void DumpMoon(int moonId, unsigned instanceId);
+void MapMoon(int configId, unsigned instanceId);
 
 #endif
