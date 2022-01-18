@@ -5,7 +5,7 @@ set -e
 allMoonDirs=(
     "depreated"
     "depreated"
-    "/libs/L2Fwd"
+    "/libs/L2Fwd-debug"
     "/libs/fastclick"
     "/libs/Libnids"
     "/libs/ndpi-new"
@@ -37,6 +37,7 @@ while [[ "$#" -gt 0 ]]; do
         -c|--core) coreMask="$2"; shift; shift;;
         -p|--pku) enablePku="--pku"; shift;;
         -g|--debug) debugFlag="gdb --args"; shift;;
+        -n|--needmap) needMap="--map"; shift;;
         *) echo "bad argument $1"; exit 1;;
     esac
 done
@@ -123,6 +124,6 @@ perm="sudo"
 progName="./build/RunMoon"
 tiangouPath="./build/libTianGou.so"
 # cmd="$perm $libraryPath $debugFlag $progName -c 0x$coreMask -- $tiangouPath $enablePku $moonConfig"
-cmd="$perm $libraryPath $debugFlag $progName -c $coreMask -- $tiangouPath $enablePku $moonConfig"
+cmd="$perm $libraryPath $debugFlag $progName -c $coreMask -- $tiangouPath $enablePku $needMap $moonConfig"
 echo $cmd
 eval $cmd

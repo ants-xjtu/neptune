@@ -292,15 +292,23 @@ uint16_t TxBurstNop(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
     return nb_pkts;
 }
 
+// use global eth devices to avoid malloc
+static struct rte_eth_dev_data __space_dev_data;
+static void *__space_rx_queues[2][16];
+static void *__space_tx_queues[2][16];
+
 void RedirectEthDevices(struct rte_eth_dev *devices)
 {
     printf("setup eth devices at: %p\n", devices);
     for (int i = 0; i < 2; i += 1)
     {
         struct rte_eth_dev *dev = &devices[i];
-        dev->data = malloc(sizeof(struct rte_eth_dev_data));
-        dev->data->rx_queues = malloc(sizeof(void *) * NumberQueue);
-        dev->data->tx_queues = malloc(sizeof(void *) * NumberQueue);
+        // dev->data = malloc(sizeof(struct rte_eth_dev_data));
+        // dev->data->rx_queues = malloc(sizeof(void *) * NumberQueue);
+        // dev->data->tx_queues = malloc(sizeof(void *) * NumberQueue);
+        dev->data = &__space_dev_data;
+        dev->data->rx_queues = __space_rx_queues[i];
+        dev->data->tx_queues = __space_tx_queues[i];
     }
     devices[0].rx_pkt_burst = RxBurst;
     // devices[0].tx_pkt_burst = TxBurstNop;

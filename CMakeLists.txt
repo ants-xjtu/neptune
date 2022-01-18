@@ -125,7 +125,7 @@ add_library(Moon_L2Fwd MODULE
     Moon/L2Fwd.c
 )
 target_compile_definitions(Moon_L2Fwd PRIVATE ALLOW_EXPERIMENTAL_API)
-target_compile_options(Moon_L2Fwd PRIVATE -Wno-unused-command-line-argument)
+target_compile_options(Moon_L2Fwd PRIVATE -Wno-unused-command-line-argument -g -fno-stack-protector)
 target_link_libraries(Moon_L2Fwd PRIVATE PkgConfig::DPDK pcap Threads::Threads)
 
 add_library(Moon_RxBurstTest MODULE

@@ -36,6 +36,6 @@ void CrossThreadSaveStack();
 void CrossThreadRestoreStack();
 
 void DumpStack(const char *path, unsigned stackIdx);
-void LoadStack(const char *path, unsigned stackIdx, FILE *reg);
+void LoadStack(const char *path, unsigned stackIdx);
 
 #endif

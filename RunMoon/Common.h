@@ -70,6 +70,7 @@ static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 // constant that will only be set once during runtime init
 int runtimePkey;
 int enablePku;
+int needMap;
 // loading time variable
 // when these variables are set/accessed, only one MOON is initializing
 // on runtime supervisor's thread, so do not need to think about thread

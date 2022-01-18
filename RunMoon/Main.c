@@ -7,7 +7,7 @@ uint64_t timer_period = 1; /* default period is 10 seconds */
 struct MoonConfig CONFIG[] = {
     {.path = "./libs/libMoon_Libnids.so", .argv = {}, .argc = 0},
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
-    {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
+    {.path = "./libs/L2Fwd-debug/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
     // {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce-heavy.click"}, .argc = 6},
     {.path = "./libs/Libnids/forward.so", .argv = {}, .argc = 0},
@@ -98,6 +98,13 @@ int main(int argc, char *argv[])
     {
         i += 1;
         enablePku = 1;
+    }
+
+    // this is bad. But we can assume no pku is enabled during migration
+    if (strcmp(argv[2], "--map") == 0)
+    {
+        i += 1;
+        needMap = 1;
     }
 
     int configIndex[16];
@@ -498,31 +505,31 @@ int MainLoop(void *_arg)
             workerDataList[workerId].txQueue);
     while (!force_quit)
     {
-        // cur_tsc = rte_rdtsc();
+        cur_tsc = rte_rdtsc();
         /*
 		 * TX burst queue drain
 		 */
-        // diff_tsc = cur_tsc - prev_tsc;
-        // if (unlikely(diff_tsc > drain_tsc))
-        // {
-        //     /* if timer is enabled */
-        //     if (timer_period > 0)
-        //     {
-        //         /* advance the timer */
-        //         timer_tsc += diff_tsc;
-        //         /* if timer has reached its timeout */
-        //         if (unlikely(timer_tsc >= timer_period))
-        //         {
-        //             /* reset the timer */
-        //             timer_tsc = 0;
-        //             RecordBench(cur_tsc);
-        //             // ssPrintBench();
-        //             // upPrintBench();
-        //             // hsPrintBench();
-        //         }
-        //     }
-        //     prev_tsc = cur_tsc;
-        // }
+        diff_tsc = cur_tsc - prev_tsc;
+        if (unlikely(diff_tsc > drain_tsc))
+        {
+            /* if timer is enabled */
+            if (timer_period > 0)
+            {
+                /* advance the timer */
+                timer_tsc += diff_tsc;
+                /* if timer has reached its timeout */
+                if (unlikely(timer_tsc >= timer_period))
+                {
+                    /* reset the timer */
+                    timer_tsc = 0;
+                    RecordBench(cur_tsc);
+                    // ssPrintBench();
+                    // upPrintBench();
+                    // hsPrintBench();
+                }
+            }
+            prev_tsc = cur_tsc;
+        }
 
         /*
 		 * Read packet from RX queues
@@ -575,17 +582,15 @@ int MainLoop(void *_arg)
 
         // NB: code changes in neptune will invalidate previous dump files
         // if we have more than one MOON, then dump the second one
-        if (moonDataList[0].switchTo != -1 && loaded == 0 && numPass++ == 10)
+        if (needMap == 0 && numPass++ == 10)
         {
             DumpMoon(1, (workerId << 4) | (unsigned)1);
             return 0;
         }
         
-        // a quick test of system malloc
-        // free(malloc(42));
-        if (moonDataList[0].switchTo == -1 && !loaded)
+        if (needMap == 1 && !loaded)
         {
-            MapMoon(7, (workerId << 4) | (unsigned)1);
+            MapMoon(2, (workerId << 4) | (unsigned)1);
             loaded = 1;
         }
         // return 0;

@@ -94,30 +94,27 @@ void DumpStack(const char *path, unsigned stackIdx)
     fclose(reg);
 }
 
-void LoadStack(const char *path, unsigned stackIdx, FILE *reg)
+void LoadStack(const char *path, unsigned stackIdx)
 {
     // fopen will segfault
-    // FILE *reg = fopen(path, "rb");
-    // char regBuf[16];
-    // void *r;
-    // for (int i = 0; i < 9; i++)
-    // {
-    //     fgets(regBuf, 16, reg);
-    //     sscanf(regBuf, "%p", &r);
-    //     // when dumping, sprintf will try to convert NULL to (nil)
-    //     if (!strcmp(regBuf, "(nil)"))
-    //         nfStack[stackIdx][i] = r;
-    //     else
-    //         nfStack[stackIdx][i] = NULL;
-    // }
-    // fclose(reg);
-    nfStack[stackIdx][0] = (void *)0x7fff59335d90;
-    nfStack[stackIdx][1] = (void *)0x55555555f5bc;
-    nfStack[stackIdx][2] = (void *)0x7fff59335db0;
-    nfStack[stackIdx][3] = NULL;
-    nfStack[stackIdx][4] = (void *)0x7fff59335ec0;
-    nfStack[stackIdx][5] = NULL;
-    nfStack[stackIdx][6] = NULL;
-    nfStack[stackIdx][7] = NULL;
-    nfStack[stackIdx][8] = (void *)0x1fa00000037f;
+    FILE *reg = fopen(path, "rb");
+    char regBuf[16];
+    void *r;
+    for (int i = 0; i < 9; i++)
+    {
+        fgets(regBuf, 16, reg);
+        sscanf(regBuf, "%p", &r);
+        // when dumping, sprintf will try to convert NULL to (nil)
+        nfStack[stackIdx][i] = r;
+    }
+    fclose(reg);
+    // nfStack[stackIdx][0] = (void *)0x7fff59335d90;
+    // nfStack[stackIdx][1] = (void *)0x55555555f5bc;
+    // nfStack[stackIdx][2] = (void *)0x7fff59335db0;
+    // nfStack[stackIdx][3] = NULL;
+    // nfStack[stackIdx][4] = (void *)0x7fff59335ec0;
+    // nfStack[stackIdx][5] = NULL;
+    // nfStack[stackIdx][6] = NULL;
+    // nfStack[stackIdx][7] = NULL;
+    // nfStack[stackIdx][8] = (void *)0x1fa00000037f;
 }

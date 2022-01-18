@@ -182,22 +182,19 @@ static void DumpRegWorker(int moonId, unsigned instanceId)
 }
 
 
-static char *regfile = "./dump/rubik-new/RegFile";
-
-static void MapRegWorker(int configId, unsigned instanceId, FILE *reg)
+static void MapRegWorker(int configId, unsigned instanceId)
 {
     // TODO: check why calling malloc in new process lead to segfault
-    // char *dumpDir = GetDumpDir(-1, configId);
-    // char regFile[256] = "";
+    char *dumpDir = GetDumpDir(-1, configId);
+    char regFile[256] = "";
 
-    // strcat(regFile, dumpDir);
-    // strcat(regFile, "RegFile");
+    strcat(regFile, dumpDir);
+    strcat(regFile, "RegFile");
 
-    // char regfile[] = "./dump/rubik-new/RegFile";
-    LoadStack(regfile, instanceId, reg);
+    LoadStack(regFile, instanceId);
 }
 
-static void MapMoonWorker(const char *moonDir)
+static void MapMoonWorker(int configId)
 {
     DIR *md;
     char md2[48];
@@ -210,6 +207,9 @@ static void MapMoonWorker(const char *moonDir)
     char filename[256];
     int numMapped = 0;
     int numFiles = 0;
+
+    // moonDir should be a slash-terminated directory
+    char *moonDir = GetDumpDir(-1, configId);
 
     printf("[MapMoonWorker] retrieving pages from MOON\n");
     if (NULL == (md = opendir(moonDir)))
@@ -225,6 +225,8 @@ static void MapMoonWorker(const char *moonDir)
         if (!strcmp(f->d_name, "."))
             continue;
         if (!strcmp(f->d_name, ".."))
+            continue;
+        if (!strcmp(f->d_name, "RegFile"))
             continue;
 
         filename[0] = '\0';
@@ -244,19 +246,14 @@ static void MapMoonWorker(const char *moonDir)
         prot |= (perm[1] == 'w')? PROT_WRITE: 0;
         prot |= (perm[2] == 'x')? PROT_EXEC: 0;
         // printf("[MapMoonWorker] addrStart=%lx, mapLength=%lx, prot=%s\n", addrStart, mapLength, perm);
-        // if (MAP_FAILED == mmap((void *)addrStart, mapLength, prot, 
-        //         MAP_FILE | MAP_PRIVATE | MAP_FIXED, fd, 0))
-        // {
-        //     fprintf(stderr, "[MapMoonWorker] mmaped failed with addrStart=%lx, mapLength=%lx, prot=%s\n", 
-        //         addrStart, mapLength, perm);
-        //     close(fd);
-        //     return;
-        // }
-        // I have totally no idea why mmap would mess up DIR
-        // manage to get the sizeof(DIR) = 48 via gdb
-        memcpy(md2, md, 48);
-        mmap((void *)addrStart, mapLength, prot, MAP_FILE | MAP_PRIVATE | MAP_FIXED, fd, 0);
-        memcpy(md, md2, 48);
+        if (MAP_FAILED == mmap((void *)addrStart, mapLength, prot, 
+                MAP_FILE | MAP_PRIVATE | MAP_FIXED, fd, 0))
+        {
+            fprintf(stderr, "[MapMoonWorker] mmaped failed with addrStart=%lx, mapLength=%lx, prot=%s\n", 
+                addrStart, mapLength, perm);
+            close(fd);
+            return;
+        }
         close(fd);
         numMapped += 1;
     }
@@ -277,15 +274,12 @@ void MapMoon(int configId, unsigned instanceId)
     // hard code for now:
     /*
         HM1: 3 -> 7; detach 7
-        HM2: 3; map 7
+        HM2: 3 -> 7; map 7(overwrite)
     */ 
     int workerId = rte_lcore_id();
-    free(strdup("hello world\n"));
-    MapMoonWorker("/home/hypermoon/neptune-yh/dump/rubik-new/");
+    MapMoonWorker(configId);
 
-    // fopen will segfault
-    // FILE *reg = fopen(regfile, "rb");
-    MapRegWorker(configId, instanceId, NULL);
+    MapRegWorker(configId, instanceId);
     
     moonDataList[0].switchTo = 1;
     moonDataList[1].switchTo = -1;
