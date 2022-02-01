@@ -101,6 +101,10 @@ target_link_libraries(Moon_Libnids PRIVATE Threads::Threads)
 # target_link_libraries(Libnids_exe PRIVATE nids)
 # target_link_libraries(Libnids_exe PRIVATE Threads::Threads)
 
+add_executable(Libnids_exe Moon/LibnidsMain.c)
+target_link_libraries(Libnids_exe PRIVATE nids)
+target_link_libraries(Libnids_exe PRIVATE Threads::Threads)
+
 # add_executable(Exe_TestPlusPlus Moon/Test++.cxx)
 # set_target_properties(Exe_TestPlusPlus PROPERTIES LINKER_LANGUAGE CXX)
 # target_link_libraries(Exe_TestPlusPlus pcap)

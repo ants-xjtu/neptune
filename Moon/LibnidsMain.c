@@ -14,12 +14,18 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/mman.h>
 
 #include "../PrivateHeap.h"
 #include "../PrivateStack.h"
 
 char ascii_string[10000];
 int state[7] = {0};          // a simple statistics on libnids
+static int dirty_pages;
+static int pkt_cnt;
+static int start;
+
 char *char_to_ascii(char ch) /* 用于把协议数据进行显示 */
 {
     memset(ascii_string, 0x00, 10000);
@@ -185,9 +191,9 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
                 // printf("\n");
                 // return;
             }
-            for (int i = 10; i < 20; i += 1) {
-                memcpy(&content[i * 1024], &content[(i - 10) * 1024], 1024);
-            }
+            // for (int i = 10; i < 20; i += 1) {
+            //     memcpy(&content[i * 1024], &content[(i - 10) * 1024], 1024);
+            // }
             return;
         }
     default:
@@ -195,6 +201,127 @@ void tcp_protocol_callback(struct tcp_stream *tcp_connection, void **arg)
         break;
     }
     return;
+}
+
+// don't mprotect until all calls to libc ends
+struct 
+{
+    void *start;
+    uint64_t len;
+    int prot;
+    // sometimes we want to ignore this, e.g. stack
+    int force;
+} to_mprotect[64];
+
+// use SIGINT as a signal to start page monitoring
+void page_monitor(int signum, siginfo_t *info, void *context)
+{
+    static int first = 1;
+    static struct timespec ts, te;
+    if (first)
+    {
+        printf("Signal %d received, start to change permission\n", signum);
+        // if this is the first time ctrl-C is pressed, mprotect all its pages to read-only
+        FILE *map = fopen("/proc/self/maps", "r");
+        if (map == NULL)
+        {
+            fprintf(stderr, "[page_monitor] cannot open map file\n");
+            return;
+        }
+        char lineBuf[256];
+        uint64_t addrStart, addrEnd = 0, prevEnd = 0;
+        char perm[5];
+        uint32_t offset;
+        uint16_t devHigh, devLow;
+        unsigned int inode;
+        char pathname[128];
+        int nConsumed;
+        uint64_t mapLength;
+        int pagecnt = 0;
+        int anon;
+        while (fgets(lineBuf, sizeof(lineBuf), map))
+        {
+            anon = 0;
+            sscanf(lineBuf, "%lx-%lx %4c %x %hx:%hx %u%n", &addrStart, &addrEnd, perm, &offset, &devHigh, &devLow, &inode, &nConsumed);
+            mapLength = addrEnd - addrStart;
+            // don't mess with the shared mappings
+            if (perm[3] == 's')
+                continue;
+            // pathname[0] = '\0';
+            // if (devHigh || devLow || inode)
+            // {
+            //     sscanf(lineBuf+nConsumed, "%s", pathname);
+            //     // printf("0x%lx-0x%lx %s\n", addrStart, addrEnd, pathname);
+            // }
+            sscanf(lineBuf+nConsumed, "%s", pathname);
+            if (*(lineBuf + nConsumed) == '\n')
+                anon = 1;
+            if (perm[1] == 'w')
+            {
+                // writeable implies readable
+                int pr = 0;
+                pr |= (perm[2] == 'x')? PROT_EXEC: 0;
+                pr |= PROT_READ;
+                to_mprotect[pagecnt].start = (void *)addrStart;
+                to_mprotect[pagecnt].len = mapLength;
+                to_mprotect[pagecnt++].prot = pr;
+                if (strcmp(pathname, "[stack]") == 0 && anon == 0)
+                    to_mprotect[pagecnt - 1].force = 1;
+                // if (strcmp(pathname, "/usr/lib/x86_64-linux-gnu/libc-2.31.so") == 0)
+                //     to_mprotect[pagecnt - 1].force = 1;
+                if ((uint64_t)&dirty_pages >= addrStart && (uint64_t)&dirty_pages <= addrEnd)
+                    to_mprotect[pagecnt - 1].force = 1;
+                // if (mprotect((void *)addrStart, mapLength, pr | PROT_READ))
+                // {
+                //     fprintf(stderr, "[page_monitor] mprotect failed with: addr=%p, len=%lu, prot=%d", (void *)addrStart, mapLength, pr);
+                //     return;
+                // }
+            }
+        }
+        first = 0;
+        // when all mprotects are done, record time and wait for next time the handler is called
+        clock_gettime(CLOCK_REALTIME, &ts);
+        for (int i = 0; i<64; i++)
+        {
+            if (to_mprotect[i].start == NULL)
+                break;
+            if (to_mprotect[i].force == 1)
+                continue;
+            if (mprotect(to_mprotect[i].start, to_mprotect[i].len, to_mprotect[i].prot))
+            {
+                fprintf(stderr, "[page_monitor] mprotect failed with: addr=%p, len=%lu, prot=%d", 
+                    to_mprotect[i].start, to_mprotect[i].len, to_mprotect[i].prot);
+                return;
+            }
+        }
+        start = 1;
+        // since heap is read only, using libc functions would likely fail.
+        // printf("Change permission done, please check layout\n");
+        // int sleeper;
+        // scanf("%d", &sleeper);
+    }
+    else
+    {
+        clock_gettime(CLOCK_REALTIME, &te);
+        printf("Signal %d received(2nd), print statistics and quit\n", signum);
+        printf("Time elapsed: %f, dirty pages: %d\n", (double)(te.tv_nsec - ts.tv_nsec) / 1e9 + (te.tv_sec - ts.tv_sec), dirty_pages);
+        // game_over();
+    }
+}
+
+void segv_handler(int signum, siginfo_t *info, void *context)
+{
+    size_t addr_num = ((size_t)info->si_addr >> 12) << 12;
+    // printf("Instruction pointer: %p\n",
+    //        (((ucontext_t*)context)->uc_mcontext.gregs[16]));
+    // printf("Addr: %p\n", (void *)addr_num);
+    // assume no page would have 'w' and 'x' at the same time
+    if (mprotect((void *)addr_num, 4096, PROT_READ | PROT_WRITE))
+    {
+        printf("restoring memory protection failed\n");
+        abort();
+    }
+    dirty_pages++;
 }
 
 void nids_run_worker()
@@ -212,6 +339,14 @@ void nids_run_worker()
     printf("Time elapsed: %d seconds, %ld nanoseconds\n", sec_val, te.tv_nsec - ts.tv_nsec);
 }
 
+// NB: if SA_SIGINFO is not set, sigaction takes a function with void (*)(int)
+void sigterm_handler(int signum)
+{
+    printf("Sigterm received, exit.\n");
+    printf("final dirty page count: %d\n", dirty_pages);
+    exit(0);
+}
+
 int main(int argc, char *argv[], char **env)
 {
     struct nids_chksum_ctl temp;
@@ -221,8 +356,18 @@ int main(int argc, char *argv[], char **env)
 
     nids_register_chksum_ctl(&temp, 1);
     /*这段是相关与计算校验和的，比较新的网卡驱动会自动计算校验和，我们要做的就是把它关掉*/
-    nids_params.filename = "/dev/shm/huawei_tcp.pcap";
+    nids_params.filename = "/home/hypermoon/enterprise.pcap";
     // nids_params.device = "all";
+    struct sigaction act1, act2, act3;
+    act1.sa_flags = SA_SIGINFO | SA_NODEFER;
+    act1.sa_sigaction = &page_monitor;
+    act2.sa_flags = SA_SIGINFO | SA_NODEFER;
+    act2.sa_sigaction = &segv_handler;
+    sigaction(SIGINT, &act1, NULL);
+    sigaction(SIGSEGV, &act2, NULL);
+    act3.sa_flags = 0;
+    act3.sa_handler = sigterm_handler;
+    sigaction(SIGTERM, &act3, NULL);
     if (!nids_init()) /* Libnids初始化 */
     {
         printf("Error：%s\n", nids_errbuf);
@@ -231,7 +376,18 @@ int main(int argc, char *argv[], char **env)
     nids_register_tcp((void *)tcp_protocol_callback);
     // former wrapper is no longer needed
     // nids_run_worker();
+
+    // do nids_run multiply times, hopefully this would make libpcap read the capture many times
     nids_run();
+    // nids_init();
+    // nids_run();
+    // nids_init();
+    // nids_run();
+    // nids_init();
+    // nids_run();
+    // nids_init();
+    // nids_run();
+    printf("libnids reach the end of the pcap and return\n");
 
     return 0;
 }

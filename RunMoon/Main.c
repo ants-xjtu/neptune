@@ -40,6 +40,8 @@ struct MoonConfig CONFIG[] = {
 //     {"./build/libMoon_MidStat_NoSFI.so", ""},
 //     {"./build/libMoon_MidStat_NoSFI.so", ""},
 // };
+static int isBlocking;
+static int endOfBatch;
 
 int main(int argc, char *argv[])
 {
@@ -161,8 +163,17 @@ int main(int argc, char *argv[])
     printf("*** START RUNTIME MAIN LOOP ***\n");
     while (!force_quit)
     {
+        static int oneTime = 0;
         PrintBench();
         // TODO: supervisor tasks, update chain, redirect traffic, etc.
+        if (oneTime)
+            continue;
+        isBlocking = 1;
+        while (endOfBatch == 0) {}
+        // mprotect all the pages of an NF to be read only
+        BlockMoon(0);
+        isBlocking = 0;
+        oneTime++;
     }
 
     RTE_LCORE_FOREACH_WORKER(workerId)
@@ -505,6 +516,7 @@ int MainLoop(void *_arg)
             workerDataList[workerId].txQueue);
     while (!force_quit)
     {
+        endOfBatch = 0;
         cur_tsc = rte_rdtsc();
         /*
 		 * TX burst queue drain
@@ -582,18 +594,32 @@ int MainLoop(void *_arg)
 
         // NB: code changes in neptune will invalidate previous dump files
         // if we have more than one MOON, then dump the second one
-        if (needMap == 0 && numPass++ == 10)
-        {
-            DumpMoon(1, (workerId << 4) | (unsigned)1);
-            return 0;
-        }
+        // if (needMap == 0 && numPass++ == 10)
+        // {
+        //     uint64_t dm_start, dm_end;
+        //     dm_start = rte_rdtsc();
+        //     DumpMoon(1, (workerId << 4) | (unsigned)1);
+        //     dm_end = rte_rdtsc();
+        //     printf("DumpMoon finished. Time elapsed: %fs\n", (double)(dm_end - dm_start) / rte_get_tsc_hz());
+        //     return 0;
+        // }
         
-        if (needMap == 1 && !loaded)
+        // if (needMap == 1 && !loaded)
+        // {
+        //     uint64_t mm_start, mm_end;
+        //     mm_start = rte_rdtsc();
+        //     MapMoon(2, (workerId << 4) | (unsigned)1);
+        //     mm_end = rte_rdtsc();
+        //     printf("MapMoon finished. Time elapsed: %fs\n", (double)(mm_end - mm_start) / rte_get_tsc_hz());
+        //     loaded = 1;
+        // }
+        
+        // wait till the lock on blocking is released
+        while (isBlocking) 
         {
-            MapMoon(2, (workerId << 4) | (unsigned)1);
-            loaded = 1;
+            // indicate the end of batch, and thus notify the main thread that we can dump/mprotect now
+            endOfBatch = 1;
         }
-        // return 0;
     }
     printf("[RunMoon] worker on lcore$%d exit\n", lcore_id);
     return 0;
@@ -777,6 +803,22 @@ uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
     else
     {
         workerId = rte_lcore_id();
+        // we are still in NF thread, retrieve heap usage here
+        if (workerDataList[workerId].current != -1) 
+        {
+            #include <malloc.h>
+            struct mallinfo *mi = HeapInfo();
+            printf("Total non-mmapped bytes (arena):       %d\n", mi->arena);
+            printf("# of free chunks (ordblks):            %d\n", mi->ordblks);
+            printf("# of free fastbin blocks (smblks):     %d\n", mi->smblks);
+            printf("# of mapped regions (hblks):           %d\n", mi->hblks);
+            printf("Bytes in mapped regions (hblkhd):      %d\n", mi->hblkhd);
+            printf("Max. total allocated space (usmblks):  %d\n", mi->usmblks);
+            printf("Free bytes held in fastbins (fsmblks): %d\n", mi->fsmblks);
+            printf("Total allocated space (uordblks):      %d\n", mi->uordblks);
+            printf("Total free space (fordblks):           %d\n", mi->fordblks);
+            printf("Topmost releasable block (keepcost):   %d\n", mi->keepcost);
+        }
         workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
         // printf("switch to %d\n", workerDataList[workerId].current);
         MoonSwitch(workerId);

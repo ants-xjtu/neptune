@@ -189,5 +189,6 @@ void ProtectMoon(const char *moonPath, int pkey);
 // CrossMach
 void DumpMoon(int moonId, unsigned instanceId);
 void MapMoon(int configId, unsigned instanceId);
+void BlockMoon(int moonId);
 
 #endif

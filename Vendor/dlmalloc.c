@@ -2524,6 +2524,10 @@ void *HeapAlignedAlloc(size_t align, size_t size) {
   return dlmemalign(align, size);
 }
 
+void *HeapInfo() {
+  return (void *)heap_start;
+}
+
 // Add by sgdxbc end
 
 /*

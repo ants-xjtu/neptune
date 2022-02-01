@@ -81,9 +81,9 @@ static void ReadMap(FILE *map, FILE *mem, int moonId, const char *moonPath, void
     unsigned int inode;
     char pathname[128];
     int nConsumed;
+    uint64_t mapLength;
 
     int dump = 0;
-    uint64_t mapLength;
     char outName[256] = "";
     char *outDir = GetDumpDir(moonId, 0);
     const char *tmp = FindDir(moonPath);
@@ -284,4 +284,68 @@ void MapMoon(int configId, unsigned instanceId)
     moonDataList[0].switchTo = 1;
     moonDataList[1].switchTo = -1;
     moonDataList[1].workers[workerId].instanceId = instanceId;
+}
+
+// TODO: reduce code redundency
+void BlockMoon(int moonId)
+{
+    int configId = moonDataList[moonId].config;
+    const char *moonName = CONFIG[configId].path;
+    int workerId = rte_lcore_id();
+    
+    FILE *map = fopen("/proc/self/maps", "r");
+    if (map == NULL)
+    {
+        fprintf(stderr, "[BlockMoon] cannot open map file\n");
+        return;
+    }
+
+    char lineBuf[256];
+    uint64_t addrStart, addrEnd = 0, prevEnd = 0;
+    char perm[5];
+    uint32_t offset;
+    uint16_t devHigh, devLow;
+    unsigned int inode;
+    char pathname[128];
+    int nConsumed;
+    uint64_t mapLength;
+    void *end = moonDataList[moonId].workers[workerId].arenaEnd;
+    int dump = 0;
+
+    while (fgets(lineBuf, sizeof(lineBuf), map))
+    {
+        sscanf(lineBuf, "%lx-%lx %4c %x %hx:%hx %u%n", &addrStart, &addrEnd, perm, &offset, &devHigh, &devLow, &inode, &nConsumed);
+        mapLength = addrEnd - addrStart;
+        if (addrEnd > (uint64_t) end)
+            break;
+        if (devHigh || devLow || inode)
+        {
+            sscanf(lineBuf+nConsumed, "%s", pathname);
+            if (MatchDir(FindDir(pathname), FindDir(moonName)))
+                dump = 1;
+            // printf("0x%lx-0x%lx %s\n", addrStart, addrEnd, pathname);
+        }
+        if(dump)
+        {
+            // we are the first map, otherwise each map has to be consistent
+            if (prevEnd && addrStart != prevEnd)
+            {
+                fprintf(stderr, "[BlockMoon] previous map ends at: %lx, but a new map is trying to start at: %lx\n", prevEnd, addrStart);
+                return;
+            }
+            if (perm[1] == 'w')
+            {
+                // writeable implies readable
+                int pr = 0;
+                pr |= (perm[2] == 'x')? PROT_EXEC: 0;
+                if (mprotect((void *)addrStart, mapLength, pr | PROT_READ))
+                {
+                    fprintf(stderr, "[BlockMoon] mprotect failed with: addr=%p, len=%lu, prot=%d", (void *)addrStart, mapLength, pr);
+                    return;
+                }
+            }
+            prevEnd = addrEnd;
+        }
+    }
+
 }

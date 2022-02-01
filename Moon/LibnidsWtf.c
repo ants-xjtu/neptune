@@ -15,8 +15,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "../PrivateHeap.h"
-#include "../PrivateStack.h"
+// #include "../PrivateHeap.h"
+// #include "../PrivateStack.h"
 
 char ascii_string[10000];
 int state[8] = {0};         // a simple statistics on libnids
@@ -243,7 +243,7 @@ int main(int argc, char *argv[], char **env)
 
     nids_register_chksum_ctl(&temp, 1);
     /*这段是相关与计算校验和的，比较新的网卡驱动会自动计算校验和，我们要做的就是把它关掉*/
-    nids_params.filename = "/dev/shm/huawei_tcp.pcap";
+    nids_params.filename = "/dev/shm/enterprise.pcap";
     // nids_params.device = "all";
     if (!nids_init()) /* Libnids初始化 */
     {

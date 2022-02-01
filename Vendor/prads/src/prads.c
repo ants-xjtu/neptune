@@ -43,6 +43,7 @@
 #include "dhcp.h"
 //#include "output-plugins/log_init.h"
 #include "output-plugins/log.h"
+#include <sys/mman.h>
 
 #ifndef CONFDIR
 #define CONFDIR "/etc/prads/"
@@ -58,6 +59,7 @@ time_t tstamp;
 servicelist *services[MAX_PORTS];
 int inpacket, gameover, intr_flag;
 int nets = 1;
+int dirty_pages;
 
 fmask network[MAX_NETS];
 
@@ -1172,6 +1174,122 @@ nets_end:
     free(snet);
     return;
 }
+// don't mprotect until all calls to libc ends
+struct 
+{
+    void *start;
+    uint64_t len;
+    int prot;
+    // sometimes we want to ignore this, e.g. stack
+    int force;
+} to_mprotect[64];
+
+// use SIGINT as a signal to start page monitoring
+void page_monitor(int signum, siginfo_t *info, void *context)
+{
+    static int first = 1;
+    static struct timespec ts, te;
+    if (first)
+    {
+        printf("Signal %d received, start to change permission\n", signum);
+        // if this is the first time ctrl-C is pressed, mprotect all its pages to read-only
+        FILE *map = fopen("/proc/self/maps", "r");
+        if (map == NULL)
+        {
+            fprintf(stderr, "[page_monitor] cannot open map file\n");
+            return;
+        }
+        char lineBuf[256];
+        uint64_t addrStart, addrEnd = 0, prevEnd = 0;
+        char perm[5];
+        uint32_t offset;
+        uint16_t devHigh, devLow;
+        unsigned int inode;
+        char pathname[128];
+        int nConsumed;
+        uint64_t mapLength;
+        int pagecnt = 0;
+        int anon;
+        while (fgets(lineBuf, sizeof(lineBuf), map))
+        {
+            anon = 0;
+            sscanf(lineBuf, "%lx-%lx %4c %x %hx:%hx %u%n", &addrStart, &addrEnd, perm, &offset, &devHigh, &devLow, &inode, &nConsumed);
+            mapLength = addrEnd - addrStart;
+            // don't mess with the shared mappings
+            if (perm[3] == 's')
+                continue;
+            // pathname[0] = '\0';
+            // if (devHigh || devLow || inode)
+            // {
+            //     sscanf(lineBuf+nConsumed, "%s", pathname);
+            //     // printf("0x%lx-0x%lx %s\n", addrStart, addrEnd, pathname);
+            // }
+            sscanf(lineBuf+nConsumed, "%s", pathname);
+            if (lineBuf + nConsumed == '\n')
+                anon = 1;
+            if (perm[1] == 'w')
+            {
+                // writeable implies readable
+                int pr = 0;
+                pr |= (perm[2] == 'x')? PROT_EXEC: 0;
+                pr |= PROT_READ;
+                to_mprotect[pagecnt].start = (void *)addrStart;
+                to_mprotect[pagecnt].len = mapLength;
+                to_mprotect[pagecnt++].prot = pr;
+                if (strcmp(pathname, "[stack]") == 0 && anon == 0)
+                    to_mprotect[pagecnt - 1].force = 1;
+                // if (strcmp(pathname, "/usr/lib/x86_64-linux-gnu/libc-2.31.so") == 0)
+                //     to_mprotect[pagecnt - 1].force = 1;
+                if ((uint64_t)&dirty_pages >= addrStart && (uint64_t)&dirty_pages <= addrEnd)
+                    to_mprotect[pagecnt - 1].force = 1;
+                // if (mprotect((void *)addrStart, mapLength, pr | PROT_READ))
+                // {
+                //     fprintf(stderr, "[page_monitor] mprotect failed with: addr=%p, len=%lu, prot=%d", (void *)addrStart, mapLength, pr);
+                //     return;
+                // }
+            }
+        }
+        first = 0;
+        // when all mprotects are done, record time and wait for next time the handler is called
+        clock_gettime(CLOCK_REALTIME, &ts);
+        for (int i = 0; i<64; i++)
+        {
+            if (to_mprotect[i].start == NULL)
+                break;
+            if (to_mprotect[i].force == 1)
+                continue;
+            if (mprotect(to_mprotect[i].start, to_mprotect[i].len, to_mprotect[i].prot))
+            {
+                fprintf(stderr, "[page_monitor] mprotect failed with: addr=%p, len=%lu, prot=%d", 
+                    to_mprotect[i].start, to_mprotect[i].len, to_mprotect[i].prot);
+                return;
+            }
+        }
+        
+    }
+    else
+    {
+        clock_gettime(CLOCK_REALTIME, &te);
+        printf("Signal %d received(2nd), print statistics and quit\n", signum);
+        printf("Time elapsed: %f, dirty pages: %d\n", (double)(te.tv_nsec - ts.tv_nsec) / 1e9 + (te.tv_sec - ts.tv_sec), dirty_pages);
+        game_over();
+    }
+}
+
+void segv_handler(int signum, siginfo_t *info, void *context)
+{
+    size_t addr_num = ((size_t)info->si_addr >> 12) << 12;
+    // printf("Instruction pointer: %p\n",
+    //        (((ucontext_t*)context)->uc_mcontext.gregs[16]));
+    // printf("Addr: %p\n", (void *)addr_num);
+    // assume no page would have 'w' and 'x' at the same time
+    if (mprotect((void *)addr_num, 4096, PROT_READ | PROT_WRITE))
+    {
+        printf("restoring memory protection failed\n");
+        abort();
+    }
+    dirty_pages++;
+}
 
 void game_over()
 {
@@ -1541,11 +1659,18 @@ int main(int argc, char *argv[])
     inpacket = gameover = intr_flag = 0;
 
     signal(SIGTERM, game_over);
-    signal(SIGINT, game_over);
+    // signal(SIGINT, game_over);
     signal(SIGQUIT, game_over);
     signal(SIGALRM, set_end_sessions);
     signal(SIGHUP, reparse_conf);
     signal(SIGUSR1, set_end_sessions);
+    struct sigaction act1, act2;
+    act1.sa_flags = SA_SIGINFO | SA_NODEFER;
+    act1.sa_sigaction = &page_monitor;
+    act2.sa_flags = SA_SIGINFO | SA_NODEFER;
+    act2.sa_sigaction = &segv_handler;
+    sigaction(SIGINT, &act1, NULL);
+    sigaction(SIGSEGV, &act2, NULL);    
 #ifdef DEBUG
     signal(SIGUSR1, cxt_log_buckets);
 #endif
@@ -1677,6 +1802,7 @@ int main(int argc, char *argv[])
     olog("[*] Sniffing...\n");
     pcap_loop(config.handle, -1, got_packet, NULL);
 
+    printf("reaching the end of prads.c\n");
     game_over();
     return (0);
 }
