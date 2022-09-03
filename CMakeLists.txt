@@ -97,15 +97,15 @@ add_library(Moon_Libnids MODULE
 target_link_libraries(Moon_Libnids PRIVATE nids)
 target_link_libraries(Moon_Libnids PRIVATE Threads::Threads)
 
-# add_library(Moon_Libnids_Slow MODULE
-#     # Moon/LibnidsMain.c 
-#     Moon/LibnidsSlow.c
-#     # originally statically linked with libnids
-#     # Vendor/libnids/src/NIDS-link_pic.bc
-# )
-# # target_link_libraries(Moon_Libnids PRIVATE gthread-2.0 nsl glib-2.0 net)
-# target_link_libraries(Moon_Libnids_Slow PRIVATE nids)
-# target_link_libraries(Moon_Libnids_Slow PRIVATE Threads::Threads)
+add_library(Moon_Libnids_Slow MODULE
+    # Moon/LibnidsMain.c 
+    Moon/LibnidsSlow.c
+    # originally statically linked with libnids
+    # Vendor/libnids/src/NIDS-link_pic.bc
+)
+# target_link_libraries(Moon_Libnids PRIVATE gthread-2.0 nsl glib-2.0 net)
+target_link_libraries(Moon_Libnids_Slow PRIVATE nids)
+target_link_libraries(Moon_Libnids_Slow PRIVATE Threads::Threads)
 
 # No, Prads is already a shared object
 # add_moon(TARGET Moon_Prads SOURCES
