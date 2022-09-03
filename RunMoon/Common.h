@@ -68,6 +68,7 @@ static uint16_t nb_txd = RTE_TEST_TX_DESC_DEFAULT;
 #define MAX_PKT_BURST 32
 #define MAX_WORKER_ID 96
 #define CYCLE_SIZE 40
+// TODO: this should align with RULE_NUM in migration.h
 #define MAX_FLOW 10
 
 // global variables of runtime supervisor & workers

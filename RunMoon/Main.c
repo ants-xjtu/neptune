@@ -14,12 +14,12 @@ static struct MoonConfig CONFIG[] = {
     {.path = "./libs/libMoon_prads.so", .argv = {}, .argc = 0},
     {.path = "./libs/L2Fwd/libMoon_L2Fwd.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     {.path = "./libs/fastclick/click", .argv = {"<program>", "--dpdk", "-c", "0x1", "--", "/home/hypermoon/neptune-yh/dpdk-bounce.click"}, .argc = 6},
-    {.path = "./libs/Libnids/forward.so", .argv = {}, .argc = 0},
+    {.path = "./libs/Libnids-clean/forward.so", .argv = {}, .argc = 0},
     {.path = "./libs/ndpi/ndpiReader.so", .argv = {"<program>", "-i", "ens3f0"}, .argc = 3},
     // #6: this config might not be used to directly call main
     {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
-    {.path = "./libs/rubik-new/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
+    {.path = "./libs/rubik-final/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     // {.path = "./libs/Libnids-slow/libMoon_Libnids_Slow.so", .argv = {}, .argc = 0},
     {.path = "./nfd/five/rtc.so", .argv = {"<program>"}, .argc = 1},
@@ -171,8 +171,9 @@ int main(int argc, char *argv[])
                 continue;
             migrated_flow0 = 5;
             migrated_flow1 = 6;
-            printf("[RunMoon] flow rules updated\n");
+            printf("[Main core] installing new flow rules\n");
             UpdateRules();
+            printf("[Main core] installing new flow done\n");
             updated = 1;
         }
     }
@@ -596,7 +597,11 @@ int MainLoop(void *_arg)
             if (workerId == 3)
             {
                 if (unlikely(migrated_flow0 == flowId || migrated_flow1 == flowId))
+                {
+                    // printf("Worker %u: find a packet from a migrated flow: %" PRIu8 ", continue\n", workerId, flowId);
                     continue;
+                }
+                    
             }
             flowDesc[flowId][flowNum[workerId][flowId]++] = workerDataList[workerId].packetBurst[i];
         }
@@ -612,16 +617,19 @@ int MainLoop(void *_arg)
             MoonSwitchLoose(workerId, flow);
             // TODO: see if this is redundant
             DisablePkey(0);
+            workerDataList[workerId].stat.tx += flowNum[workerId][flow];
+            for (int pkt = 0; pkt < flowNum[workerId][flow]; pkt++)
+                workerDataList[workerId].stat.bytes += rte_pktmbuf_pkt_len(flowDesc[flow][pkt]);
         }
 
         // hard code for per core throughput measurement
-        for (int i = 0; i < nb_rx; i++)
-        {
-            struct rte_ether_hdr *ehdr = rte_pktmbuf_mtod(
-                workerDataList[workerId].packetBurst[i], struct rte_ether_hdr *);
-            struct rte_ether_addr *dst_mac = &ehdr->d_addr;
-            dst_mac->addr_bytes[4] = (uint8_t) workerId;
-        }
+        // for (int i = 0; i < nb_rx; i++)
+        // {
+        //     struct rte_ether_hdr *ehdr = rte_pktmbuf_mtod(
+        //         workerDataList[workerId].packetBurst[i], struct rte_ether_hdr *);
+        //     struct rte_ether_addr *dst_mac = &ehdr->d_addr;
+        //     dst_mac->addr_bytes[4] = (uint8_t) workerId;
+        // }
 
         // now we are back from the last MOON, the packet burst is done!
         // original mbufs are stil in workerDataList[workerId].packetBurst, simply send it out
