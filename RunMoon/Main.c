@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
     preUpdate = rte_rdtsc();
     while (!force_quit)
     {
-        PrintBench();
+        // PrintBench();
         // TODO: supervisor tasks, update chain, redirect traffic, etc.
         curTsc = rte_rdtsc();
         uint64_t diff = curTsc - preUpdate;
@@ -543,24 +543,35 @@ int MainLoop(void *_arg)
         /*
 		 * TX burst queue drain
 		 */
-        // diff_tsc = cur_tsc - prev_tsc;
-        // if (unlikely(diff_tsc > drain_tsc))
-        // {
-        //     /* if timer is enabled */
-        //     if (timer_period > 0)
-        //     {
-        //         /* advance the timer */
-        //         timer_tsc += diff_tsc;
-        //         /* if timer has reached its timeout */
-        //         if (unlikely(timer_tsc >= timer_period))
-        //         {
-        //             /* reset the timer */
-        //             timer_tsc = 0;
-        //             RecordBench(cur_tsc);
-        //         }
-        //     }
-        //     prev_tsc = cur_tsc;
-        // }
+        diff_tsc = cur_tsc - prev_tsc;
+        if (unlikely(diff_tsc > drain_tsc))
+        {
+            /* if timer is enabled */
+            if (timer_period > 0)
+            {
+                /* advance the timer */
+                timer_tsc += diff_tsc;
+                /* if timer has reached its timeout */
+                if (unlikely(timer_tsc >= timer_period))
+                {
+                    double timeInterval = (double)timer_tsc / rte_get_timer_hz();
+                    /* reset the timer */
+                    timer_tsc = 0;
+                    // instead record the performance and print it in main core
+                    // we print it out right here to bypass doing average
+                    // RecordBench(cur_tsc);
+                    if (workerDataList[workerId].stat.tx)
+                    {
+                        double ppsOnCore = workerDataList[workerId].stat.tx / timeInterval / 1000;
+                        double bpsOnCore = workerDataList[workerId].stat.bytes / timeInterval / 1000/ 1000 * 8;
+                        printf("[worker$%02d] pps: %fK\tbps:%fM\n", workerId, ppsOnCore, bpsOnCore);
+                        workerDataList[workerId].stat.tx = 0;
+                        workerDataList[workerId].stat.bytes = 0;
+                    }
+                }
+            }
+            prev_tsc = cur_tsc;
+        }
 
         /*
 		 * Read packet from RX queues
