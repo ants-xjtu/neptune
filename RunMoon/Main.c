@@ -499,12 +499,14 @@ void MoonSwitchLoose(unsigned int workerId, int flowId)
             moonDataList[workerDataList[workerId].current]
                 .workers[flowId]
                 .instanceId;
+        // printf("[worker #%u] switching to flow$%d, instance!%03x\n", workerId, flowId+1, instanceId);
         HeapSwitch(instanceId);
         UpdatePkey(workerId);
         StackSwitch(instanceId);
     }
     else
     {
+        // printf("[worker #%u] switching to back to main stack\n", workerId);
         StackSwitch(-1);
     }
 }
@@ -741,8 +743,9 @@ int PcapLoop(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
         }
         else
         {
+            workerId = rte_lcore_id();
             workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
-            MoonSwitch(workerId);
+            MoonSwitchLoose(workerId, workerDataList[workerId].flowId);
         }
 
         for (int i = 0; i < workerDataList[workerId].burstSize; i += 1)
@@ -779,7 +782,7 @@ int PcapDispatch(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
     {
         workerDataList[workerId].pcapNextIndex = 0;
         workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
-        MoonSwitch(workerId);
+        MoonSwitchLoose(workerId, workerDataList[workerId].flowId);
     }
     int i = workerDataList[workerId].pcapNextIndex;
     workerDataList[workerId].pcapNextIndex += 1;
@@ -809,7 +812,7 @@ const u_char *PcapNext(pcap_t *p, struct pcap_pkthdr *h)
     {
         workerDataList[workerId].pcapNextIndex = 0;
         workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
-        MoonSwitch(workerId);
+        MoonSwitchLoose(workerId, workerDataList[workerId].flowId);
     }
     int i = workerDataList[workerId].pcapNextIndex;
     workerDataList[workerId].pcapNextIndex += 1;
