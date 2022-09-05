@@ -871,7 +871,8 @@ uint16_t TxBurst(void *txq, struct rte_mbuf **tx_pkts, uint16_t nb_pkts)
     // memcpy(
     //     &workerDataList[workerId].packetBurst[workerDataList[workerId].burstSize],
     //     tx_pkts, nb_pkts * sizeof(struct rte_mbuf *));
-    // workerDataList[workerId].burstSize += nb_pkts;
+    int workerId = rte_lcore_id();
+    workerDataList[workerId].burstSize += nb_pkts;
     return nb_pkts;
 }
 
