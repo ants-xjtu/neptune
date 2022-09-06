@@ -11,6 +11,13 @@ both for a reliable result and future self to conduct the experiments all over a
 I also prepare a 'snapshot' of `lib/` before I proceed,
 and I will commit it if it's really necessary.
 
+**Also an important note before proceed**:
+you MUST start `run_tcpreplay.py` after neptune pauses for user input,
+otherwise there might be packets in the queues of both cores,
+causing the cores to preempt an instance once resume, and thus sigfault.
+When neptune pauses, the rules are already installed on the NIC,
+so that no race condition would happen.
+
 ## rubik
 
 This is rather easy.

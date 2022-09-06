@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
         // TODO: supervisor tasks, update chain, redirect traffic, etc.
         curTsc = rte_rdtsc();
         uint64_t diff = curTsc - preUpdate;
-        if (unlikely(diff > timer_period * 10))
+        if (unlikely(diff > timer_period * 20))
         {
             if (updated)
                 continue;
@@ -636,13 +636,13 @@ int MainLoop(void *_arg)
         }
 
         // hard code for per core throughput measurement
-        // for (int i = 0; i < nb_rx; i++)
-        // {
-        //     struct rte_ether_hdr *ehdr = rte_pktmbuf_mtod(
-        //         workerDataList[workerId].packetBurst[i], struct rte_ether_hdr *);
-        //     struct rte_ether_addr *dst_mac = &ehdr->d_addr;
-        //     dst_mac->addr_bytes[4] = (uint8_t) workerId;
-        // }
+        for (int i = 0; i < nb_rx; i++)
+        {
+            struct rte_ether_hdr *ehdr = rte_pktmbuf_mtod(
+                workerDataList[workerId].packetBurst[i], struct rte_ether_hdr *);
+            struct rte_ether_addr *dst_mac = &ehdr->d_addr;
+            dst_mac->addr_bytes[4] = (uint8_t) workerId;
+        }
 
         // now we are back from the last MOON, the packet burst is done!
         // original mbufs are stil in workerDataList[workerId].packetBurst, simply send it out
