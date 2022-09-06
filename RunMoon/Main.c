@@ -19,7 +19,7 @@ static struct MoonConfig CONFIG[] = {
     // #6: this config might not be used to directly call main
     {.path = "./libs/NetBricks/libzcsi_lpm.so", .argv = {"<program>", "-c", "1", "-p", "06:00.0"}, .argc = 5},
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
-    {.path = "./libs/rubik-final/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
+    {.path = "./libs/rubik-new/rubik.so", .argv = {"<program>", "-p", "0x1"}, .argc = 3},
     // {.path = "./libs/rubik/rubik.so", .argv = {"<program>", "-p", "0x3", "-q", "2"}, .argc = 5},
     // {.path = "./libs/Libnids-slow/libMoon_Libnids_Slow.so", .argv = {}, .argc = 0},
     {.path = "./nfd/five/rtc.so", .argv = {"<program>"}, .argc = 1},

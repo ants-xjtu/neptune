@@ -21,6 +21,17 @@ Another interesting proof that I'm on the right track is that
 by running `readelf -d ./libs/rubik-final*`, 
 you will find that every copy of hashed rubik share the same file size.
 
+*upd:* For some unknown reason, `rubik-final*` is injected with a dependency called `libTianGou.so.1`,
+which might be a legacy from NB experiments.
+So the path of rubik is pointed to `libs/rubik-new`.
+(Though it does not have the latest timestamp)
+Also, `libs/rubik-new2` has older timestamp than `libs/rubik-new`,
+which may be a result of a later single-core experiment.
+Thus, I create a copy of `libs/rubik2`.
+
+All these issues will be solved after we adopt a clean-slate, compile-from-scratch
+approach towards our MOONs.
+
 ## nDPI
 
 Similarly, `./libs/ndpiReader.so` is the taint-proof copy (how I wish I created this for every NF!).
@@ -68,7 +79,7 @@ As `./RunMoon/go.sh` is coupled with one SFC on one chain model,
 I have to craft the command manually, just like the times before this script is created.
 
 ```
-sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/hypermoon/neptune-yh/libs/fastclick:/home/hypermoon/neptune-yh/libs/Libnids-clean:/home/hypermoon/neptune-yh/libs/ndpi:/home/hypermoon/neptune-yh/libs/rubik-final:/home/hypermoon/neptune-yh/libs/fastclick2:/home/hypermoon/neptune-yh/libs/Libnids-clean2:/home/hypermoon/neptune-yh/libs/ndpi2:/home/hypermoon/neptune-yh/libs/rubik-final2:/home/hypermoon/neptune-yh/libs/fastclick3:/home/hypermoon/neptune-yh/libs/Libnids-clean3:/home/hypermoon/neptune-yh/libs/ndpi3:/home/hypermoon/neptune-yh/libs/rubik-final3:/home/hypermoon/neptune-yh/libs/fastclick4:/home/hypermoon/neptune-yh/libs/Libnids-clean4:/home/hypermoon/neptune-yh/libs/ndpi4:/home/hypermoon/neptune-yh/libs/rubik-final4:/home/hypermoon/neptune-yh/libs/fastclick5:/home/hypermoon/neptune-yh/libs/Libnids-clean5:/home/hypermoon/neptune-yh/libs/ndpi5:/home/hypermoon/neptune-yh/libs/rubik-final5:/home/hypermoon/neptune-yh/libs/fastclick6:/home/hypermoon/neptune-yh/libs/Libnids-clean6:/home/hypermoon/neptune-yh/libs/ndpi6:/home/hypermoon/neptune-yh/libs/rubik-final6:/home/hypermoon/neptune-yh/libs/fastclick7:/home/hypermoon/neptune-yh/libs/Libnids-clean7:/home/hypermoon/neptune-yh/libs/ndpi7:/home/hypermoon/neptune-yh/libs/rubik-final7:/home/hypermoon/neptune-yh/libs/fastclick8:/home/hypermoon/neptune-yh/libs/Libnids-clean8:/home/hypermoon/neptune-yh/libs/ndpi8:/home/hypermoon/neptune-yh/libs/rubik-final8:/home/hypermoon/neptune-yh/libs/fastclick9:/home/hypermoon/neptune-yh/libs/Libnids-clean9:/home/hypermoon/neptune-yh/libs/ndpi9:/home/hypermoon/neptune-yh/libs/rubik-final9:/home/hypermoon/neptune-yh/libs/fastclick10:/home/hypermoon/neptune-yh/libs/Libnids-clean10:/home/hypermoon/neptune-yh/libs/ndpi10:/home/hypermoon/neptune-yh/libs/rubik-final10:/home/hypermoon/neptune-yh/build ./build/RunMoon -c 0xb -- ./build/libTianGou.so --pku 3 4 5 7
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/hypermoon/neptune-yh/libs/fastclick:/home/hypermoon/neptune-yh/libs/Libnids-clean:/home/hypermoon/neptune-yh/libs/ndpi:/home/hypermoon/neptune-yh/libs/rubik-new:/home/hypermoon/neptune-yh/libs/fastclick2:/home/hypermoon/neptune-yh/libs/Libnids-clean2:/home/hypermoon/neptune-yh/libs/ndpi2:/home/hypermoon/neptune-yh/libs/rubik-new2:/home/hypermoon/neptune-yh/libs/fastclick3:/home/hypermoon/neptune-yh/libs/Libnids-clean3:/home/hypermoon/neptune-yh/libs/ndpi3:/home/hypermoon/neptune-yh/libs/rubik-new3:/home/hypermoon/neptune-yh/libs/fastclick4:/home/hypermoon/neptune-yh/libs/Libnids-clean4:/home/hypermoon/neptune-yh/libs/ndpi4:/home/hypermoon/neptune-yh/libs/rubik-new4:/home/hypermoon/neptune-yh/libs/fastclick5:/home/hypermoon/neptune-yh/libs/Libnids-clean5:/home/hypermoon/neptune-yh/libs/ndpi5:/home/hypermoon/neptune-yh/libs/rubik-new5:/home/hypermoon/neptune-yh/libs/fastclick6:/home/hypermoon/neptune-yh/libs/Libnids-clean6:/home/hypermoon/neptune-yh/libs/ndpi6:/home/hypermoon/neptune-yh/libs/rubik-new6:/home/hypermoon/neptune-yh/libs/fastclick7:/home/hypermoon/neptune-yh/libs/Libnids-clean7:/home/hypermoon/neptune-yh/libs/ndpi7:/home/hypermoon/neptune-yh/libs/rubik-new7:/home/hypermoon/neptune-yh/libs/fastclick8:/home/hypermoon/neptune-yh/libs/Libnids-clean8:/home/hypermoon/neptune-yh/libs/ndpi8:/home/hypermoon/neptune-yh/libs/rubik-new8:/home/hypermoon/neptune-yh/libs/fastclick9:/home/hypermoon/neptune-yh/libs/Libnids-clean9:/home/hypermoon/neptune-yh/libs/ndpi9:/home/hypermoon/neptune-yh/libs/rubik-new9:/home/hypermoon/neptune-yh/libs/fastclick10:/home/hypermoon/neptune-yh/libs/Libnids-clean10:/home/hypermoon/neptune-yh/libs/ndpi10:/home/hypermoon/neptune-yh/libs/rubik-new10:/home/hypermoon/neptune-yh/build ./build/RunMoon -c 0xb -- ./build/libTianGou.so --pku 3 4 5 7
 ```
 
 To test fastclick using only 5 flows:
@@ -101,4 +112,9 @@ sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/hypermoon/neptune-yh/libs/Libnids-cl
 And fastclick followed by nDPI:
 ```
 sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/hypermoon/neptune-yh/libs/fastclick:/home/hypermoon/neptune-yh/libs/fastclick2:/home/hypermoon/neptune-yh/libs/fastclick3:/home/hypermoon/neptune-yh/libs/fastclick4:/home/hypermoon/neptune-yh/libs/fastclick5:/home/hypermoon/neptune-yh/libs/fastclick6:/home/hypermoon/neptune-yh/libs/fastclick7:/home/hypermoon/neptune-yh/libs/fastclick8:/home/hypermoon/neptune-yh/libs/fastclick9:/home/hypermoon/neptune-yh/libs/fastclick10:/home/hypermoon/neptune-yh/libs/ndpi:/home/hypermoon/neptune-yh/libs/ndpi2:/home/hypermoon/neptune-yh/libs/ndpi3:/home/hypermoon/neptune-yh/libs/ndpi4:/home/hypermoon/neptune-yh/libs/ndpi5:/home/hypermoon/neptune-yh/libs/ndpi6:/home/hypermoon/neptune-yh/libs/ndpi7:/home/hypermoon/neptune-yh/libs/ndpi8:/home/hypermoon/neptune-yh/libs/ndpi9:/home/hypermoon/neptune-yh/libs/ndpi10:/home/hypermoon/neptune-yh/build ./build/RunMoon -c 0xb -- ./build/libTianGou.so --pku 3 5
+```
+
+Rubik only:
+```
+sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/hypermoon/neptune-yh/libs/rubik-new:/home/hypermoon/neptune-yh/libs/rubik-new2:/home/hypermoon/neptune-yh/libs/rubik-new3:/home/hypermoon/neptune-yh/libs/rubik-new4:/home/hypermoon/neptune-yh/libs/rubik-new5:/home/hypermoon/neptune-yh/libs/rubik-new6:/home/hypermoon/neptune-yh/libs/rubik-new7:/home/hypermoon/neptune-yh/libs/rubik-new8:/home/hypermoon/neptune-yh/libs/rubik-new9:/home/hypermoon/neptune-yh/libs/rubik-new10:/home/hypermoon/neptune-yh/build ./build/RunMoon -c 0xb -- ./build/libTianGou.so --pku 7
 ```
