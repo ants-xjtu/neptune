@@ -176,8 +176,10 @@ void RedirectEthDevices(struct rte_eth_dev *devices);
 // bench
 uint64_t numberTimerSecond;
 extern uint64_t timer_period;
+int record_interval;
 void RecordBench(uint64_t);
 void PrintBench();
+void RecordBenchToFile(uint64_t, FILE *);
 
 // pkey
 void UpdatePkey(unsigned int workerId);

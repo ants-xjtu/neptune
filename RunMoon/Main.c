@@ -2,6 +2,8 @@
 #include "../Loader/NFlink.h"
 
 uint64_t timer_period = 1; /* default period is 10 seconds */
+uint64_t record_period = 1; // inter-server time interval for worker node profiling
+int record_interval = 10; // default time interval is 1s/10
 
 
 struct MoonConfig CONFIG[] = {
@@ -54,6 +56,8 @@ int main(int argc, char *argv[])
     SetupDpdk();
     numberTimerSecond = timer_period;
     timer_period *= rte_get_timer_hz();
+    record_period *= rte_get_timer_hz();
+    record_period /= record_interval;
     struct rte_eth_dev_info srcInfo, dstInfo;
     rte_eth_dev_info_get(srcPort, &srcInfo);
     rte_eth_dev_info_get(dstPort, &dstInfo);
@@ -166,14 +170,14 @@ int main(int argc, char *argv[])
         static int oneTime = 0;
         PrintBench();
         // TODO: supervisor tasks, update chain, redirect traffic, etc.
-        if (oneTime)
-            continue;
-        isBlocking = 1;
-        while (endOfBatch == 0) {}
-        // mprotect all the pages of an NF to be read only
-        BlockMoon(0);
-        isBlocking = 0;
-        oneTime++;
+        // if (oneTime)
+        //     continue;
+        // isBlocking = 1;
+        // while (endOfBatch == 0) {}
+        // // mprotect all the pages of an NF to be read only
+        // BlockMoon(0);
+        // isBlocking = 0;
+        // oneTime++;
     }
 
     RTE_LCORE_FOREACH_WORKER(workerId)
@@ -508,6 +512,14 @@ int MainLoop(void *_arg)
     int numPass = 0;
 
     DisablePkey(1);
+
+    FILE *profilingResult = fopen("worker_performance.csv", "w+");
+    if (!profilingResult)
+    {
+        fprintf(stderr, "[worker %u] opening profile result failed\n", workerId);
+        return -1;
+    }
+
     RTE_LOG(INFO, L2FWD, "entering main loop on lcore $%u\n", lcore_id);
     printf("entering main loop on lcore $%u\n", lcore_id);
     printf("lcore %u is processing rx queue %d, tx queue %d\n", 
@@ -530,14 +542,13 @@ int MainLoop(void *_arg)
                 /* advance the timer */
                 timer_tsc += diff_tsc;
                 /* if timer has reached its timeout */
-                if (unlikely(timer_tsc >= timer_period))
+                if (unlikely(timer_tsc >= record_period))
                 {
                     /* reset the timer */
                     timer_tsc = 0;
-                    RecordBench(cur_tsc);
-                    // ssPrintBench();
-                    // upPrintBench();
-                    // hsPrintBench();
+                    // record the performance into file
+                    // RecordBench(cur_tsc);
+                    RecordBenchToFile(cur_tsc, profilingResult);
                 }
             }
             prev_tsc = cur_tsc;
@@ -804,21 +815,21 @@ uint16_t RxBurst(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
     {
         workerId = rte_lcore_id();
         // we are still in NF thread, retrieve heap usage here
-        if (workerDataList[workerId].current != -1) 
-        {
-            #include <malloc.h>
-            struct mallinfo *mi = HeapInfo();
-            printf("Total non-mmapped bytes (arena):       %d\n", mi->arena);
-            printf("# of free chunks (ordblks):            %d\n", mi->ordblks);
-            printf("# of free fastbin blocks (smblks):     %d\n", mi->smblks);
-            printf("# of mapped regions (hblks):           %d\n", mi->hblks);
-            printf("Bytes in mapped regions (hblkhd):      %d\n", mi->hblkhd);
-            printf("Max. total allocated space (usmblks):  %d\n", mi->usmblks);
-            printf("Free bytes held in fastbins (fsmblks): %d\n", mi->fsmblks);
-            printf("Total allocated space (uordblks):      %d\n", mi->uordblks);
-            printf("Total free space (fordblks):           %d\n", mi->fordblks);
-            printf("Topmost releasable block (keepcost):   %d\n", mi->keepcost);
-        }
+        // if (workerDataList[workerId].current != -1) 
+        // {
+        //     #include <malloc.h>
+        //     struct mallinfo *mi = HeapInfo();
+        //     printf("Total non-mmapped bytes (arena):       %d\n", mi->arena);
+        //     printf("# of free chunks (ordblks):            %d\n", mi->ordblks);
+        //     printf("# of free fastbin blocks (smblks):     %d\n", mi->smblks);
+        //     printf("# of mapped regions (hblks):           %d\n", mi->hblks);
+        //     printf("Bytes in mapped regions (hblkhd):      %d\n", mi->hblkhd);
+        //     printf("Max. total allocated space (usmblks):  %d\n", mi->usmblks);
+        //     printf("Free bytes held in fastbins (fsmblks): %d\n", mi->fsmblks);
+        //     printf("Total allocated space (uordblks):      %d\n", mi->uordblks);
+        //     printf("Total free space (fordblks):           %d\n", mi->fordblks);
+        //     printf("Topmost releasable block (keepcost):   %d\n", mi->keepcost);
+        // }
         workerDataList[workerId].current = moonDataList[workerDataList[workerId].current].switchTo;
         // printf("switch to %d\n", workerDataList[workerId].current);
         MoonSwitch(workerId);

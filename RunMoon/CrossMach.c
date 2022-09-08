@@ -287,6 +287,7 @@ void MapMoon(int configId, unsigned instanceId)
 }
 
 // TODO: reduce code redundency
+// cancel the write permission of a MOON
 void BlockMoon(int moonId)
 {
     int configId = moonDataList[moonId].config;

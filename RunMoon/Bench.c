@@ -48,6 +48,22 @@ void RecordBench(uint64_t currentTsc)
     // printf("[worker$%02d] pps: %.3fK\n", workerId, sum / count);
 }
 
+// record the *immediate* performance of a worker to a file
+void RecordBenchToFile(uint64_t currentTsc, FILE *outputFile)
+{
+    unsigned int workerId = rte_lcore_id();
+    struct l2fwd_port_statistics *stat = &workerDataList[workerId].stat;
+    // TODO: use precise timing instead of fixed
+    double bps = (double)stat->bytes * record_interval / 1000 / 1000 * 8;
+    stat->tx = 0;
+    stat->bytes = 0;
+
+    char currLine[64];
+    memset(currLine, 0, 64);
+    sprintf(currLine, "%" PRIu64 ",%f,,\n", currentTsc, bps);
+    fwrite(currLine, strlen(currLine), 1, outputFile);
+}
+
 static uint64_t prevPrintTsc;
 
 void PrintBench()
