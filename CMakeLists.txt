@@ -96,6 +96,12 @@ add_library(Moon_Libnids MODULE
 target_link_libraries(Moon_Libnids PRIVATE nids)
 target_link_libraries(Moon_Libnids PRIVATE Threads::Threads)
 
+add_library(Moon_Libnids_Faulty MODULE
+    Moon/LibnidsFaulty.c
+)
+
+target_link_libraries(Moon_Libnids PRIVATE nids)
+target_link_libraries(Moon_Libnids PRIVATE Threads::Threads)
 # add_executable(Libnids_exe Moon/LibnidsWtf.c)
 # target_link_libraries(Libnids_exe PRIVATE nids)
 # target_link_libraries(Libnids_exe PRIVATE Threads::Threads)
