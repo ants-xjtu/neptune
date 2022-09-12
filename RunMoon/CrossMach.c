@@ -387,12 +387,14 @@ void BlockMoon(int moonId)
 }
 
 // dump all the memory mappings recorded in map_entry_buffer
-// in a zero-copy way, i.e. sendfile instead of read+write
-#include <sys/sendfile.h>
+// in a zero-copy way, i.e. copy_file_range instead of read+write
 void PrecopyMoon(const char *baseDir)
 {
     int recordEntryCtr = 0;
     int memFd = open64("/proc/self/mem", O_RDONLY | O_LARGEFILE);
+    struct stat memStat;
+    fstat(memFd, &memStat);
+    printf("the length of memory file is %lx\n", memStat.st_size);
     if (unlikely(memFd == -1))
     {
         fprintf(stderr, "[PrecopyMoon] open virtual memory failed\n");
@@ -414,9 +416,11 @@ void PrecopyMoon(const char *baseDir)
             abort();
         }
         loff_t offset = map_entry_buffer[recordEntryCtr].startAddr;
+        // TODO: see why sendfile and splice failed
         // size_t sendCount = (size_t) map_entry_buffer[recordEntryCtr].length;
         // ssize_t bytesWritten = sendfile64(dumpFd, memFd, &offset, sendCount);
         // ssize_t bytesWritten = splice(memFd, &offset, dumpFd, NULL, map_entry_buffer[recordEntryCtr].length, 0);
+        errno = 0;
         ssize_t bytesWritten = copy_file_range(memFd, &offset, dumpFd, NULL, map_entry_buffer[recordEntryCtr].length, 0);
         if (unlikely(bytesWritten == -1))
         {
