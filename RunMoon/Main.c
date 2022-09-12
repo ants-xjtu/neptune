@@ -42,8 +42,8 @@ struct MoonConfig CONFIG[] = {
 //     {"./build/libMoon_MidStat_NoSFI.so", ""},
 //     {"./build/libMoon_MidStat_NoSFI.so", ""},
 // };
-static int isBlocking;
-static int endOfBatch;
+int need_dump = 0;
+int block_finish = 0;
 
 int main(int argc, char *argv[])
 {
@@ -154,9 +154,14 @@ int main(int argc, char *argv[])
         tx += 1;
     }
 
+    // the following utilities is useful when debugging
+    // i.e. showing whether the segfault address is really inside the designated MOON
     printf("[RunMoon] see memory layout\n");
     int sleeper;
     scanf("%d", &sleeper);
+
+    // clearing out stdin
+    while ((getchar()) != '\n');
 
     printf("[RunMoon] launch workers\n");
     RTE_LCORE_FOREACH_WORKER(workerId)
@@ -178,6 +183,14 @@ int main(int argc, char *argv[])
         // BlockMoon(0);
         // isBlocking = 0;
         // oneTime++;
+        if (need_dump && block_finish)
+        {
+            // unblock the worker as soon as the main core acquire the lock
+            // however, this still has the same concurrency issue:
+            // the worker core might finish way too fast, before we could finish the next line
+            need_dump = 0;
+            PrecopyMoon("./dump/tmp/");
+        }
     }
 
     RTE_LCORE_FOREACH_WORKER(workerId)
@@ -528,7 +541,16 @@ int MainLoop(void *_arg)
             workerDataList[workerId].txQueue);
     while (!force_quit)
     {
-        endOfBatch = 0;
+        // block the MOON to dump so that we can track and set it to read only
+        if (need_dump)
+        {
+            BlockMoon(0);
+            block_finish = 1;
+            // print to profiling results to indicate the start of segfault-based live migration
+            const char startProfiling[] = "***Write permission of MOON canceled***\n";
+            fwrite(startProfiling, strlen(startProfiling), 1, profilingResult);
+        }
+        
         cur_tsc = rte_rdtsc();
         /*
 		 * TX burst queue drain
@@ -624,13 +646,6 @@ int MainLoop(void *_arg)
         //     printf("MapMoon finished. Time elapsed: %fs\n", (double)(mm_end - mm_start) / rte_get_tsc_hz());
         //     loaded = 1;
         // }
-        
-        // wait till the lock on blocking is released
-        while (isBlocking) 
-        {
-            // indicate the end of batch, and thus notify the main thread that we can dump/mprotect now
-            endOfBatch = 1;
-        }
     }
     printf("[RunMoon] worker on lcore$%d exit\n", lcore_id);
     return 0;

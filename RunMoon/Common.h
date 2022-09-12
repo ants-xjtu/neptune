@@ -172,6 +172,7 @@ uint16_t srcPort, dstPort;
 uintptr_t mbufLow, mbufHigh;
 void SetupDpdk();
 void RedirectEthDevices(struct rte_eth_dev *devices);
+extern int dirty_pages;
 
 // bench
 uint64_t numberTimerSecond;
@@ -192,5 +193,10 @@ void ProtectMoon(const char *moonPath, int pkey);
 void DumpMoon(int moonId, unsigned instanceId);
 void MapMoon(int configId, unsigned instanceId);
 void BlockMoon(int moonId);
+void PrecopyMoon(const char *baseDir);
+// the worker sets this flag needs main core to conduct pre-copy
+extern int need_dump;
+// the worker notify the main core when finish blockmoon 
+extern int block_finish;
 
 #endif

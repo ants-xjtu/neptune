@@ -13,6 +13,16 @@ static void *EndAddr   = (void *)0x700000000000;
 // page does not have to be 1000, but we buffer it every 1000
 static char pageBuf[4096];
 
+struct MapEntry
+{
+    uint64_t startAddr;
+    uint64_t length;
+    char perm[5];
+};
+
+// singleton to save all maps of the MOON to dump
+struct MapEntry map_entry_buffer[128];
+
 // path.split('/')[-2]
 static const char *FindDir(const char *path)
 {
@@ -288,6 +298,7 @@ void MapMoon(int configId, unsigned instanceId)
 
 // TODO: reduce code redundency
 // cancel the write permission of a MOON
+// also, record the address span of the MOON to dump
 void BlockMoon(int moonId)
 {
     int configId = moonDataList[moonId].config;
@@ -311,7 +322,13 @@ void BlockMoon(int moonId)
     int nConsumed;
     uint64_t mapLength;
     void *end = moonDataList[moonId].workers[workerId].arenaEnd;
+    // use start address of arena to mark the stack
+    // yet the mapping always starts 0x1000 eariler
+    // so that we hard code it for now.
+    // TODO: fix the hard code
+    void *start = (void *)((uint64_t)moonDataList[moonId].workers[workerId].arenaStart - 0x1000);
     int dump = 0;
+    int recordEntryCtr = 0;
 
     while (fgets(lineBuf, sizeof(lineBuf), map))
     {
@@ -339,14 +356,76 @@ void BlockMoon(int moonId)
                 // writeable implies readable
                 int pr = 0;
                 pr |= (perm[2] == 'x')? PROT_EXEC: 0;
-                if (mprotect((void *)addrStart, mapLength, pr | PROT_READ))
+                // we find the main stack. Never play with its permission 
+                if (addrStart == (uint64_t)start)
+                {
+                    printf("[BlockMoon] Find main stack of moon and escape it\n");
+                    goto post_protect;
+                }
+                if (unlikely(mprotect((void *)addrStart, mapLength, pr | PROT_READ) == -1))
                 {
                     fprintf(stderr, "[BlockMoon] mprotect failed with: addr=%p, len=%lu, prot=%d", (void *)addrStart, mapLength, pr);
                     return;
                 }
             }
+        post_protect:
             prevEnd = addrEnd;
+            map_entry_buffer[recordEntryCtr].startAddr = addrStart;
+            map_entry_buffer[recordEntryCtr].length = mapLength;
+            // the destination lies in .bss, thus is zero terminated on default
+            strncpy(map_entry_buffer[recordEntryCtr].perm, perm, 4);
+            recordEntryCtr++;
+            if (unlikely(recordEntryCtr >= 128))
+            {
+                fprintf(stderr, "[BlockMoon] The number of pre-defined map entries reachs limit, return in advance\n");
+                return;
+            }
         }
     }
+    fclose(map);
+    printf("[BlockMoon] Successfully set a MOON with non-writable\n");
+}
 
+// dump all the memory mappings recorded in map_entry_buffer
+// in a zero-copy way, i.e. sendfile instead of read+write
+#include <sys/sendfile.h>
+void PrecopyMoon(const char *baseDir)
+{
+    int recordEntryCtr = 0;
+    int memFd = open64("/proc/self/mem", O_RDONLY | O_LARGEFILE);
+    if (unlikely(memFd == -1))
+    {
+        fprintf(stderr, "[PrecopyMoon] open virtual memory failed\n");
+        abort();
+    }
+    while (map_entry_buffer[recordEntryCtr].length != 0 && recordEntryCtr < 128)
+    {
+        char filename[128] = "";
+        strcpy(filename, baseDir);
+        sprintf(filename + strlen(filename), "%" PRIx64 "_%" PRIx64 "_%s.dump", 
+            map_entry_buffer[recordEntryCtr].startAddr,
+            map_entry_buffer[recordEntryCtr].length,
+            map_entry_buffer[recordEntryCtr].perm);
+        printf("[main] creating dump file at: %s\n", filename);
+        int dumpFd = open64(filename, O_WRONLY | O_CREAT | O_LARGEFILE, 0644);
+        if (unlikely(dumpFd == -1))
+        {
+            fprintf(stderr, "[PrecopyMoon] open memory dump %s failed\n", filename);
+            abort();
+        }
+        loff_t offset = map_entry_buffer[recordEntryCtr].startAddr;
+        // size_t sendCount = (size_t) map_entry_buffer[recordEntryCtr].length;
+        // ssize_t bytesWritten = sendfile64(dumpFd, memFd, &offset, sendCount);
+        // ssize_t bytesWritten = splice(memFd, &offset, dumpFd, NULL, map_entry_buffer[recordEntryCtr].length, 0);
+        ssize_t bytesWritten = copy_file_range(memFd, &offset, dumpFd, NULL, map_entry_buffer[recordEntryCtr].length, 0);
+        if (unlikely(bytesWritten == -1))
+        {
+            perror("[PrecopyMoon] copy_file_range failed because");
+            abort();
+        }
+        close(dumpFd);
+        recordEntryCtr++;
+    }
+    close(memFd);
+    printf("[PrecopyMoon] Done.\n");
 }

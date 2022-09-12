@@ -11,9 +11,39 @@ void signal_handler(int signum)
             printf("Exit ungracefully now, should check for blocking/looping in code.\n");
             abort();
         }
-        printf("Signal %d received, preparing to exit...\n",
-               signum);
-        force_quit = true;
+        printf("Signal %d received, waiting for user action...\n\
+Pressing \'d\' to start dumping, otherwise quitting\n", signum);
+        char userOption = getchar();
+        if (userOption == 'd')
+        {
+            printf("Confirm dumping.\n");
+            need_dump = 1;
+        }
+        else
+        {
+            printf("receiving option %c\n", userOption);
+            force_quit = true;
+        }
+            
+    }
+}
+
+int dirty_pages = 0;
+
+void segv_handler(int signum, siginfo_t *info, void *context)
+{
+    size_t addr_num = ((size_t)info->si_addr >> 12) << 12;
+    // printf("Instruction pointer: %p\n",
+    //        (((ucontext_t*)context)->uc_mcontext.gregs[16]));
+    // printf("Addr: %p\n", (void *)addr_num);
+    dirty_pages++;
+    // note that printing in signal handler is generally bad approach
+    printf("[worker] catch a segfault in %p! Now dirty page count: %d\n", (void *)addr_num, dirty_pages);
+    // assume no page would have 'w' and 'x' at the same time
+    if (mprotect((void *)addr_num, 4096, PROT_READ | PROT_WRITE))
+    {
+        printf("restoring memory protection failed\n");
+        abort();
     }
 }
 
@@ -226,6 +256,11 @@ void SetupDpdk()
     force_quit = false;
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
+
+    struct sigaction act1;
+    act1.sa_flags = SA_SIGINFO | SA_NODEFER;
+    act1.sa_sigaction = &segv_handler;
+    sigaction(SIGSEGV, &act1, NULL);
 
     uint16_t nb_ports = rte_eth_dev_count_avail();
     if (nb_ports < 2)
