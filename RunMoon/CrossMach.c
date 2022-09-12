@@ -1,6 +1,7 @@
 #include "Common.h"
 #include <dirent.h>
 #include <fcntl.h>
+#define _FILE_OFFSET_BITS 64
 
 #define TOTAL_SLOTS 128
 #define ACTIVE_NFS 16
@@ -391,15 +392,6 @@ void BlockMoon(int moonId)
 void PrecopyMoon(const char *baseDir)
 {
     int recordEntryCtr = 0;
-    int memFd = open64("/proc/self/mem", O_RDONLY | O_LARGEFILE);
-    struct stat memStat;
-    fstat(memFd, &memStat);
-    printf("the length of memory file is %lx\n", memStat.st_size);
-    if (unlikely(memFd == -1))
-    {
-        fprintf(stderr, "[PrecopyMoon] open virtual memory failed\n");
-        abort();
-    }
     while (map_entry_buffer[recordEntryCtr].length != 0 && recordEntryCtr < 128)
     {
         char filename[128] = "";
@@ -409,27 +401,40 @@ void PrecopyMoon(const char *baseDir)
             map_entry_buffer[recordEntryCtr].length,
             map_entry_buffer[recordEntryCtr].perm);
         printf("[main] creating dump file at: %s\n", filename);
-        int dumpFd = open64(filename, O_WRONLY | O_CREAT | O_LARGEFILE, 0644);
+        int dumpFd = open(filename, O_RDWR | O_CREAT, 0666);
         if (unlikely(dumpFd == -1))
         {
             fprintf(stderr, "[PrecopyMoon] open memory dump %s failed\n", filename);
             abort();
         }
-        loff_t offset = map_entry_buffer[recordEntryCtr].startAddr;
-        // TODO: see why sendfile and splice failed
-        // size_t sendCount = (size_t) map_entry_buffer[recordEntryCtr].length;
-        // ssize_t bytesWritten = sendfile64(dumpFd, memFd, &offset, sendCount);
-        // ssize_t bytesWritten = splice(memFd, &offset, dumpFd, NULL, map_entry_buffer[recordEntryCtr].length, 0);
-        errno = 0;
-        ssize_t bytesWritten = copy_file_range(memFd, &offset, dumpFd, NULL, map_entry_buffer[recordEntryCtr].length, 0);
-        if (unlikely(bytesWritten == -1))
+        // if the mapping is not readable, we just create an empty file for it
+        if (map_entry_buffer[recordEntryCtr].perm[0] == '-')
         {
-            perror("[PrecopyMoon] copy_file_range failed because");
-            abort();
+            if (unlikely(fallocate(dumpFd, FALLOC_FL_ZERO_RANGE, 0, map_entry_buffer[recordEntryCtr].length) == -1))
+            {
+                perror("[PrecopyMoon] cannot fallocate new file");
+                abort();
+            }
         }
+        else
+        {
+            ssize_t bytesWritten = 0;
+            do
+            {
+                bytesWritten += write(dumpFd,
+                    (void *)(map_entry_buffer[recordEntryCtr].startAddr + bytesWritten), 
+                    map_entry_buffer[recordEntryCtr].length - bytesWritten);
+                if (unlikely(bytesWritten == -1))
+                {
+                    perror("[PrecopyMoon] cannot write to file");
+                    abort();
+                }
+            } while (bytesWritten != map_entry_buffer[recordEntryCtr].length);
+        }
+                
+        
         close(dumpFd);
         recordEntryCtr++;
     }
-    close(memFd);
     printf("[PrecopyMoon] Done.\n");
 }
