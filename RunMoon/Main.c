@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
     argv += ret;
 
     SetupDpdk();
+    SetupIPC();
     numberTimerSecond = timer_period;
     timer_period *= rte_get_timer_hz();
     record_period *= rte_get_timer_hz();
@@ -106,7 +107,7 @@ int main(int argc, char *argv[])
         enablePku = 1;
     }
 
-    // this is bad. But we can assume no pku is enabled during migration
+    // TODO: fix hard code in argument parsing
     if (strcmp(argv[2], "--map") == 0)
     {
         i += 1;
@@ -169,28 +170,38 @@ int main(int argc, char *argv[])
         rte_eal_remote_launch(MainLoop, NULL, workerId);
     }
 
-    printf("*** START RUNTIME MAIN LOOP ***\n");
+    printf("*** START RUNTIME MAIN LOOP on lcore %u***\n", rte_lcore_id());
     while (!force_quit)
     {
         static int oneTime = 0;
         PrintBench();
-        // TODO: supervisor tasks, update chain, redirect traffic, etc.
-        // if (oneTime)
-        //     continue;
-        // isBlocking = 1;
-        // while (endOfBatch == 0) {}
-        // // mprotect all the pages of an NF to be read only
-        // BlockMoon(0);
-        // isBlocking = 0;
-        // oneTime++;
-        if (need_dump && block_finish)
+        // *** primary proc ***
+        if (!needMap)
         {
-            // unblock the worker as soon as the main core acquire the lock
-            // however, this still has the same concurrency issue:
-            // the worker core might finish way too fast, before we could finish the next line
-            need_dump = 0;
-            PrecopyMoon("./dump/tmp/");
+            if (need_dump && block_finish)
+            {
+                // unblock the worker as soon as the main core acquire the lock
+                // however, this still has the same concurrency issue:
+                // the worker core might finish way too fast, before we could finish the next line
+                need_dump = 0;
+                PrecopyMoon("./dump/tmp/");
+                
+                write(sharedFd, "1", 1);
+            }
         }
+        // *** secondary proc ***
+        else
+        {
+            // polling a shared memory flag
+            char c;
+            ssize_t br = 0;
+            while (br == 0)
+                br += read(sharedFd, &c, 1);
+
+            printf("Secondary neptune received message\n");
+            exit(0);
+        }
+        
     }
 
     RTE_LCORE_FOREACH_WORKER(workerId)
@@ -202,7 +213,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-static void RewriteMoonPath(struct PrivateLibrary *library, int workerId, int moonId)
+static void RewriteMoonPath(struct PrivateLibrary *library, int moonId)
 {
     // using renaming to fix multi-instance Moon. Works for multi-core and 
     // uni-core duplicated instances.
@@ -212,21 +223,11 @@ static void RewriteMoonPath(struct PrivateLibrary *library, int workerId, int mo
         if (moonDataList[i].config == moonDataList[moonId].config)
             instanceCtr++;
     }
-    if (workerId == 1 && instanceCtr == 0)
-        // lcore 1 is handled by default
+    if (loading.workerCount == 0 && instanceCtr == 0)
+        // everything on the first lcore is unchanged
         return;
     // NB: simply do not duplicate instance in MC
-    int newId;
-    if (workerId == 1)
-    {
-        // if we are duplicating instances, assume we are on worker$1
-        newId = instanceCtr + 1;
-    }
-    else
-    {
-        // otherwise, the index will increase with the number of worker count
-        newId = loading.workerCount + 1;
-    }
+    int newId = loading.workerCount;
     char workerid[16];
     sprintf(workerid, "%d", newId);
     char *p = malloc(strlen(library->file) + 5);
@@ -279,7 +280,7 @@ void LoadMoon(char *moonPath, int moonId, int configIndex)
 
         struct PrivateLibrary library;
         library.file = moonPath;
-        RewriteMoonPath(&library, workerId, moonId);
+        RewriteMoonPath(&library, moonId);
         // we don't need to know the size of a library beforehand now
         // LoadLibrary(&library);
         // printf("library requires space: %#lx\n", library.length);

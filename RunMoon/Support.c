@@ -317,6 +317,25 @@ void SetupDpdk()
     // check_all_ports_link_status(portMask);
 }
 
+int sharedFd;
+void SetupIPC()
+{
+    if (needMap == 0)
+    {
+        // truncate the file so that there won't be redundant content across multiple runs
+        sharedFd = open("/dev/shm/nptn_shared_flag", O_RDWR | O_CREAT | O_TRUNC);
+    }
+    else
+    {
+        sharedFd = open("/dev/shm/nptn_shared_flag", O_RDONLY);
+    }
+    if (sharedFd == -1)
+    {
+        fprintf(stderr, "[SetupIPC] cannot open shared file\n");
+        abort();
+    }
+}
+
 uint16_t RxBurstNop(void *rxq, struct rte_mbuf **rx_pkts, uint16_t nb_pkts)
 {
     return 0;

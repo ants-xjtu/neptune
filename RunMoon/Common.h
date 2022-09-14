@@ -24,6 +24,7 @@
 #include <time.h>
 #include <sys/mman.h>
 #include <dirent.h>
+#include <fcntl.h>
 
 #include <rte_common.h>
 #include <rte_log.h>
@@ -174,6 +175,8 @@ uintptr_t mbufLow, mbufHigh;
 void SetupDpdk();
 void RedirectEthDevices(struct rte_eth_dev *devices);
 extern int dirty_pages;
+void SetupIPC();
+extern int sharedFd;
 
 // bench
 uint64_t numberTimerSecond;

@@ -1,6 +1,4 @@
 #include "Common.h"
-#include <dirent.h>
-#include <fcntl.h>
 #define _FILE_OFFSET_BITS 64
 
 #define TOTAL_SLOTS 128
@@ -388,7 +386,8 @@ void BlockMoon(int moonId)
 }
 
 // dump all the memory mappings recorded in map_entry_buffer
-// in a zero-copy way, i.e. copy_file_range instead of read+write
+// in a zero-copy way, i.e. write from an immediate address instead of read+write
+// together with new `BlockMoon`, reading maps file and dumping them are decoupled
 void PrecopyMoon(const char *baseDir)
 {
     int recordEntryCtr = 0;
@@ -431,8 +430,7 @@ void PrecopyMoon(const char *baseDir)
                 }
             } while (bytesWritten != map_entry_buffer[recordEntryCtr].length);
         }
-                
-        
+
         close(dumpFd);
         recordEntryCtr++;
     }

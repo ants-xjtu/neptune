@@ -37,7 +37,7 @@ while [[ "$#" -gt 0 ]]; do
         -c|--core) coreMask="$2"; shift; shift;;
         -p|--pku) enablePku="--pku"; shift;;
         -g|--debug) debugFlag="gdb --args"; shift;;
-        -n|--needmap) needMap="--map"; shift;;
+        -n|--needmap) needMap="--map"; filePrefix="--file-prefix=nptnSec_"; shift;;
         *) echo "bad argument $1"; exit 1;;
     esac
 done
@@ -49,11 +49,9 @@ then
     exit 1;
 fi
 
-detectCore=$coreMask
+detectCore=$((coreMask))
 numCore=0
 
-# ignore main core which is always on lcore 0
-detectCore=$((detectCore>>1))
 while [ ! "$detectCore" -eq "0" ]
 do
     # echo $detectCore
@@ -63,6 +61,8 @@ do
     fi
     detectCore=$((detectCore>>1))
 done
+# 1 main core, numCore-1 worker core
+numCore=$((numCore-1))
 # coreMask=$(( (1<<(numCore+1))-1 ))
 # coreMask=$( printf "%x" $coreMask )
 # echo "core mask=$coreMask"
@@ -124,6 +124,6 @@ perm="sudo"
 progName="./build/RunMoon"
 tiangouPath="./build/libTianGou.so"
 # cmd="$perm $libraryPath $debugFlag $progName -c 0x$coreMask -- $tiangouPath $enablePku $moonConfig"
-cmd="$perm $libraryPath $debugFlag $progName -c $coreMask -- $tiangouPath $enablePku $needMap $moonConfig"
+cmd="$perm $libraryPath $debugFlag $progName -c $coreMask $filePrefix -- $tiangouPath $enablePku $needMap $moonConfig"
 echo $cmd
 eval $cmd
