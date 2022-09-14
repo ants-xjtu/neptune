@@ -53,6 +53,27 @@ int main(int argc, char *argv[])
     argc -= ret;
     argv += ret;
 
+    if (argc < 3)
+    {
+        printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon_idx> [<moon_idxs>]\n", argv[0]);
+        return 0;
+    }
+    
+    int argIndex = 2;
+    enablePku = 0;
+    if (strcmp(argv[2], "--pku") == 0)
+    {
+        argIndex += 1;
+        enablePku = 1;
+    }
+
+    // TODO: fix hard code in argument parsing
+    if (strcmp(argv[2], "--map") == 0)
+    {
+        argIndex += 1;
+        needMap = 1;
+    }
+
     SetupDpdk();
     SetupIPC();
     numberTimerSecond = timer_period;
@@ -61,14 +82,7 @@ int main(int argc, char *argv[])
     record_period /= record_interval;
     struct rte_eth_dev_info srcInfo, dstInfo;
     rte_eth_dev_info_get(srcPort, &srcInfo);
-    rte_eth_dev_info_get(dstPort, &dstInfo);
-
-    if (argc < 3)
-    {
-        printf("usage: %s [EAL options] -- [--pku] <tiangou> <moon_idx> [<moon_idxs>]\n", argv[0]);
-        return 0;
-    }
-    // InitLoader(argc, argv, environ);
+    rte_eth_dev_info_get(dstPort, &dstInfo);    
 
     const char *tiangouPath = argv[1];
     printf("loading tiangou library %s\n", tiangouPath);
@@ -99,25 +113,10 @@ int main(int argc, char *argv[])
     // PreloadLibrary(tiangou);
     printf("%s: tiangou\n", DONE_STRING);
 
-    int i = 2;
-    enablePku = 0;
-    if (strcmp(argv[2], "--pku") == 0)
-    {
-        i += 1;
-        enablePku = 1;
-    }
-
-    // TODO: fix hard code in argument parsing
-    if (strcmp(argv[2], "--map") == 0)
-    {
-        i += 1;
-        needMap = 1;
-    }
-
     int configIndex[16];
-    for (int moonId = 0; i < argc; moonId += 1, i += 1)
+    for (int moonId = 0; argIndex < argc; moonId += 1, argIndex += 1)
     {
-        configIndex[moonId] = atoi(argv[i]);
+        configIndex[moonId] = atoi(argv[argIndex]);
         configIndex[moonId + 1] = -1;
     }
     loading.inProgress = 1;

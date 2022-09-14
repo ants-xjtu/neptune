@@ -257,11 +257,15 @@ void SetupDpdk()
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    struct sigaction act1;
-    act1.sa_flags = SA_SIGINFO | SA_NODEFER;
-    act1.sa_sigaction = &segv_handler;
-    sigaction(SIGSEGV, &act1, NULL);
-
+    // only register sigfault handler in source process, because there might be issues in dest.
+    if (needMap == 0)
+    {
+        struct sigaction act1;
+        act1.sa_flags = SA_SIGINFO | SA_NODEFER;
+        act1.sa_sigaction = &segv_handler;
+        sigaction(SIGSEGV, &act1, NULL);
+    }
+    
     uint16_t nb_ports = rte_eth_dev_count_avail();
     if (nb_ports < 2)
         rte_exit(EXIT_FAILURE, "No enough Ethernet ports - bye\n");
