@@ -80,7 +80,7 @@ void StackStart(int stackId, PrivateStart start)
     currStackId = -1;
 }
 
-void DumpStack(const char *path, unsigned stackIdx)
+void DumpReg(const char *path, unsigned stackIdx)
 {
     FILE *reg = fopen(path, "wb");
     char regBuf[16];
@@ -94,7 +94,7 @@ void DumpStack(const char *path, unsigned stackIdx)
     fclose(reg);
 }
 
-void LoadStack(const char *path, unsigned stackIdx)
+void LoadReg(const char *path, unsigned stackIdx)
 {
     // fopen will segfault
     FILE *reg = fopen(path, "rb");

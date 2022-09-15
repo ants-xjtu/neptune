@@ -35,7 +35,7 @@ void StackSwitch(int stackId);
 void CrossThreadSaveStack();
 void CrossThreadRestoreStack();
 
-void DumpStack(const char *path, unsigned stackIdx);
-void LoadStack(const char *path, unsigned stackIdx);
+void DumpReg(const char *path, unsigned stackIdx);
+void LoadReg(const char *path, unsigned stackIdx);
 
 #endif
