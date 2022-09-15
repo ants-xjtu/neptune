@@ -200,7 +200,7 @@ static void MapRegWorker(int configId, unsigned instanceId)
     strcat(regFile, dumpDir);
     strcat(regFile, "RegFile");
 
-    LoadStack(regFile, instanceId);
+    // LoadStack(regFile, instanceId);
 }
 
 static void MapMoonWorker(int configId)
@@ -385,6 +385,20 @@ void BlockMoon(int moonId)
     printf("[BlockMoon] Successfully set a MOON with non-writable\n");
 }
 
+static void confirmWrite(int fd, uint64_t addr, size_t len)
+{
+    ssize_t bytesWritten = 0;
+    do
+    {
+        bytesWritten += write(fd, (void *)(addr + bytesWritten), len - bytesWritten);
+        if (unlikely(bytesWritten == -1))
+        {
+            fprintf(stderr, "[%s] cannot write to %lx with length %lu", __func__, addr, len);
+            abort();
+        }
+    } while (bytesWritten != len);
+}
+
 // dump all the memory mappings recorded in map_entry_buffer
 // in a zero-copy way, i.e. write from an immediate address instead of read+write
 // together with new `BlockMoon`, reading maps file and dumping them are decoupled
@@ -417,22 +431,144 @@ void PrecopyMoon(const char *baseDir)
         }
         else
         {
-            ssize_t bytesWritten = 0;
-            do
-            {
-                bytesWritten += write(dumpFd,
-                    (void *)(map_entry_buffer[recordEntryCtr].startAddr + bytesWritten), 
-                    map_entry_buffer[recordEntryCtr].length - bytesWritten);
-                if (unlikely(bytesWritten == -1))
-                {
-                    perror("[PrecopyMoon] cannot write to file");
-                    abort();
-                }
-            } while (bytesWritten != map_entry_buffer[recordEntryCtr].length);
+            confirmWrite(dumpFd, map_entry_buffer[recordEntryCtr].startAddr, map_entry_buffer[recordEntryCtr].length);
+            // ssize_t bytesWritten = 0;
+            // do
+            // {
+            //     bytesWritten += write(dumpFd,
+            //         (void *)(map_entry_buffer[recordEntryCtr].startAddr + bytesWritten), 
+            //         map_entry_buffer[recordEntryCtr].length - bytesWritten);
+            //     if (unlikely(bytesWritten == -1))
+            //     {
+            //         perror("[PrecopyMoon] cannot write to file");
+            //         abort();
+            //     }
+            // } while (bytesWritten != map_entry_buffer[recordEntryCtr].length);
         }
 
         close(dumpFd);
         recordEntryCtr++;
     }
     printf("[PrecopyMoon] Done.\n");
+}
+
+// preload the mappings, while prefix indicates its epoch
+void PreloadMoon(const char *baseDir, const char *prefix)
+{
+    DIR *md;
+    char md2[48];
+    struct dirent *f;
+    uint64_t addrStart;
+    uint64_t mapLength;
+    char perm[5];
+    int prot;
+    int fd;
+    char filename[256];
+    int numMapped = 0;
+    int numFiles = 0;
+
+    if (unlikely(NULL == (md = opendir(baseDir))))
+    {
+        fprintf(stderr, "[PreloadMoon] cannot open dump file directory: %s\n", baseDir);
+        return;
+    }
+    
+    while ((f = readdir(md)) != NULL)
+    {
+        numFiles++;
+        printf("[PreloadMoon] opening file %s\n", f->d_name);
+        
+        int prefixLen = strlen(prefix);
+        if(strncmp(f->d_name, prefix, prefixLen) != 0)
+            continue;
+
+        filename[0] = '\0';
+        strcat(filename, baseDir);
+        strcat(filename, f->d_name);
+        // since we will always deal with MAP_PRIVATE, open only needs read perm
+        fd = open(filename, O_RDONLY);
+        if (fd == -1)
+        {
+            fprintf(stderr, "[PreloadMoon] cannot open file: %s\n", filename);
+            return;
+        }
+        sscanf(f->d_name, "%lx_%lx_%4c", &addrStart, &mapLength, perm);
+        
+        prot = 0;
+        prot |= (perm[0] == 'r')? PROT_READ: 0;
+        prot |= (perm[1] == 'w')? PROT_WRITE: 0;
+        prot |= (perm[2] == 'x')? PROT_EXEC: 0;
+
+        // TODO: check if MAP_POPULATE affect performance
+        if (MAP_FAILED == mmap((void *)addrStart, mapLength, prot, 
+                MAP_FILE | MAP_PRIVATE | MAP_FIXED | MAP_POPULATE, fd, 0))
+        {
+            fprintf(stderr, "[PreloadMoon] mmaped failed with addrStart=%lx, mapLength=%lx, prot=%s\n", 
+                addrStart, mapLength, perm);
+            close(fd);
+            return;
+        }
+        close(fd);
+        numMapped += 1;
+    }
+    printf("[PreloadMoon] finish mapping of %d pages out of %d files\n", numMapped, numFiles);
+}
+
+// copy the pages in iterative buffer [low, high]
+void IterCopyMoon(const char *baseDir, int low, int high, const char *prefix)
+{
+    while (low < high)
+    {
+        char filename[128] = "";
+        char outname[64] = "";
+        uint64_t addr = dirtyBuffer[low % MAX_DIRTY_PAGE].addr;
+        uint32_t len  = dirtyBuffer[low % MAX_DIRTY_PAGE].len;
+        uint32_t iter = dirtyBuffer[low % MAX_DIRTY_PAGE].iter;
+
+        sprintf(outname, "%s%d_%lx_%x_rw-p.dump", prefix, iter, addr, len);
+        strcat(filename, baseDir);
+        strcat(filename, outname);
+
+        int fd = open(filename, O_RDWR | O_CREAT);
+        if (fd == -1)
+        {
+            fprintf(stderr, "[%s] opening dump file %s failed\n", __func__, filename);
+            abort();
+        }
+
+        confirmWrite(fd, addr, len);
+        // ssize_t bytesWritten = 0;
+        // do
+        // {
+        //     bytesWritten += write(fd, (void *)addr + bytesWritten, len - bytesWritten);
+        //     if (unlikely(bytesWritten == -1))
+        //     {
+        //         perror("[IterCopyMoon] cannot write to file");
+        //         abort();
+        //     }
+        // } while (bytesWritten < len);
+        close(fd);
+        low++;
+    }
+}
+
+void DumpStack(const char *baseDir, int moonId)
+{
+    unsigned workerId = rte_lcore_id();
+    char path[128] = "";
+    uint64_t start = (uint64_t)(moonDataList[moonId].workers[workerId].arenaStart) - 0x1000;
+    uint64_t end = (uint64_t)(moonDataList[moonId].workers[workerId].arenaStart) + STACK_SIZE;
+    size_t len = end - start;
+
+    sprintf(path, "Stack_%lx_%lx_rw-p.dump", start, len);
+
+    int fd = open(path, O_RDWR | O_CREAT);
+    if (fd == -1)
+    {
+        fprintf(stderr, "[%s] opening dump file %s failed\n", __func__, path);
+        abort();
+    }
+
+    confirmWrite(fd, start, len);
+    close(fd);
 }

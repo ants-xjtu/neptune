@@ -177,6 +177,7 @@ void RedirectEthDevices(struct rte_eth_dev *devices);
 extern int dirty_pages;
 void SetupIPC();
 extern int sharedFd;
+void retrieve_perm();
 
 // bench
 uint64_t numberTimerSecond;
@@ -202,5 +203,23 @@ void PrecopyMoon(const char *baseDir);
 extern int need_dump;
 // the worker notify the main core when finish blockmoon 
 extern int block_finish;
+void PreloadMoon(const char *baseDir, const char *prefix);
+// iterative migration
+struct dirtyPage
+{
+    uint64_t addr;
+    uint32_t len;
+    uint32_t iter;
+};
+#define MAX_DIRTY_PAGE 1024
+extern struct dirtyPage dirtyBuffer[MAX_DIRTY_PAGE];
+extern int iteration_epoch;
+
+// pointer to dirty page buffer
+extern int dirty_lb;
+extern int dirty_mb;
+extern int dirty_ub;
+void IterCopyMoon(const char *baseDir, int low, int high, const char *prefix);
+void DumpStack(const char *, int);
 
 #endif
