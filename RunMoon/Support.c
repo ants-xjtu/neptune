@@ -28,8 +28,6 @@ Pressing \'d\' to start dumping, otherwise quitting\n", signum);
     }
 }
 
-int dirty_pages = 0;
-
 int dirty_lb = 0;
 int dirty_mb = 0;
 int dirty_ub = 0;
@@ -42,18 +40,19 @@ void segv_handler(int signum, siginfo_t *info, void *context)
     // printf("Instruction pointer: %p\n",
     //        (((ucontext_t*)context)->uc_mcontext.gregs[16]));
     // printf("Addr: %p\n", (void *)addr_num);
-    dirty_pages++;
     // note that printing in signal handler is generally bad approach
-    printf("[worker] catch a segfault in %p! Now dirty page count: %d\n", (void *)addr_num, dirty_pages);
 
     dirtyBuffer[dirty_ub % MAX_DIRTY_PAGE].addr = addr_num;
     dirtyBuffer[dirty_ub % MAX_DIRTY_PAGE].len  = 4096;
     dirtyBuffer[dirty_ub % MAX_DIRTY_PAGE].iter = iteration_epoch;
+
+    printf("[worker] catch a segfault in %p! Now dirty page count: %d\n", (void *)addr_num, dirty_ub - dirty_mb);
     if (mprotect((void *)addr_num, 4096, PROT_READ | PROT_WRITE))
     {
         printf("restoring memory protection failed\n");
         abort();
     }
+    dirty_ub++;
 }
 
 // when the worker finds too many dirty pages, it blocks and retrieve the 'w' granted to pervious pages
@@ -69,7 +68,7 @@ void retrieve_perm()
     }
     // a new round of iteration lead to changes in dump prefix
     iteration_epoch++;
-    dirty_mb = dirty_lb;
+    dirty_mb = dirty_ub;
     printf("new round of iteration! Now at #%d\n", iteration_epoch);
 }
 

@@ -174,7 +174,6 @@ uint16_t srcPort, dstPort;
 uintptr_t mbufLow, mbufHigh;
 void SetupDpdk();
 void RedirectEthDevices(struct rte_eth_dev *devices);
-extern int dirty_pages;
 void SetupIPC();
 extern int sharedFd;
 void retrieve_perm();

@@ -511,7 +511,12 @@ void PreloadMoon(const char *baseDir, const char *prefix)
         close(fd);
         numMapped += 1;
     }
-    printf("[PreloadMoon] finish mapping of %d pages out of %d files\n", numMapped, numFiles);
+    if (unlikely(numMapped == 0))
+    {
+        fprintf(stderr, "Cannot find file with prefix %s\n", prefix);
+        abort();
+    }
+    printf("[PreloadMoon] finish mapping of %d pages with prefix %s\n", numMapped, prefix);
 }
 
 // copy the pages in iterative buffer [low, high]
@@ -525,7 +530,7 @@ void IterCopyMoon(const char *baseDir, int low, int high, const char *prefix)
         uint32_t len  = dirtyBuffer[low % MAX_DIRTY_PAGE].len;
         uint32_t iter = dirtyBuffer[low % MAX_DIRTY_PAGE].iter;
 
-        sprintf(outname, "%s%d_%lx_%x_rw-p.dump", prefix, iter, addr, len);
+        sprintf(outname, "%s_%lx_%x_rw-p.dump", prefix, addr, len);
         strcat(filename, baseDir);
         strcat(filename, outname);
 

@@ -46,6 +46,8 @@ int need_dump = 0;
 int block_finish = 0;
 static int worker_done = 0;
 static int main_done   = 0;
+static int converge    = 0;
+static int precopy_done= 0;
 
 int main(int argc, char *argv[])
 {
@@ -172,6 +174,8 @@ int main(int argc, char *argv[])
     }
 
     printf("*** START RUNTIME MAIN LOOP on lcore %u***\n", rte_lcore_id());
+    // the pages copied in previous iteration
+    int prev_copied = 0;
     while (!force_quit)
     {
         static int oneTime = 0;
@@ -188,16 +192,24 @@ int main(int argc, char *argv[])
                 PrecopyMoon("./dump/tmp/");
                 
                 write(sharedFd, "0", 1);
+                precopy_done = 1;
             }
             if (dirty_mb > dirty_lb)
             {
                 char iter_str[16] = "";
-                sprintf(iter_str, "iter%d_", iteration_epoch);
+                sprintf(iter_str, "iter%d", iteration_epoch);
                 IterCopyMoon("./dump/tmp/", dirty_lb, dirty_mb, iter_str);
                 // write the iteration such that the destination can know which prefix to load
                 write(sharedFd, &iter_str[4], 1);
+                printf("iterative copy #%d done, page copied:%d\n", iter_str[4] - '0', dirty_mb - dirty_lb);
+                // we see it as converged if the pages copied between iterations have minor increase
+                if (dirty_mb - dirty_lb - prev_copied < 10)
+                {
+                    printf("[main] dirty pages count converging!\n");
+                    converge = 1;
+                }
+                prev_copied = dirty_mb - dirty_lb;
                 dirty_lb = dirty_mb;
-                printf("iterative copy #%d done\n", iter_str[4]);
             }
             if (worker_done == 1)
             {
@@ -216,8 +228,8 @@ int main(int argc, char *argv[])
             while (br == 0)
                 br += read(sharedFd, &c, 1);
 
-            printf("Secondary neptune received message\n");
             PreloadMoon("./dump/tmp/", "7f");
+            printf("[main] Preload MOON done!\n");
             
             while(1)
             {
@@ -228,9 +240,9 @@ int main(int argc, char *argv[])
                 if (iter != 0xff)
                 {
                     char iter_str[16] = "";
-                    sprintf(iter_str, "iter%d_", iter);
+                    sprintf(iter_str, "iter%d", iter - '0');
                     PreloadMoon("./dump/tmp/", iter_str);
-                    printf("iterative loading #%d done\n", iter_str[4]);
+                    printf("iterative loading #%d done\n", iter_str[4] - '0');
                 }
                 else
                 {                    
@@ -595,23 +607,27 @@ int MainLoop(void *_arg)
             // block the MOON to dump so that we can track and set it to read only
             if (need_dump)
             {
-                BlockMoon(0);
+                BlockMoon(1);
                 block_finish = 1;
                 // print to profiling results to indicate the start of segfault-based live migration
                 const char startProfiling[] = "***Write permission of MOON canceled***\n";
                 fwrite(startProfiling, strlen(startProfiling), 1, profilingResult);
             }
 
+            if (!precopy_done)
+                goto pkt_processing;
             // TODO: discuss when to start a new epoch
             // if there are many dirty pages, and the main core is idle
-            if (dirty_ub - dirty_mb > 200 && dirty_lb == dirty_mb)
+            if (dirty_ub - dirty_mb > 100 && dirty_lb == dirty_mb)
                 retrieve_perm();
             
             // TODO: discuss when to block copy
             // an intuitive condition is a `force quit': we cannot run this forever
-            if (dirty_ub > 1024 || (dirty_ub - dirty_mb < dirty_mb - dirty_lb && dirty_mb - dirty_lb < 100))
+            // if (dirty_ub > 1024 || (dirty_ub - dirty_mb < dirty_mb - dirty_lb && dirty_mb - dirty_lb < 100))
+            if (iteration_epoch > 3 || converge)
             {
-                IterCopyMoon("./dump/tmp/", dirty_mb, dirty_ub, "final_");
+                // TODO: see if we need to offload page copy to main core
+                IterCopyMoon("./dump/tmp/", dirty_mb, dirty_ub, "final");
                 // hard code to dump the second MOON on chain
                 unsigned instanceId = (workerId << 4) | 1;
                 DumpReg("./dump/tmp/RegFile", instanceId);
@@ -641,7 +657,7 @@ int MainLoop(void *_arg)
             }
         }
             
-        
+    pkt_processing:
         cur_tsc = rte_rdtsc();
         /*
 		 * TX burst queue drain
