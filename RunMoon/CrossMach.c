@@ -511,11 +511,12 @@ void PreloadMoon(const char *baseDir, const char *prefix)
         close(fd);
         numMapped += 1;
     }
-    if (unlikely(numMapped == 0))
-    {
-        fprintf(stderr, "Cannot find file with prefix %s\n", prefix);
-        abort();
-    }
+    // loose control over final_ mappings for there might not be them
+    // if (unlikely(numMapped == 0))
+    // {
+    //     fprintf(stderr, "Cannot find file with prefix %s\n", prefix);
+    //     abort();
+    // }
     printf("[PreloadMoon] finish mapping of %d pages with prefix %s\n", numMapped, prefix);
 }
 
@@ -534,7 +535,7 @@ void IterCopyMoon(const char *baseDir, int low, int high, const char *prefix)
         strcat(filename, baseDir);
         strcat(filename, outname);
 
-        int fd = open(filename, O_RDWR | O_CREAT);
+        int fd = open(filename, O_RDWR | O_CREAT, 0666);
         if (fd == -1)
         {
             fprintf(stderr, "[%s] opening dump file %s failed\n", __func__, filename);
@@ -570,7 +571,7 @@ void DumpStack(const char *baseDir, int moonId)
     strcat(path, baseDir);
     strcat(path, out);
 
-    int fd = open(path, O_RDWR | O_CREAT);
+    int fd = open(path, O_RDWR | O_CREAT, 0666);
     if (fd == -1)
     {
         fprintf(stderr, "[%s] opening dump file %s failed\n", __func__, path);

@@ -366,7 +366,7 @@ void SetupIPC()
     if (needMap == 0)
     {
         // truncate the file so that there won't be redundant content across multiple runs
-        sharedFd = open("/dev/shm/nptn_shared_flag", O_RDWR | O_CREAT | O_TRUNC);
+        sharedFd = open("/dev/shm/nptn_shared_flag", O_RDWR | O_CREAT | O_TRUNC, 0666);
     }
     else
     {

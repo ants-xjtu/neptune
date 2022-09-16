@@ -628,21 +628,25 @@ int MainLoop(void *_arg)
             // if (dirty_ub > 1024 || (dirty_ub - dirty_mb < dirty_mb - dirty_lb && dirty_mb - dirty_lb < 100))
             if (iteration_epoch > 3 || converge)
             {
+                uint64_t sb_tsc = rte_rdtsc();
                 // TODO: see if we need to offload page copy to main core
                 IterCopyMoon("./dump/tmp/", dirty_mb, dirty_ub, "final");
                 // hard code to dump the second MOON on chain
                 unsigned instanceId = (workerId << 4) | 1;
                 DumpReg("./dump/tmp/RegFile", instanceId);
-                DumpStack("./dump/tmp/", 1);
-
+                DumpStack("./dump/tmp/", 1);                
                 // notify the main about copy done
                 worker_done = 1;
                 // hard code the chain to ignore the second NF
                 // TODO: fix hard code
                 moonDataList[0].switchTo = -1;
                 printf("worker done! lb:%d, mb:%d, ub:%d\n", dirty_lb, dirty_mb, dirty_ub);
+                uint64_t eb_tsc = rte_rdtsc();
                 const char workerUnblock[] = "***Worker unblocked***\n";
+                char sb_string[64];
+                sprintf(sb_string, "tsc start blocking: %lu, end: %lu\n", sb_tsc, eb_tsc);
                 fwrite(workerUnblock, strlen(workerUnblock), 1, profilingResult);
+                fwrite(sb_string, strlen(sb_string), 1, profilingResult);
             }
         }
         // *** destination process ***
@@ -650,6 +654,7 @@ int MainLoop(void *_arg)
         {
             if (main_done == 1)
             {
+                uint64_t sb_tsc = rte_rdtsc();
                 // copy the final iteration and restore
                 PreloadMoon("./dump/tmp/", "final_");
                 PreloadMoon("./dump/tmp/", "Stack_");
@@ -658,6 +663,10 @@ int MainLoop(void *_arg)
                 moonDataList[0].switchTo = 1;
                 moonDataList[1].switchTo = -1;
                 worker_done = 1;
+                char eb_string[64];
+                uint64_t eb_tsc = rte_rdtsc();
+                sprintf(eb_string, "tsc statr: %lu, end blocking: %lu\n", sb_tsc, eb_tsc);
+                fwrite(eb_string, strlen(eb_string), 1, profilingResult);
                 printf("destination loading finished, now resume processing\n");
             }
         }
