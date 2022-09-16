@@ -225,13 +225,15 @@ int main(int argc, char *argv[])
             // polling a shared memory flag
             char c;
             ssize_t br = 0;
-            while (br == 0)
+            while (br == 0 && !force_quit)
                 br += read(sharedFd, &c, 1);
 
+            if (force_quit)
+                continue;
             PreloadMoon("./dump/tmp/", "7f");
             printf("[main] Preload MOON done!\n");
             
-            while(1)
+            while(!force_quit)
             {
                 uint8_t iter = 0;
                 ssize_t r = 0;
@@ -240,7 +242,7 @@ int main(int argc, char *argv[])
                 if (iter != 0xff)
                 {
                     char iter_str[16] = "";
-                    sprintf(iter_str, "iter%d", iter - '0');
+                    sprintf(iter_str, "iter%d_", iter - '0');
                     PreloadMoon("./dump/tmp/", iter_str);
                     printf("iterative loading #%d done\n", iter_str[4] - '0');
                 }
@@ -639,6 +641,8 @@ int MainLoop(void *_arg)
                 // TODO: fix hard code
                 moonDataList[0].switchTo = -1;
                 printf("worker done! lb:%d, mb:%d, ub:%d\n", dirty_lb, dirty_mb, dirty_ub);
+                const char workerUnblock[] = "***Worker unblocked***\n";
+                fwrite(workerUnblock, strlen(workerUnblock), 1, profilingResult);
             }
         }
         // *** destination process ***
@@ -652,6 +656,7 @@ int MainLoop(void *_arg)
                 unsigned instanceId = (workerId << 4) | 1;
                 LoadReg("./dump/tmp/RegFile", instanceId);
                 moonDataList[0].switchTo = 1;
+                moonDataList[1].switchTo = -1;
                 worker_done = 1;
                 printf("destination loading finished, now resume processing\n");
             }
@@ -718,6 +723,27 @@ int MainLoop(void *_arg)
         // workerDataList[workerId].stat.latency += (double)(preTx - postRx) * 1000 * 1000 / rte_get_tsc_hz();
         // workerDataList[workerId].stat.batch++;
 
+        // for VF-based migration, we'll have to update MAC address
+        if (!needMap)
+        {
+            // MAC of VF 3
+            char dst_mac[] = {0x36, 0x29, 0x4d, 0xb8, 0x75, 0x3c};
+            for (int i = 0;i < nb_rx; i++)
+            {
+                char *pkt_mac = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], char *);
+                memcpy(pkt_mac, dst_mac, 6);
+            }
+        }
+        else
+        {
+            // MAC of pkt source
+            char dst_mac[] = {0xb8, 0xce, 0xf6, 0x31, 0x3b, 0x57};
+            for (int i = 0;i < nb_rx; i++)
+            {
+                char *pkt_mac = rte_pktmbuf_mtod(workerDataList[workerId].packetBurst[i], char *);
+                memcpy(pkt_mac, dst_mac, 6);
+            }
+        }
 
         sent = rte_eth_tx_burst(
             // dstPort, workerDataList[workerId].txQueue,
@@ -727,10 +753,10 @@ int MainLoop(void *_arg)
             workerDataList[workerId].stat.tx += sent;
         for (int i = 0;i < sent; i++)
             workerDataList[workerId].stat.bytes += rte_pktmbuf_pkt_len(workerDataList[workerId].packetBurst[i]);
-        // if (unlikely(sent < nb_rx))
-        // {
-        //     rte_pktmbuf_free_bulk(workerDataList[workerId].packetBurst + sent, nb_rx-sent);
-        // }
+        if (unlikely(sent < nb_rx))
+        {
+            rte_pktmbuf_free_bulk(workerDataList[workerId].packetBurst + sent, nb_rx-sent);
+        }
 
         // NB: code changes in neptune will invalidate previous dump files
         // if we have more than one MOON, then dump the second one

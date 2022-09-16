@@ -46,7 +46,7 @@ void segv_handler(int signum, siginfo_t *info, void *context)
     dirtyBuffer[dirty_ub % MAX_DIRTY_PAGE].len  = 4096;
     dirtyBuffer[dirty_ub % MAX_DIRTY_PAGE].iter = iteration_epoch;
 
-    printf("[worker] catch a segfault in %p! Now dirty page count: %d\n", (void *)addr_num, dirty_ub - dirty_mb);
+    // printf("[worker] catch a segfault in %p! Now dirty page count: %d\n", (void *)addr_num, dirty_ub - dirty_mb);
     if (mprotect((void *)addr_num, 4096, PROT_READ | PROT_WRITE))
     {
         printf("restoring memory protection failed\n");
@@ -292,10 +292,20 @@ void SetupDpdk()
     }
     
     uint16_t nb_ports = rte_eth_dev_count_avail();
-    if (nb_ports < 2)
+    if (nb_ports == 0)
         rte_exit(EXIT_FAILURE, "No enough Ethernet ports - bye\n");
     uint16_t portid;
     int portCount = 0;
+
+    // struct rte_ether_addr src_mac;
+	// rte_eth_macaddr_get(0, &src_mac);
+    // printf("Src MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n\n",
+	// 	   src_mac.addr_bytes[0],
+	// 	   src_mac.addr_bytes[1],
+	// 	   src_mac.addr_bytes[2],
+	// 	   src_mac.addr_bytes[3],
+	// 	   src_mac.addr_bytes[4],
+	// 	   src_mac.addr_bytes[5]);
     RTE_ETH_FOREACH_DEV(portid)
     {
         if (portCount == 0)
@@ -313,7 +323,11 @@ void SetupDpdk()
     printf("ethernet rx port: %u, tx port: %u\n", srcPort, dstPort);
 
     // const unsigned int numberMbufs = 8192u, MEMPOOL_CACHE_SIZE = 256;
-    struct rte_mempool *pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    struct rte_mempool *pktmbufPool = NULL;
+    if (needMap == 0)
+        pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+    else
+        pktmbufPool = rte_pktmbuf_pool_create("mbuf_pool_secondary", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
     if (pktmbufPool == NULL)
         rte_exit(EXIT_FAILURE, "Cannot init mbuf pool\n");
     copyPool = rte_pktmbuf_pool_create("copy_pool", NB_MBUFS, MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());

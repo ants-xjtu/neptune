@@ -413,7 +413,7 @@ void PrecopyMoon(const char *baseDir)
             map_entry_buffer[recordEntryCtr].startAddr,
             map_entry_buffer[recordEntryCtr].length,
             map_entry_buffer[recordEntryCtr].perm);
-        printf("[main] creating dump file at: %s\n", filename);
+        // printf("[main] creating dump file at: %s\n", filename);
         int dumpFd = open(filename, O_RDWR | O_CREAT, 0666);
         if (unlikely(dumpFd == -1))
         {
@@ -476,7 +476,6 @@ void PreloadMoon(const char *baseDir, const char *prefix)
     while ((f = readdir(md)) != NULL)
     {
         numFiles++;
-        printf("[PreloadMoon] opening file %s\n", f->d_name);
         
         int prefixLen = strlen(prefix);
         if(strncmp(f->d_name, prefix, prefixLen) != 0)
@@ -486,13 +485,14 @@ void PreloadMoon(const char *baseDir, const char *prefix)
         strcat(filename, baseDir);
         strcat(filename, f->d_name);
         // since we will always deal with MAP_PRIVATE, open only needs read perm
+        // printf("[PreloadMoon] mapping file %s\n", f->d_name);
         fd = open(filename, O_RDONLY);
         if (fd == -1)
         {
             fprintf(stderr, "[PreloadMoon] cannot open file: %s\n", filename);
             return;
         }
-        sscanf(f->d_name, "%lx_%lx_%4c", &addrStart, &mapLength, perm);
+        sscanf(f->d_name + prefixLen, "%lx_%lx_%4c", &addrStart, &mapLength, perm);
         
         prot = 0;
         prot |= (perm[0] == 'r')? PROT_READ: 0;
@@ -506,7 +506,7 @@ void PreloadMoon(const char *baseDir, const char *prefix)
             fprintf(stderr, "[PreloadMoon] mmaped failed with addrStart=%lx, mapLength=%lx, prot=%s\n", 
                 addrStart, mapLength, perm);
             close(fd);
-            return;
+            abort();
         }
         close(fd);
         numMapped += 1;
@@ -561,11 +561,14 @@ void DumpStack(const char *baseDir, int moonId)
 {
     unsigned workerId = rte_lcore_id();
     char path[128] = "";
+    char out[64] = "";
     uint64_t start = (uint64_t)(moonDataList[moonId].workers[workerId].arenaStart) - 0x1000;
     uint64_t end = (uint64_t)(moonDataList[moonId].workers[workerId].arenaStart) + STACK_SIZE;
     size_t len = end - start;
 
-    sprintf(path, "Stack_%lx_%lx_rw-p.dump", start, len);
+    sprintf(out, "Stack_%lx_%lx_rw-p.dump", start, len);
+    strcat(path, baseDir);
+    strcat(path, out);
 
     int fd = open(path, O_RDWR | O_CREAT);
     if (fd == -1)

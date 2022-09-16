@@ -38,6 +38,7 @@ while [[ "$#" -gt 0 ]]; do
         -p|--pku) enablePku="--pku"; shift;;
         -g|--debug) debugFlag="gdb --args"; shift;;
         -n|--needmap) needMap="--map"; filePrefix="--file-prefix=nptnSec_"; shift;;
+        -v|--vf) vfIdx="$2"; shift; shift;;
         *) echo "bad argument $1"; exit 1;;
     esac
 done
@@ -47,6 +48,16 @@ if [ ${coreMask:0:2} != "0x" ]
 then
     echo "please input a core mask"
     exit 1;
+fi
+
+if [[ $vfIdx ]]
+then
+    if [ "$vfIdx" -gt 5 ] || [ "$vfIdx" -lt 0 ]
+    then
+        echo "please input an VF index from 0 to 5";
+        exit 1;
+    fi
+    vfString="-a af:00."$vfIdx
 fi
 
 detectCore=$((coreMask))
@@ -124,6 +135,6 @@ perm="sudo"
 progName="./build/RunMoon"
 tiangouPath="./build/libTianGou.so"
 # cmd="$perm $libraryPath $debugFlag $progName -c 0x$coreMask -- $tiangouPath $enablePku $moonConfig"
-cmd="$perm $libraryPath $debugFlag $progName -c $coreMask $filePrefix -- $tiangouPath $enablePku $needMap $moonConfig"
+cmd="$perm $libraryPath $debugFlag $progName -c $coreMask $vfString $filePrefix -- $tiangouPath $enablePku $needMap $moonConfig"
 echo $cmd
 eval $cmd
