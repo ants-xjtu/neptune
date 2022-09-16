@@ -361,18 +361,22 @@ void SetupDpdk()
 }
 
 int sharedFd;
+int reverseFd;
 void SetupIPC()
 {
     if (needMap == 0)
     {
         // truncate the file so that there won't be redundant content across multiple runs
         sharedFd = open("/dev/shm/nptn_shared_flag", O_RDWR | O_CREAT | O_TRUNC, 0666);
+        reverseFd = open("/dev/shm/nptn_reverse_flag", O_RDWR | O_CREAT | O_TRUNC, 0666);
     }
     else
     {
         sharedFd = open("/dev/shm/nptn_shared_flag", O_RDONLY);
+        // the destination use this file to notify source
+        reverseFd = open("/dev/shm/nptn_reverse_flag", O_RDWR);
     }
-    if (sharedFd == -1)
+    if (sharedFd == -1 || reverseFd == -1)
     {
         fprintf(stderr, "[SetupIPC] cannot open shared file\n");
         abort();

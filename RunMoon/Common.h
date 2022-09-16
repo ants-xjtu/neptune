@@ -176,6 +176,7 @@ void SetupDpdk();
 void RedirectEthDevices(struct rte_eth_dev *devices);
 void SetupIPC();
 extern int sharedFd;
+extern int reverseFd;
 void retrieve_perm();
 
 // bench

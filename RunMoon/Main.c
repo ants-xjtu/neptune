@@ -245,6 +245,7 @@ int main(int argc, char *argv[])
                     sprintf(iter_str, "iter%d_", iter - '0');
                     PreloadMoon("./dump/tmp/", iter_str);
                     printf("iterative loading #%d done\n", iter_str[4] - '0');
+                    write(reverseFd, &iter, 1);
                 }
                 else
                 {                    
@@ -620,13 +621,17 @@ int MainLoop(void *_arg)
                 goto pkt_processing;
             // TODO: discuss when to start a new epoch
             // if there are many dirty pages, and the main core is idle
-            if (dirty_ub - dirty_mb > 100 && dirty_lb == dirty_mb)
+            if (dirty_ub - dirty_mb > 100 && dirty_lb == dirty_mb && !converge)
                 retrieve_perm();
             
             // TODO: discuss when to block copy
             // an intuitive condition is a `force quit': we cannot run this forever
             // if (dirty_ub > 1024 || (dirty_ub - dirty_mb < dirty_mb - dirty_lb && dirty_mb - dirty_lb < 100))
-            if (iteration_epoch > 3 || converge)
+            uint8_t iter;
+            if (read(reverseFd, &iter, 1) != 1)
+                goto pkt_processing;
+            printf("receive from reverseFd: %d\n", iter - '0');
+            if (iter - '0' == iteration_epoch)
             {
                 uint64_t sb_tsc = rte_rdtsc();
                 // TODO: see if we need to offload page copy to main core
