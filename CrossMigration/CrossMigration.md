@@ -94,10 +94,41 @@ Currently, when source converges, it will halt pre-copy stage,
 and wait for the destiniation to complete.
 Then the source will start to block the worker and proceed to block copy stage. 
 
+The policy that waits for pre-copy to complete reduce downtime from 500ms to less than 40ms.
+
+### Overhead breakup in blocking
+
+First, some experiment results:
+
+- Dumping ~150 4K dirty pages for the final iteration: ~2.8ms
+- Dumping a 4M stack and registers: ~2.8ms
+- Dumping a 32M stack and registers: ~19ms
+
+From here we can well understand that stack is the biggest part in dumping,
+after all, `150*4 = 600 << 32K`, though writing several small files incurs extra overhead (e.g. more metadata, more frequent vacancy finding).
+Therefore, reducing stack size from 32M to 4M can further reduce block time from ~40ms to ~7ms.
+
+This does not mean that we cannot support a larger stack.
+In fact, we can utilize multi-threading to dump stack concurrently, 
+such that a 32M stack dumping can be as fast as 2.8ms, and we reach the real bottleneck there.
+
+In conclusion, reducing the stack size to 4M is REALLY, REALLY lucky,
+because we unconsciously find the balance between stack copy and dirty page copying!
+
+### Performance archive
+
+The file `worker*_performance.csv` records per-core throughput.
+Because in the setting of this experiment, 
+two neptune processes are chained in a pipeline way,
+it will be enough to only focus on the performance of the destination process (i.e. `worker2` or `worker4`).
+
+The file has necessary tsc timestamp to perform fine-grained profiling.
+
 ## Existing problems
 
 1. The synchronization between the main core and worker core, as well as that of two processes,
 are poorly implemented and definitely not in a standard way.
+Should all (or some) of them be marked as `volatile`?
 
 2. The DPDK driver.
 Previous versions of neptune can run stably for a long time.
