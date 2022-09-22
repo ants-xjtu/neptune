@@ -93,3 +93,17 @@ Ideally, pre-load can happen for several rounds, hopefully the source can find a
 Currently, when source converges, it will halt pre-copy stage,
 and wait for the destiniation to complete.
 Then the source will start to block the worker and proceed to block copy stage. 
+
+## Existing problems
+
+1. The synchronization between the main core and worker core, as well as that of two processes,
+are poorly implemented and definitely not in a standard way.
+
+2. The DPDK driver.
+Previous versions of neptune can run stably for a long time.
+This is an indication of dynamic balance: the packets received are always equal to the packets transmitted.
+Otherwise, under the line speed, `mempool` will be full in a flash, and block the process forever.
+However, in this branch, I'll have to manually free the untransmitted packets,
+implying that the transmitted packets are stably less than received.
+Because we are in a hurry, I don't have enough time to debug this issue,
+which could be the cause of weird performance behavior during migration.
