@@ -54,7 +54,7 @@
 #include "PrivateLoad.h"
 #include "TianGou.h"
 
-static const size_t STACK_SIZE = 32ul << 20; // 32MB
+static const size_t STACK_SIZE = 4ul << 20; // 32MB
 static const int NUMBER_STACK = 4;
 static const size_t MOON_SIZE = 1ul << 30; // 32GB
 // Heap size = MOON_SIZE - NUMBER_STACK * STACK_SIZE - library.length

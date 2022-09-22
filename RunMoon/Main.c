@@ -45,7 +45,9 @@ struct MoonConfig CONFIG[] = {
 int need_dump = 0;
 int block_finish = 0;
 static int worker_done = 0;
+static int worker_ok   = 0;
 static int main_done   = 0;
+static int main_ok     = 0;
 static int converge    = 0;
 static int precopy_done= 0;
 
@@ -211,9 +213,14 @@ int main(int argc, char *argv[])
                 prev_copied = dirty_mb - dirty_lb;
                 dirty_lb = dirty_mb;
             }
-            if (worker_done == 1)
+            if (worker_ok == 1 && worker_done != -1)
             {
+                uint64_t main_start = rte_rdtsc();
+                IterCopyMoon("./dump/tmp/", dirty_mb, dirty_ub, "final");
+                uint64_t main_end   = rte_rdtsc();
+                printf("main cycles: start at %lu, end at %lu, diff: %lu\n", main_start, main_end, main_end - main_start);
                 uint8_t fin = 0xff;
+                while (worker_done == 0) {continue;}
                 write(sharedFd, &fin, 1);
                 worker_done = -1;
                 printf("source proc finished\n");
@@ -249,6 +256,8 @@ int main(int argc, char *argv[])
                 }
                 else
                 {                    
+                    main_ok = 1;
+                    PreloadMoon("./dump/tmp/", "final_");
                     printf("finish mark received! Waiting for worker to finish final iteration\n");
                     main_done = 1;
                     break;
@@ -621,7 +630,7 @@ int MainLoop(void *_arg)
                 goto pkt_processing;
             // TODO: discuss when to start a new epoch
             // if there are many dirty pages, and the main core is idle
-            if (dirty_ub - dirty_mb > 100 && dirty_lb == dirty_mb && !converge)
+            if (dirty_ub - dirty_mb > 100 && dirty_lb == dirty_mb && !converge && iteration_epoch < 10)
                 retrieve_perm();
             
             // TODO: discuss when to block copy
@@ -631,11 +640,12 @@ int MainLoop(void *_arg)
             if (read(reverseFd, &iter, 1) != 1)
                 goto pkt_processing;
             printf("receive from reverseFd: %d\n", iter - '0');
-            if (iter - '0' == iteration_epoch)
+            if (iter - '0' == iteration_epoch && converge)
             {
+                worker_ok = 1;
                 uint64_t sb_tsc = rte_rdtsc();
                 // TODO: see if we need to offload page copy to main core
-                IterCopyMoon("./dump/tmp/", dirty_mb, dirty_ub, "final");
+                // IterCopyMoon("./dump/tmp/", dirty_mb, dirty_ub, "final");
                 // hard code to dump the second MOON on chain
                 unsigned instanceId = (workerId << 4) | 1;
                 DumpReg("./dump/tmp/RegFile", instanceId);
@@ -657,11 +667,11 @@ int MainLoop(void *_arg)
         // *** destination process ***
         else if (needMap == 1 && worker_done == 0)
         {
-            if (main_done == 1)
+            if (main_ok == 1)
             {
                 uint64_t sb_tsc = rte_rdtsc();
                 // copy the final iteration and restore
-                PreloadMoon("./dump/tmp/", "final_");
+                // PreloadMoon("./dump/tmp/", "final_");
                 PreloadMoon("./dump/tmp/", "Stack_");
                 unsigned instanceId = (workerId << 4) | 1;
                 LoadReg("./dump/tmp/RegFile", instanceId);
@@ -669,6 +679,7 @@ int MainLoop(void *_arg)
                 moonDataList[1].switchTo = -1;
                 worker_done = 1;
                 char eb_string[64];
+                while (main_done != 1) {printf("waiting for main_done(currently at %d)\n", main_done);}
                 uint64_t eb_tsc = rte_rdtsc();
                 sprintf(eb_string, "tsc statr: %lu, end blocking: %lu\n", sb_tsc, eb_tsc);
                 fwrite(eb_string, strlen(eb_string), 1, profilingResult);
