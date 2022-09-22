@@ -44,7 +44,7 @@ struct MoonConfig CONFIG[] = {
 // };
 int need_dump = 0;
 int block_finish = 0;
-static int worker_done = 0;
+volatile static int worker_done = 0;
 static int worker_ok   = 0;
 static int main_done   = 0;
 static int main_ok     = 0;
